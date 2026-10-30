@@ -8,9 +8,15 @@ import kotlin.test.Test
 class UiRenderTest {
     @Test fun renderMainScreens() {
         val app = UiShots.newApp()
+        app.prefs.set("setup.done", true)
         for (dark in listOf(false, true)) {
             app.prefs.set("theme", if (dark) "DARK" else "LIGHT")
             for (d in Dest.entries) UiShots.shot(d.name.lowercase(), dark, 1100, 1500) { MainScreen(app, d) }
         }
+    }
+
+    @Test fun renderWizard() {
+        val app = UiShots.newApp()
+        for (dark in listOf(false)) UiShots.shot("wizard", dark, 1100, 900) { dev.ontask.ui.OnTaskTheme(dev.ontask.ui.ThemeMode.LIGHT) { dev.ontask.ui.SetupWizard(app) {} } }
     }
 }

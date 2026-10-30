@@ -1,6 +1,7 @@
 package dev.ontask
 
 import dev.ontask.block.*
+import dev.ontask.plan.Priorities
 import dev.ontask.classify.Classifier
 import dev.ontask.db.Db
 import dev.ontask.db.Prefs
@@ -43,6 +44,19 @@ class App(val dir: Path = dataDir()) {
     val focus = Focus(db, events)
     val blocking = BlockingService(dir, prefs, blocklist, unblocks, focus, settings = { settings })
     val workHours = WorkHoursEditor(settingsStore, events, { settings }) { settings = it }
+
+    val priorities = Priorities(db)
+    val habits = dev.ontask.plan.Habits(prefs)
+
+    fun requestAccessibility() { scope.launch { helper.request("request_accessibility") } }
+
+    /** The line shown on the delay screen: the user's own static message, or (if enabled) a random alternative. */
+    fun unblockMessage(): String {
+        val own = prefs.str("unblock.message", "Is this really what you want to be doing right now?")
+        if (!prefs.bool("unblock.random", false)) return own
+        val alts = prefs.str("unblock.alternatives", "").lines().filter { it.isNotBlank() }
+        return if (alts.isEmpty()) own else alts.random()
+    }
 
     val tracker = Tracker(TickStore(db), { classifier }, { settings })
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

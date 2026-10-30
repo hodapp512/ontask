@@ -34,3 +34,25 @@ class DaemonScriptTest {
         } finally { p.destroy() }
     }
 }
+
+class RootHelperTest {
+    @Test fun installIntoPrefixAndUninstall() {
+        val dir = Files.createTempDirectory("ontask-root")
+        val rh = dev.ontask.block.RootHelper(File("../daemon").absoluteFile, prompt = false)
+        val r = rh.install(dir.resolve("hosts"), 12999, prefix = dir.resolve("root"))
+        assertTrue(r.ok, r.output)
+        assertTrue(Files.exists(dir.resolve("root/Library/LaunchDaemons/dev.ontask.daemon.plist")))
+        assertTrue(Files.readString(dir.resolve("root/Library/LaunchDaemons/dev.ontask.daemon.plist")).contains("12999"))
+        assertTrue(rh.install(dir.resolve("hosts"), 12999, dryRun = true).output.contains("dry-run") || rh.blockMeDaemonPresent)
+        assertTrue(rh.uninstall(prefix = dir.resolve("root")).ok)
+        assertTrue(!Files.exists(dir.resolve("root/Library/LaunchDaemons/dev.ontask.daemon.plist")))
+    }
+
+    @Test fun loginItemWritesAgentPlist() {
+        val dir = Files.createTempDirectory("ontask-agents")
+        val li = dev.ontask.block.LoginItem(dir)
+        assertTrue(!li.set(true, null)) // not packaged -> refuses
+        assertTrue(li.set(true, "/Applications/OnTask.app/Contents/MacOS/OnTask") && li.enabled)
+        li.set(false); assertTrue(!li.enabled)
+    }
+}

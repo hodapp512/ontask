@@ -116,6 +116,19 @@ object Schema {
             synced INTEGER NOT NULL DEFAULT 0
         );
         """,
+        // Phase 3: planning and AI
+        """
+        CREATE TABLE priorities (date TEXT NOT NULL, pos INTEGER NOT NULL, text TEXT NOT NULL, PRIMARY KEY (date, pos));
+        CREATE TABLE checkins (
+            id INTEGER PRIMARY KEY, date TEXT NOT NULL, kind TEXT NOT NULL, ts INTEGER NOT NULL,
+            rating INTEGER, helped TEXT, hurt TEXT, change_tomorrow TEXT, message TEXT, sent INTEGER NOT NULL DEFAULT 0,
+            UNIQUE(date, kind)
+        );
+        CREATE TABLE ai_calls (
+            id INTEGER PRIMARY KEY, ts INTEGER NOT NULL, provider TEXT NOT NULL, model TEXT NOT NULL, tier TEXT NOT NULL,
+            ms INTEGER NOT NULL, in_tokens INTEGER, out_tokens INTEGER, cost_usd REAL, ok INTEGER NOT NULL
+        );
+        """,
     )
 
     fun migrate(db: Db) = db.use { c ->

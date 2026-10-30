@@ -1,0 +1,216 @@
+package dev.ontask.ui
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.InputChip
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import dev.ontask.App
+import dev.ontask.block.BlockMode
+import dev.ontask.block.UnblockKind
+import dev.ontask.block.UnblockRejected
+import kotlinx.coroutines.delay
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun BlockingScreen(app: App) {
+    var tick by remember { mutableStateOf(0) }
+    var now by remember { mutableStateOf(App.nowSec()) }
+    LaunchedEffect(tick) { while (true) { now = App.nowSec(); delay(1000) } } // only while this screen is open
+    val svc = app.blocking
+    val strict = svc.strictNow(now)
+    var unblockFor by remember { mutableStateOf<List<String>?>(null) }
+    var mode by remember(tick) { mutableStateOf(svc.mode) }
+
+    Page("Blocking", "Distracting sites are blocked during work hours and Focus sessions. Outside them, anything goes.") {
+        val blocked = remember(tick, strict) { svc.currentlyBlocked(now) }
+        SectionCard("Status") {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Dot(if (strict) levelColor(dev.ontask.Level.WASTED) else levelColor(dev.ontask.Level.DEEP))
+                Text(if (strict) "Strict mode is on — ${blocked.size} sites blocked right now." else "Outside work hours — nothing is blocked.", style = MaterialTheme.typography.titleSmall)
+            }
+            svc.focus.active(now)?.let { Text("Focus session: ${fmtDuration(it.plannedEndTs - now)} left", color = MaterialTheme.colorScheme.primary) }
+            svc.lastError?.let { Notice(it, error = true) }
+            if (mode != BlockMode.LIVE) Notice("Mode: ${mode.label}. ${mode.explain}")
+        }
+        FocusCard(app, now) { tick++ }
+        SectionCard("Unblock a site", "Unblocking always has a delay that grows through the day (${app.blocking.unblocks.delays.joinToString(", ") { fmtDelay(it) }}) and resets at ${app.blocking.unblocks.resetHour}am. Today so far: ${app.blocking.unblocks.todayCount(now)}.") {
+            var pick by remember { mutableStateOf<String?>(null) }
+            val all = remember(tick) { svc.blocklist.all() }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Picker(pick ?: "Choose a site", all, { it }) { pick = it }
+                Button({ pick?.let { unblockFor = listOf(it) } }, enabled = pick != null) { Text("Unblock…") }
+            }
+            if (all.isEmpty()) Text("Your block list is empty. Add sites below.", style = MaterialTheme.typography.bodySmall)
+        }
+        PurposeCard(app, now) { tick++ }
+        val active = remember(tick, now / 5) { svc.unblocks.active(now) }
+        SectionCard("Active unblocks") {
+            if (active.isEmpty()) Text("Nothing is unblocked.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            active.forEach { u ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(u.domain + if (u.kind == UnblockKind.WORK) "  (work: ${u.purpose})" else "", style = MaterialTheme.typography.bodyLarge)
+                        Text("${fmtDuration(u.expiresTs - now)} left", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    TextButton({ app.unblocks.end(u.id, now); app.blocking.tick(now); tick++ }) { Text("Block again") }
+                }
+            }
+        }
+        BlocklistCard(app) { tick++ }
+        BlockingSetup(app, mode) { mode = it; tick++ }
+    }
+    unblockFor?.let { UnblockDialog(app, it, onClose = { unblockFor = null; tick++ }) }
+}
+
+private fun fmtDelay(s: Int) = if (s >= 60 && s % 60 == 0) "${s / 60}m" else "${s}s"
+private val App.unblocks get() = blocking.unblocks
+
+@Composable
+private fun FocusCard(app: App, now: Long, changed: () -> Unit) {
+    val active = app.focus.active(now)
+    SectionCard("Focus session", "Apply work-hours blocking for a set time, even outside work hours. It's logged as a deep-work attempt.") {
+        if (active != null) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("${fmtDuration(active.plannedEndTs - now)} remaining", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                OutlinedButton({ app.focus.stop(now); app.blocking.tick(now); changed() }) { Text("End early") }
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(25, 45, 60, 90, 120).forEach { m -> OutlinedButton({ app.focus.start(m, now); app.blocking.tick(now); changed() }) { Text("$m min") } }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PurposeCard(app: App, now: Long, changed: () -> Unit) {
+    var site by remember { mutableStateOf<String?>(null) }
+    var purpose by remember { mutableStateOf("") }
+    var minutes by remember { mutableStateOf(60) }
+    var error by remember { mutableStateOf<String?>(null) }
+    SectionCard("Unblock for work", "For sites you genuinely need for a task. No delay, but your partner is told what and why, and drifting off-purpose can end it early.") {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Picker(site ?: "Site", app.blocking.blocklist.all(), { it }) { site = it }
+            OutlinedTextField(purpose, { purpose = it }, label = { Text("Purpose, e.g. Acme customer: onboarding videos") }, singleLine = true, modifier = Modifier.weight(1f))
+        }
+        SliderSetting("Duration", "How long the site stays open (up to ${app.unblocks.maxWorkMinutes / 60} hours).", minutes, 5..app.unblocks.maxWorkMinutes, "min", step = 5, format = { fmtDuration(it * 60L) }) { minutes = it }
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        Button({
+            try { app.unblocks.startPurpose(site ?: throw UnblockRejected("Choose a site"), purpose, minutes, now); app.blocking.tick(now); purpose = ""; error = null; changed() }
+            catch (e: UnblockRejected) { error = e.message }
+        }) { Text("Unblock for work") }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun BlocklistCard(app: App, changed: () -> Unit) {
+    var text by remember { mutableStateOf("") }
+    var msg by remember { mutableStateOf("") }
+    val list = remember { mutableStateOf(app.blocking.blocklist.all()) }
+    fun reload() { list.value = app.blocking.blocklist.all(); changed() }
+    SectionCard("Block list", "Sites blocked during work hours and Focus sessions. www. is covered automatically.") {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(text, { text = it }, label = { Text("Add a site, e.g. news.ycombinator.com") }, singleLine = true, modifier = Modifier.weight(1f))
+            Button({ val n = app.blocking.blocklist.add(text.split(',', ' ', '\n'), App.nowSec()); msg = if (n == 0) "Nothing new added (invalid or already listed)." else "Added $n."; text = ""; reload() }, enabled = text.isNotBlank()) { Text("Add") }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton({ val n = app.blocking.blocklist.importFromBlockMe(now = App.nowSec()); msg = if (n == 0) "No new sites found in BlockMe's list." else "Imported $n sites from BlockMe (read-only)."; reload() }) { Text("Import from BlockMe") }
+            Text(msg, style = MaterialTheme.typography.bodySmall)
+        }
+        if (list.value.isEmpty()) EmptyState("No sites yet", "Add a site above or import BlockMe's list.")
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            list.value.forEach { d -> InputChip(false, { app.blocking.blocklist.remove(d); reload() }, label = { Text(d) }, trailingIcon = { Text("✕") }) }
+        }
+    }
+}
+
+@Composable
+private fun BlockingSetup(app: App, mode: BlockMode, onMode: (BlockMode) -> Unit) {
+    val helper = remember { dev.ontask.block.RootHelper() }
+    var msg by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf(false) }
+    Expander("Advanced: blocking mode and root helper") {
+        SettingRow("Blocking mode", mode.explain) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                BlockMode.entries.forEach { m -> FilterChip(mode == m, { app.blocking.mode = m; onMode(m) }, label = { Text(m.label) }) }
+            }
+        }
+        KV("Root helper installed", if (helper.installed) "yes" else "no")
+        KV("Staged hosts file", app.blocking.stagedFile.toString())
+        KV("Daemon port", app.blocking.port.toString())
+        if (helper.blockMeDaemonPresent) Notice("BlockMe's daemon is installed. OnTask won't install its helper until you disable BlockMe — both would overwrite /etc/hosts.", error = true)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Button({ confirm = true }, enabled = helper.available && !helper.blockMeDaemonPresent) { Text(if (helper.installed) "Reinstall helper…" else "Install helper…") }
+            OutlinedButton({ msg = helper.install(app.blocking.stagedFile, app.blocking.port, dryRun = true).output }) { Text("Dry run") }
+            if (helper.installed) TextButton({ msg = helper.uninstall().output }) { Text("Uninstall") }
+        }
+        if (msg.isNotBlank()) Text(msg, style = MaterialTheme.typography.bodySmall)
+    }
+    if (confirm) AlertDialog(
+        onDismissRequest = { confirm = false },
+        title = { Text("Install the blocking helper?") },
+        text = { Text("macOS will ask for your administrator password. This installs a small background daemon that copies OnTask's hosts file to /etc/hosts. Then switch the mode to Live.") },
+        confirmButton = { TextButton({ confirm = false; msg = helper.install(app.blocking.stagedFile, app.blocking.port).output.ifBlank { "Done." } }) { Text("Install") } },
+        dismissButton = { TextButton({ confirm = false }) { Text("Cancel") } },
+    )
+}
+
+/** The friction screen: pick a duration, wait out the delay (showing today's count, priorities and your own message). */
+@Composable
+fun UnblockDialog(app: App, domains: List<String>, onClose: () -> Unit) {
+    val now0 = remember { App.nowSec() }
+    val delay = remember { app.unblocks.nextDelaySec(now0) }
+    val count = remember { app.unblocks.todayCount(now0) }
+    var minutes by remember { mutableStateOf(5) }
+    var remaining by remember { mutableStateOf(delay) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val message = remember { app.unblockMessage() }
+    LaunchedEffect(Unit) { while (remaining > 0) { delay(1000); remaining-- } }
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text("Unblock ${domains.joinToString()}?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(message, style = MaterialTheme.typography.titleSmall)
+                Text("Unblocks so far today: $count", style = MaterialTheme.typography.bodyMedium)
+                val priorities = remember { app.priorities.today(now0) }
+                if (priorities.isNotEmpty()) {
+                    Text("Today's priorities:", style = MaterialTheme.typography.labelMedium)
+                    priorities.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    app.unblocks.durationsMin.forEach { m -> FilterChip(minutes == m, { minutes = m }, label = { Text("$m min") }) }
+                }
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = {
+            Button({
+                try { app.unblocks.startRegular(domains, minutes, App.nowSec(), delay); app.blocking.tick(App.nowSec()); onClose() } catch (e: UnblockRejected) { error = e.message }
+            }, enabled = remaining <= 0) { Text(if (remaining > 0) "Wait ${remaining}s" else "Unblock for $minutes min") }
+        },
+        dismissButton = { TextButton(onClose) { Text("Never mind") } },
+    )
+}
