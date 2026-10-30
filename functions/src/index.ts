@@ -55,14 +55,17 @@ async function tokensOf(uid: string): Promise<string[]> {
 
 const code8 = () => randomBytes(5).toString("hex").toUpperCase().slice(0, 8);
 
-export const createInvite = onCall(async (req) => {
+/** Callables check req.auth themselves; Cloud Run must still let the browser reach them. */
+const PUBLIC = { invoker: "public" as const };
+
+export const createInvite = onCall(PUBLIC, async (req) => {
   if (!req.auth) throw new HttpsError("unauthenticated", "Sign in first");
   const code = code8();
   await db.doc(`invites/${code}`).set({ trackedUid: req.auth.uid, createdAt: Date.now(), expiresAt: Date.now() + 7 * 86_400_000, used: false });
   return { code };
 });
 
-export const acceptInvite = onCall(async (req) => {
+export const acceptInvite = onCall(PUBLIC, async (req) => {
   if (!req.auth) throw new HttpsError("unauthenticated", "Sign in first");
   const code = String(req.data?.code ?? "").toUpperCase().trim();
   const ref = db.doc(`invites/${code}`);
@@ -83,12 +86,12 @@ export const acceptInvite = onCall(async (req) => {
 });
 
 /** The Mac signs in with a custom token minted for the signed-in PWA user (no passwords on the Mac). */
-export const createDeviceToken = onCall(async (req) => {
+export const createDeviceToken = onCall(PUBLIC, async (req) => {
   if (!req.auth) throw new HttpsError("unauthenticated", "Sign in first");
   return { token: await admin.auth().createCustomToken(req.auth.uid, { device: "mac" }) };
 });
 
-export const sendTestMessage = onCall({ secrets: MSG_SECRETS }, async (req) => {
+export const sendTestMessage = onCall({ ...PUBLIC, secrets: MSG_SECRETS }, async (req) => {
   if (!req.auth) throw new HttpsError("unauthenticated", "Sign in first");
   const linkId = String(req.data?.linkId ?? "");
   const snap = await db.doc(`links/${linkId}`).get();

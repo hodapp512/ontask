@@ -61,7 +61,11 @@ Done once per Firebase project. In the console (<https://console.firebase.google
      (The app only offers emailed links; there are no passwords.)
 4. **Web app:** ⚙ Project settings → General → *Your apps* → **</>** (Web) → register. Copy the config values into
    `web/.env.local` (template: `web/.env.example`). Set `VITE_FIREBASE_AUTH_DOMAIN` to `<project-id>.web.app` (not
-   `firebaseapp.com`) so Google sign-in works inside an iPhone Home Screen app.
+   `firebaseapp.com`) so Google sign-in works inside an iPhone Home Screen app. Then allow that address for Google
+   sign-in: Google Cloud console → APIs & Services → **Credentials** → *Web client (auto created by Google Service)* →
+   add `https://<project-id>.web.app` under *Authorized JavaScript origins* and
+   `https://<project-id>.web.app/__/auth/handler` under *Authorized redirect URIs* → Save. (Without this, Google
+   sign-in fails with `redirect_uri_mismatch`.)
 5. **Push key:** ⚙ Project settings → **Cloud Messaging** → *Web Push certificates* → **Generate key pair**. Copy the
    key into `VITE_FIREBASE_VAPID_KEY`.
 6. **Command line** (from the repo root):
