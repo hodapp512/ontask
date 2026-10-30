@@ -96,6 +96,10 @@ class App(val dir: Path = dataDir()) {
         fun dataDir(): Path = System.getProperty("ontask.data")?.let { Path.of(it) }
             ?: Path.of(System.getProperty("user.home"), "Library", "Application Support", "OnTask")
 
-        fun helperBinary(): File = File(System.getProperty("ontask.helper") ?: "../helper/.build/release/ontask-helper")
+        fun helperBinary(): File {
+            System.getProperty("ontask.helper")?.let { return File(it) }
+            System.getProperty("compose.application.resources.dir")?.let { File(it, "helper/ontask-helper").takeIf { f -> f.exists() }?.let { f -> return f } }
+            return File("../helper/.build/release/ontask-helper")
+        }
     }
 }

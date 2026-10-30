@@ -37,6 +37,8 @@ class HelperClient(private val binary: File) : SampleSource, AutoCloseable {
 
     private fun start(): Boolean {
         if (process?.isAlive == true) return true
+        // jpackage drops the executable bit on bundled resources.
+        if (binary.exists() && !binary.canExecute()) binary.setExecutable(true)
         if (!binary.canExecute()) { status = "helper not found at $binary (run: swift build -c release in helper/)"; return false }
         return try {
             val p = ProcessBuilder(binary.path).redirectError(ProcessBuilder.Redirect.INHERIT).start()
