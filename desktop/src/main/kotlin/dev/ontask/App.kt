@@ -1,5 +1,6 @@
 package dev.ontask
 
+import dev.ontask.block.*
 import dev.ontask.classify.Classifier
 import dev.ontask.db.Db
 import dev.ontask.db.Prefs
@@ -36,11 +37,19 @@ class App(val dir: Path = dataDir()) {
     @Volatile var settings: Settings = settingsStore.load(); private set
     @Volatile private var classifier = Classifier(ruleStore.userRules())
 
+    val events = Events(db)
+    val blocklist = Blocklist(db)
+    val unblocks = Unblocks(db, prefs, events)
+    val focus = Focus(db, events)
+    val blocking = BlockingService(dir, prefs, blocklist, unblocks, focus, settings = { settings })
+    val workHours = WorkHoursEditor(settingsStore, events, { settings }) { settings = it }
+
     val tracker = Tracker(TickStore(db), { classifier }, { settings })
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     fun start() {
         Retention.rollup(db, nowSec(), settings.retentionDays)
+        if (!prefs.bool("blocklist.seeded", false)) { blocklist.seedDefault(nowSec()); prefs.set("blocklist.seeded", true) }
         tracker.seedTotals(LocalDate.now(), reports.totals(LocalDate.now()))
         scope.launch {
             var lastFlush = nowSec(); var lastRollup = nowSec()
@@ -48,6 +57,7 @@ class App(val dir: Path = dataDir()) {
                 val t0 = System.nanoTime()
                 helper.sample()?.let { tracker.onSample(it, nowSec(), (System.nanoTime() - t0) / 1_000_000) }
                 val now = nowSec()
+                blocking.tick(now)
                 if (now - lastFlush >= FLUSH_EVERY_SEC) { tracker.flush(); lastFlush = now }
                 if (now - lastRollup >= 3600) { Retention.rollup(db, now, settings.retentionDays); lastRollup = now }
                 delay(settings.tickSec * 1000L)
