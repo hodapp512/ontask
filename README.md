@@ -21,7 +21,7 @@ Everything you must do by hand (accounts, secrets, cutover): [SETUP.md](SETUP.md
 | `helper/` | Swift helper: active app/title/URL, idle, lock, media, OCR, screenshots, battery. JSON lines over stdio. |
 | `daemon/` | Root hosts daemon + install/uninstall scripts. |
 | `functions/` | Firebase Cloud Functions (TypeScript): message routing, schedules, pairing, model recommendations. |
-| `firebase/` | Firestore rules, indexes, emulator/hosting config, rules tests. |
+| `firebase/` | Firestore rules, indexes, rules tests (config: `firebase.json` at the repo root). |
 | `web/` | The PWA for partners and phone use (Vite + TypeScript). |
 | `.github/workflows/` | CI, and the tag-triggered `.dmg` release. |
 
