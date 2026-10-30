@@ -22,13 +22,15 @@ data class Segment(
     val title: String?,
     val url: String?,
     val domain: String?,
-    val category: Category,
-    val source: dev.ontask.Source,
+    var category: Category,
+    var source: dev.ontask.Source,
     val ruleId: Long?,
     val workTime: Boolean,
     var skippedIdle: Int = 0,
     var skippedUnchanged: Int = 0,
     var procMs: Long = 0,
+    var alignment: Int? = null,
+    var confidence: Double? = null,
     var dirty: Boolean = true,
 ) {
     val level get() = category.level
@@ -42,10 +44,10 @@ class TickStore(private val db: Db) {
         db.tx { c ->
             val ins = c.prepareStatement(
                 """INSERT INTO ticks(start_ts,end_ts,n,seconds,app,bundle,title,url,domain,category,level,source,rule_id,work_time,
-                   skipped_idle,skipped_unchanged,proc_ms) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   skipped_idle,skipped_unchanged,proc_ms,alignment,confidence) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             )
             val upd = c.prepareStatement(
-                "UPDATE ticks SET end_ts=?,n=?,seconds=?,skipped_idle=?,skipped_unchanged=?,proc_ms=? WHERE id=?",
+                "UPDATE ticks SET end_ts=?,n=?,seconds=?,skipped_idle=?,skipped_unchanged=?,proc_ms=?,category=?,level=?,source=?,alignment=?,confidence=? WHERE id=?",
             )
             for (s in todo) {
                 if (s.id == 0L) {
@@ -56,12 +58,18 @@ class TickStore(private val db: Db) {
                     ins.setString(i++, s.category.name); ins.setString(i++, s.level.name); ins.setString(i++, s.source.name)
                     if (s.ruleId == null) ins.setNull(i++, java.sql.Types.INTEGER) else ins.setLong(i++, s.ruleId)
                     ins.setInt(i++, if (s.workTime) 1 else 0)
-                    ins.setInt(i++, s.skippedIdle); ins.setInt(i++, s.skippedUnchanged); ins.setLong(i, s.procMs)
+                    ins.setInt(i++, s.skippedIdle); ins.setInt(i++, s.skippedUnchanged); ins.setLong(i++, s.procMs)
+                    if (s.alignment == null) ins.setNull(i++, java.sql.Types.INTEGER) else ins.setInt(i++, s.alignment!!)
+                    if (s.confidence == null) ins.setNull(i, java.sql.Types.REAL) else ins.setDouble(i, s.confidence!!)
                     ins.executeUpdate()
                     c.createStatement().use { st -> st.executeQuery("SELECT last_insert_rowid()").use { it.next(); s.id = it.getLong(1) } }
                 } else {
                     upd.setLong(1, s.endTs); upd.setInt(2, s.n); upd.setInt(3, s.seconds)
-                    upd.setInt(4, s.skippedIdle); upd.setInt(5, s.skippedUnchanged); upd.setLong(6, s.procMs); upd.setLong(7, s.id)
+                    upd.setInt(4, s.skippedIdle); upd.setInt(5, s.skippedUnchanged); upd.setLong(6, s.procMs)
+                    upd.setString(7, s.category.name); upd.setString(8, s.level.name); upd.setString(9, s.source.name)
+                    if (s.alignment == null) upd.setNull(10, java.sql.Types.INTEGER) else upd.setInt(10, s.alignment!!)
+                    if (s.confidence == null) upd.setNull(11, java.sql.Types.REAL) else upd.setDouble(11, s.confidence!!)
+                    upd.setLong(12, s.id)
                     upd.executeUpdate()
                 }
                 s.dirty = false

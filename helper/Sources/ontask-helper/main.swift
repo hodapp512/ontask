@@ -11,6 +11,9 @@ import ApplicationServices
 import CoreGraphics
 import Foundation
 import IOKit.pwr_mgt
+import IOKit.ps
+import ScreenCaptureKit
+import Vision
 
 let protocolVersion = 1
 let helperVersion = "0.1.0"
@@ -159,19 +162,142 @@ func sample(_ req: [String: Any]) -> Result<[String: Any], HelperError> {
 
 let handlers: [String: Handler] = [
     "ping": { _ in .success(["pong": true]) },
+    "battery": battery,
+    "screen_capture_status": { _ in .success(["granted": CGPreflightScreenCaptureAccess()]) },
+    "request_screen_capture": { _ in .success(["granted": CGRequestScreenCaptureAccess()]) },
     "sample": sample,
     // Shows the system Accessibility prompt (once) so window titles become available.
     "request_accessibility": { _ in
         let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         return .success(["trusted": AXIsProcessTrustedWithOptions(opts)])
     },
-    // Phase 3 will add: "screenshot", "ocr".
 ]
+
+// MARK: - Screen capture + OCR (phase 3). Needs Screen Recording permission.
+
+let respondLock = NSLock()
+typealias AsyncHandler = ([String: Any], @escaping (Result<[String: Any], HelperError>) -> Void) -> Void
+
+var lastFingerprints: [UInt32: [UInt8]] = [:]
+
+/// 16x16 grayscale thumbnail, used to notice that a screen did not change.
+func fingerprint(_ img: CGImage) -> [UInt8] {
+    let n = 16
+    var px = [UInt8](repeating: 0, count: n * n)
+    guard let ctx = CGContext(data: &px, width: n, height: n, bitsPerComponent: 8, bytesPerRow: n,
+                              space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue) else { return px }
+    ctx.interpolationQuality = .low
+    ctx.draw(img, in: CGRect(x: 0, y: 0, width: n, height: n))
+    return px
+}
+
+func similar(_ a: [UInt8], _ b: [UInt8]) -> Bool {
+    guard a.count == b.count else { return false }
+    var diff = 0
+    for i in 0..<a.count { diff += abs(Int(a[i]) - Int(b[i])) }
+    return diff < a.count * 2 // mean difference < 2/255
+}
+
+func recognizeText(_ img: CGImage) -> String {
+    let req = VNRecognizeTextRequest()
+    req.recognitionLevel = .fast
+    req.usesLanguageCorrection = false
+    try? VNImageRequestHandler(cgImage: img, options: [:]).perform([req])
+    return (req.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
+}
+
+func pngBase64(_ img: CGImage, maxDim: Int) -> String? {
+    var out = img
+    let m = max(img.width, img.height)
+    if m > maxDim, let ctx = CGContext(data: nil, width: img.width * maxDim / m, height: img.height * maxDim / m, bitsPerComponent: 8, bytesPerRow: 0,
+                                       space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) {
+        ctx.interpolationQuality = .medium
+        ctx.draw(img, in: CGRect(x: 0, y: 0, width: ctx.width, height: ctx.height))
+        if let scaled = ctx.makeImage() { out = scaled }
+    }
+    let rep = NSBitmapImageRep(cgImage: out)
+    return rep.representation(using: .png, properties: [:])?.base64EncodedString()
+}
+
+/// Captures every display. Screens are never written to disk; the images live only for the duration of this call.
+func captureDisplays(_ done: @escaping (Result<[(UInt32, CGImage)], HelperError>) -> Void) {
+    guard CGPreflightScreenCaptureAccess() else { done(.failure(HelperError(message: "screen_recording_denied"))); return }
+    SCShareableContent.getExcludingDesktopWindows(true, onScreenWindowsOnly: true) { content, err in
+        guard let content = content, !content.displays.isEmpty else { done(.failure(HelperError(message: err?.localizedDescription ?? "no_displays"))); return }
+        var results: [(UInt32, CGImage)] = []
+        let group = DispatchGroup()
+        let lock = NSLock()
+        for d in content.displays {
+            group.enter()
+            let cfg = SCStreamConfiguration()
+            cfg.width = d.width; cfg.height = d.height
+            cfg.showsCursor = false
+            SCScreenshotManager.captureImage(contentFilter: SCContentFilter(display: d, excludingWindows: []), configuration: cfg) { img, _ in
+                if let img = img { lock.lock(); results.append((d.displayID, img)); lock.unlock() }
+                group.leave()
+            }
+        }
+        group.notify(queue: .global()) { done(results.isEmpty ? .failure(HelperError(message: "capture_failed")) : .success(results)) }
+    }
+}
+
+/// {"cmd":"ocr","skipIfUnchanged":true,"maxChars":4000} -> text for all displays; "unchanged":true when nothing moved.
+let ocr: AsyncHandler = { req, done in
+    let skip = (req["skipIfUnchanged"] as? Bool) ?? false
+    let maxChars = (req["maxChars"] as? Int) ?? 4000
+    captureDisplays { res in
+        switch res {
+        case .failure(let e): done(.failure(e))
+        case .success(let shots):
+            var changed = false
+            for (id, img) in shots {
+                let fp = fingerprint(img)
+                if let old = lastFingerprints[id], similar(old, fp) {} else { changed = true }
+                lastFingerprints[id] = fp
+            }
+            if skip && !changed { done(.success(["unchanged": true, "displays": shots.count])); return }
+            var text = shots.map { recognizeText($0.1) }.filter { !$0.isEmpty }.joined(separator: "\n---\n")
+            if text.count > maxChars { text = String(text.prefix(maxChars)) }
+            done(.success(["text": text, "displays": shots.count, "unchanged": false]))
+        }
+    }
+}
+
+/// {"cmd":"screenshot","maxDim":1280} -> base64 PNG per display (for the vision tier).
+let screenshot: AsyncHandler = { req, done in
+    let maxDim = (req["maxDim"] as? Int) ?? 1280
+    captureDisplays { res in
+        switch res {
+        case .failure(let e): done(.failure(e))
+        case .success(let shots):
+            done(.success(["images": shots.compactMap { pngBase64($0.1, maxDim: maxDim) }, "displays": shots.count]))
+        }
+    }
+}
+
+func battery(_ req: [String: Any]) -> Result<[String: Any], HelperError> {
+    guard let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
+          let list = IOPSCopyPowerSourcesList(info)?.takeRetainedValue() as? [CFTypeRef] else { return .success(["hasBattery": false]) }
+    for ps in list {
+        guard let d = IOPSGetPowerSourceDescription(info, ps)?.takeUnretainedValue() as? [String: Any],
+              (d[kIOPSTypeKey] as? String) == kIOPSInternalBatteryType else { continue }
+        let cur = d[kIOPSCurrentCapacityKey] as? Int ?? 0, max = d[kIOPSMaxCapacityKey] as? Int ?? 100
+        return .success([
+            "hasBattery": true, "percent": max > 0 ? cur * 100 / max : 0,
+            "charging": (d[kIOPSIsChargingKey] as? Bool) ?? false,
+            "onBattery": (d[kIOPSPowerSourceStateKey] as? String) == kIOPSBatteryPowerValue,
+        ])
+    }
+    return .success(["hasBattery": false])
+}
+
+let asyncHandlers: [String: AsyncHandler] = ["ocr": ocr, "screenshot": screenshot]
 
 func respond(_ obj: [String: Any]) {
     guard let data = try? JSONSerialization.data(withJSONObject: obj, options: []),
           var line = String(data: data, encoding: .utf8) else { return }
     line += "\n"
+    respondLock.lock(); defer { respondLock.unlock() }
     FileHandle.standardOutput.write(line.data(using: .utf8)!)
 }
 
@@ -182,6 +308,15 @@ func handle(line: String) {
         return
     }
     let id: Any = req["id"] ?? NSNull()
+    if let cmd = req["cmd"] as? String, let ah = asyncHandlers[cmd] {
+        ah(req) { result in
+            switch result {
+            case .success(let r): respond(["id": id, "ok": true, "result": r])
+            case .failure(let e): respond(["id": id, "ok": false, "error": e.message])
+            }
+        }
+        return
+    }
     guard let cmd = req["cmd"] as? String, let h = handlers[cmd] else {
         respond(["id": id, "ok": false, "error": "unknown_command"])
         return

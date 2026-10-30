@@ -15,7 +15,7 @@ A personal macOS productivity tool: blocks distractions, adds friction to unbloc
 
 ## Run
 
-Requires macOS 13+, a JDK (17+), and the Swift toolchain (Xcode or Command Line Tools).
+Requires macOS 14+, a JDK (17+), and the Swift toolchain (Xcode or Command Line Tools).
 
 ```bash
 cd desktop

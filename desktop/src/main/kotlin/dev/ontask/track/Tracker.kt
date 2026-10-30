@@ -101,6 +101,24 @@ class Tracker(
         closed.clear()
     }
 
+    /** Applies an AI classification to the open segment (it only ever runs on segments no rule covered). */
+    @Synchronized
+    fun applyAi(res: dev.ontask.ai.AiResult): Boolean {
+        val seg = open ?: return false
+        if (seg.source != dev.ontask.Source.METADATA) return false
+        val old = seg.level
+        seg.category = res.category; seg.source = res.source; seg.alignment = res.alignment; seg.confidence = res.confidence; seg.dirty = true
+        if (old != seg.level) { // keep running totals consistent
+            totals.merge(old, -seg.seconds.toLong(), Long::plus); totals.merge(seg.level, seg.seconds.toLong(), Long::plus)
+            _live.value = _live.value.copy(totals = HashMap(totals), classification = Classification(seg.category, seg.source, seg.ruleId))
+        }
+        return true
+    }
+
+    /** True if the open segment is unclassified and could use AI. */
+    @Synchronized
+    fun needsAi(): Boolean = open?.let { it.source == dev.ontask.Source.METADATA && it.category == Category.UNKNOWN } ?: false
+
     /** Forget the open segment, e.g. after rules change so the next tick reclassifies. */
     @Synchronized
     fun invalidate() { openClassifier = null }

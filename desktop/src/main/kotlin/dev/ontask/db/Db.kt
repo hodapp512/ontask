@@ -129,6 +129,10 @@ object Schema {
             ms INTEGER NOT NULL, in_tokens INTEGER, out_tokens INTEGER, cost_usd REAL, ok INTEGER NOT NULL
         );
         """,
+        """
+        ALTER TABLE ticks ADD COLUMN alignment INTEGER;
+        ALTER TABLE ticks ADD COLUMN confidence REAL;
+        """,
     )
 
     fun migrate(db: Db) = db.use { c ->
