@@ -120,3 +120,32 @@ class TestCfg(base: CloudConfig, private val port: Int) : CloudConfig(base.proje
     override val authRefresh get() = "http://127.0.0.1:$port/securetoken/token"
     override fun callable(name: String) = "http://127.0.0.1:$port/fn/$name"
 }
+
+/** Opt-in end-to-end against the Firebase emulators: ONTASK_E2E_FILE=/tmp/ontask-e2e.json (see firebase/e2e/pair.mjs). */
+class EmulatorE2E {
+    @Test fun macEventsReachThePartnerThroughCloudFunctions() {
+        val file = System.getenv("ONTASK_E2E_FILE") ?: return
+        val cfg = Json.parseToJsonElement(java.io.File(file).readText()).jsonObject
+        val db = Db.memory(); val prefs = Prefs(db); val events = Events(db)
+        prefs.set("cloud.project", "demo-ontask"); prefs.set("cloud.emulator", true); prefs.set("cloud.api_key", "demo")
+        val sync = CloudSync(prefs, events, Reports(db), { Settings() }, Habits(prefs), Checkins(db), clientFactory = { CloudClient(it, null) })
+        sync.linkThisMac(cfg["token"]!!.jsonPrimitive.content)
+        events.emit("work_unblock", 1000, "domain" to "youtube.com", "minutes" to 45, "purpose" to "Acme onboarding videos")
+        events.emit("work_hours_change", 1001, "reason" to "Dentist", "meaning" to "Blocking off for 1h.")
+        assertTrue(sync.syncOnce(2000, force = true), sync.lastError ?: "sync failed")
+
+        // The Cloud Function turns events into messages on the link; poll the emulator for them.
+        val http = java.net.http.HttpClient.newHttpClient()
+        val url = "http://127.0.0.1:8080/v1/projects/demo-ontask/databases/(default)/documents/links/${cfg["linkId"]!!.jsonPrimitive.content}/messages"
+        var texts = emptyList<String>()
+        repeat(30) {
+            val body = http.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create(url)).header("Authorization", "Bearer owner").build(), java.net.http.HttpResponse.BodyHandlers.ofString()).body()
+            texts = Regex("\"text\":\\s*\\{\\s*\"stringValue\":\\s*\"((?:[^\"\\\\]|\\\\.)*)\"").findAll(body).map { it.groupValues[1] }.toList()
+            if (texts.size >= 2) return@repeat
+            Thread.sleep(500)
+        }
+        println("PARTNER MESSAGES: $texts")
+        assertTrue(texts.any { "Acme onboarding videos" in it }, "work unblock message missing: $texts")
+        assertTrue(texts.any { "Dentist" in it }, "work-hours message missing: $texts")
+    }
+}

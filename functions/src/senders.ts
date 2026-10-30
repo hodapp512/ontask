@@ -15,6 +15,8 @@ export function realSenders(secrets: () => Secrets): Senders {
   return {
     async push(tokens, title, body, data) {
       if (!tokens.length) return { ok: false, detail: "no push tokens", invalidTokens: [] };
+      // There is no FCM emulator; do not reach for real credentials while developing locally.
+      if (process.env.FUNCTIONS_EMULATOR === "true") return { ok: false, detail: "push skipped (emulator)", invalidTokens: [] };
       const res = await admin.messaging().sendEachForMulticast({ tokens, notification: { title, body }, data, webpush: { fcmOptions: { link: "/" } } });
       const invalid: string[] = [];
       res.responses.forEach((r, i) => {

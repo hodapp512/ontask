@@ -46,12 +46,17 @@ export async function deliverToPartner(
 
   const title = TITLES[type].replace("{name}", trackedName);
   let res: { ok: boolean; detail: string };
-  if (d.channel === "push") {
-    const r = await senders.push(tokens, title, body, { linkId, type });
-    res = r;
-    if (r.invalidTokens.length) await db.doc(`users/${link.partnerUid}`).update(Object.fromEntries(r.invalidTokens.map((t) => [`fcmTokens.${t}`, FieldValue.delete()])));
-  } else if (d.channel === "text") res = await senders.text(phone!, `${title}: ${body}`);
-  else res = await senders.email(email!, title, body);
+  try {
+    if (d.channel === "push") {
+      const r = await senders.push(tokens, title, body, { linkId, type });
+      res = r;
+      if (r.invalidTokens.length) await db.doc(`users/${link.partnerUid}`).update(Object.fromEntries(r.invalidTokens.map((t) => [`fcmTokens.${t}`, FieldValue.delete()])));
+    } else if (d.channel === "text") res = await senders.text(phone!, `${title}: ${body}`);
+    else res = await senders.email(email!, title, body);
+  } catch (e) {
+    // A failing channel must not lose the message: it is still recorded (and visible in the app) with the error.
+    res = { ok: false, detail: `send failed: ${String(e).slice(0, 200)}` };
+  }
 
   await msgs.add({ type, text: body, ts: now.getTime(), fromUid: link.trackedUid, delivery: { channel: d.channel, ok: res.ok, detail: res.detail, fellBackToText: d.fellBackToText ?? false } });
   return { delivered: res.ok, channel: d.channel };

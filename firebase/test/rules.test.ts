@@ -1,5 +1,5 @@
 import { assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment } from "@firebase/rules-unit-testing";
-import { doc, getDoc, setDoc, updateDoc, collection, addDoc } from "firebase/firestore";
+import { doc, getDoc, getDocs, setDoc, updateDoc, collection, collectionGroup, query, where, addDoc } from "firebase/firestore";
 import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 
@@ -58,6 +58,12 @@ describe("links", () => {
     await assertFails(updateDoc(doc(as(TRACKED), "links", LINK), { partnerPrefs: {} }));
     await assertFails(updateDoc(doc(as(STRANGER), "links", LINK), { share: "messages" }));
   });
+  it("each side can list its own links with a filtered query, but not everyone's", async () => {
+    await assertSucceeds(getDocs(query(collection(as(TRACKED), "links"), where("trackedUid", "==", TRACKED))));
+    await assertSucceeds(getDocs(query(collection(as(PARTNER), "links"), where("partnerUid", "==", PARTNER))));
+    await assertFails(getDocs(collection(as(STRANGER), "links")));
+    await assertFails(getDocs(query(collection(as(STRANGER), "links"), where("trackedUid", "==", TRACKED))));
+  });
   it("only participants read messages; nobody writes them from a client", async () => {
     await env.withSecurityRulesDisabled(async (c) => { await setDoc(doc(c.firestore(), "links", LINK, "messages", "m1"), { text: "hi" }); });
     await assertSucceeds(getDoc(doc(as(PARTNER), "links", LINK, "messages", "m1")));
@@ -76,6 +82,15 @@ describe("reactions", () => {
     await assertFails(addDoc(collection(as(PARTNER), "links", LINK, "reactions"), { ...ok, reply: "x".repeat(281) }));
     await assertFails(addDoc(collection(as(PARTNER), "links", LINK, "reactions"), { ...ok, fromUid: TRACKED }));
     await assertFails(addDoc(collection(as(TRACKED), "links", LINK, "reactions"), { ...ok, fromUid: TRACKED }));
+  });
+});
+
+describe("reaction pull by the tracked user's Mac", () => {
+  it("can query reactions addressed to themselves, not anyone else's", async () => {
+    await env.withSecurityRulesDisabled(async (c) => { await setDoc(doc(c.firestore(), "links", LINK, "reactions", "r1"), { fromUid: PARTNER, trackedUid: TRACKED, kind: "proud", ts: 5 }); });
+    await assertSucceeds(getDocs(query(collectionGroup(as(TRACKED), "reactions"), where("trackedUid", "==", TRACKED))));
+    await assertFails(getDocs(query(collectionGroup(as(STRANGER), "reactions"), where("trackedUid", "==", TRACKED))));
+    await assertFails(getDocs(collectionGroup(as(STRANGER), "reactions")));
   });
 });
 

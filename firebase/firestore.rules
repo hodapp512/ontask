@@ -22,6 +22,7 @@ service cloud.firestore {
       return signedIn() && exists(/databases/$(database)/documents/links/$(trackedUid + '_' + request.auth.uid))
         && linkDoc(trackedUid, request.auth.uid).data.status == 'active';
     }
+    function isParty(link) { return signedIn() && (request.auth.uid == link.trackedUid || request.auth.uid == link.partnerUid); }
     function partnerSeesReport(trackedUid) { return isPartnerOf(trackedUid) && linkDoc(trackedUid, request.auth.uid).data.share == 'report'; }
 
     match /users/{uid} {
@@ -44,9 +45,10 @@ service cloud.firestore {
     }
 
     match /links/{linkId} {
-      allow read: if signedIn() && request.auth.uid in resource.data.participants;
+      // Written so that `where trackedUid == me` or `where partnerUid == me` queries are provably allowed.
+      allow read: if isParty(resource.data);
       // Tracked user controls what the partner sees; partner controls how they are notified. Nothing else changes.
-      allow update: if signedIn() && request.auth.uid in resource.data.participants
+      allow update: if isParty(resource.data)
         && (
           (request.auth.uid == resource.data.trackedUid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['share']))
           || (request.auth.uid == resource.data.partnerUid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['partnerPrefs']))
@@ -54,11 +56,11 @@ service cloud.firestore {
       allow create, delete: if false;
 
       match /messages/{id} {
-        allow read: if signedIn() && request.auth.uid in get(/databases/$(database)/documents/links/$(linkId)).data.participants;
+        allow read: if isParty(get(/databases/$(database)/documents/links/$(linkId)).data);
         allow write: if false;
       }
       match /reactions/{id} {
-        allow read: if signedIn() && request.auth.uid in get(/databases/$(database)/documents/links/$(linkId)).data.participants;
+        allow read: if isParty(get(/databases/$(database)/documents/links/$(linkId)).data);
         allow create: if signedIn()
           && request.auth.uid == get(/databases/$(database)/documents/links/$(linkId)).data.partnerUid
           && request.resource.data.fromUid == request.auth.uid
@@ -67,6 +69,11 @@ service cloud.firestore {
           && (!('reply' in request.resource.data) || request.resource.data.reply.size() <= 280);
         allow update, delete: if false;
       }
+    }
+
+    // The tracked user's Mac pulls reactions with a collection-group query (trackedUid == me).
+    match /{path=**}/reactions/{id} {
+      allow read: if signedIn() && resource.data.trackedUid == request.auth.uid;
     }
 
     match /groups/{groupId} {

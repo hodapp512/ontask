@@ -18,6 +18,10 @@ function shell(user: User, active: string, content: HTMLElement): HTMLElement {
 let current: User | null = null;
 
 async function render() {
+  try { await renderInner(); } catch (e: any) { clear(root); root.append(h("main", {}, h("div", { class: "card" }, h("h2", {}, "Something went wrong"), h("p", { class: "error" }, String(e?.message ?? e))))); }
+}
+
+async function renderInner() {
   clear(root);
   if (!configured) {
     root.append(h("main", {}, h("h1", {}, "OnTask"), h("div", { class: "card" }, h("p", {}, "This app isn't connected to a Firebase project yet."), h("p", { class: "muted" }, "Copy web/.env.example to web/.env.local and fill it in (see SETUP.md), or run with the emulators: npm run dev -- --mode emulator."))));
