@@ -71,6 +71,17 @@ class App(val dir: Path = dataDir()) {
         return if (alts.isEmpty()) own else alts.random()
     }
 
+    val cloud by lazy { dev.ontask.cloud.CloudSync(prefs, events, reports, { settings }, habits, checkins) }
+    val updates = dev.ontask.cloud.UpdateCheck()
+    @Volatile var updateAvailable: dev.ontask.cloud.UpdateInfo? = null; private set
+    private var lastCloud = 0L; private var lastUpdateCheck = 0L
+
+    fun checkForUpdates(): dev.ontask.cloud.UpdateInfo? {
+        val repo = prefs.get("update.repo") ?: return null
+        updateAvailable = updates.check(repo, dev.ontask.cloud.UpdateCheck.currentVersion()); lastUpdateCheck = nowSec()
+        return updateAvailable
+    }
+
     val ai = AiService(prefs, db, dir.toFile())
     val checkins = Checkins(db)
     val ladder = Ladder()
@@ -126,6 +137,8 @@ class App(val dir: Path = dataDir()) {
 
         if (ai.enabled && !ai.metadataOnly && !live.away && now - lastAi >= prefs.int("ai.interval_sec", 30) && tracker.needsAi() && !aiBusy) { lastAi = now; scope.launch(IO) { aiCycle(live.sample) } }
         if (ai.llama.running) ai.llama.stopIfIdle()
+        if (cloud.configured && now - lastCloud >= 60) { lastCloud = now; scope.launch(IO) { cloud.syncOnce(now) } }
+        if (prefs.get("update.repo") != null && now - lastUpdateCheck >= 7 * 86400) { lastUpdateCheck = now; scope.launch(IO) { checkForUpdates() } }
         if (ai.enabled && now - lastBattery >= 60) { lastBattery = now; scope.launch(IO) { batteryCheck() } }
         if (now - lastRhythm >= 30) { lastRhythm = now; runCatching { rhythmCheck(now, live.away) } }
     }

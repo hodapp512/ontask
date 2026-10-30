@@ -18,10 +18,12 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
     implementation("org.xerial:sqlite-jdbc:3.54.1.0")
+    implementation("com.google.zxing:core:3.5.3")
     testImplementation(kotlin("test"))
 }
 
 tasks.test { useJUnitPlatform() }
+tasks.processResources { filesMatching("version.properties") { expand("version" to project.version) } }
 
 // The Swift helper is built before `run` so the app can launch it.
 val helperDir = layout.projectDirectory.dir("../helper")

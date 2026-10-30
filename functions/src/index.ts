@@ -72,8 +72,9 @@ export const acceptInvite = onCall(async (req) => {
     const trackedUid = inv.get("trackedUid") as string;
     if (trackedUid === req.auth!.uid) throw new HttpsError("failed-precondition", "You can't pair with yourself");
     const linkId = `${trackedUid}_${req.auth!.uid}`;
+    const [tu, pu] = await Promise.all([tx.get(db.doc(`users/${trackedUid}`)), tx.get(db.doc(`users/${req.auth!.uid}`))]);
     tx.set(db.doc(`links/${linkId}`), {
-      trackedUid, partnerUid: req.auth!.uid, participants: [trackedUid, req.auth!.uid], status: "active", share: "report", createdAt: Date.now(),
+      trackedUid, partnerUid: req.auth!.uid, trackedName: tu.get("displayName") ?? "Your friend", partnerName: pu.get("displayName") ?? "Your partner", participants: [trackedUid, req.auth!.uid], status: "active", share: "report", createdAt: Date.now(),
       partnerPrefs: { channels: { binge_alert: "push", checkin: "push", work_hours_change: "push", missed_checkin: "push", work_unblock: "push" }, quietHours: null },
     });
     tx.update(ref, { used: true, usedBy: req.auth!.uid });

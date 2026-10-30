@@ -3,6 +3,7 @@ package dev.ontask.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Text
@@ -56,15 +57,20 @@ fun ExtraSettings(app: App) {
     BlockingSettings(app)
     InterventionSettings(app)
     AiSettings(app)
+    CloudSettings(app)
+    UpdateSettings(app)
     SettingsHooks.sections.forEach { it(app) }
 }
 
 object SettingsHooks { val sections = mutableListOf<@Composable (App) -> Unit>() }
 
 // Filled in by later phases; defined here so the first-run wizard compiles at every step.
-@Composable fun PartnerSetupContent(app: App) { Text("Available once cloud sync is set up (see SETUP.md).") }
+@Composable fun PartnerSetupContent(app: App) { CloudSettingsBody(app) }
 @Composable fun AiSetupContent(app: App) { AiSettingsBody(app) }
-@Composable fun ChannelsSetupContent(app: App) { Text("Available once cloud sync is set up (see SETUP.md).") }
+@Composable fun ChannelsSetupContent(app: App) {
+    Text("Your partner chooses how they hear from you (push, text or email) in the OnTask web app under Settings. Their phone number or email is stored in their own account — never on your Mac or in the code.")
+    Text("Use the web app's \"Send test message\" button once you've paired to check delivery.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
 
 @Composable
 fun InterventionSettings(app: App) {
