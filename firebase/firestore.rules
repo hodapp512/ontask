@@ -1,0 +1,81 @@
+rules_version = '2';
+
+// Data model (see DESIGN.md "Phone & partner"):
+//   users/{uid}                     profile + fcmTokens           (owner)
+//   users/{uid}/contact/{doc}       phone / email for channels    (owner only; functions read it)
+//   users/{uid}/events/{id}         outbox written by the Mac     (owner creates; functions process)
+//   users/{uid}/reports/{date}      daily aggregates              (owner writes; partner reads if share == "report")
+//   users/{uid}/schedule/current    work hours, habits, times     (owner)
+//   links/{trackedUid}_{partnerUid} one tracked<->partner link    (created by functions only)
+//     messages/{id}                 messages delivered to partner (functions only)
+//     reactions/{id}                partner reactions             (partner creates)
+//   invites/{code}                  functions only
+//   modelRecommendation/latest      public read, functions write
+// The raw activity log is never uploaded.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+    function linkDoc(trackedUid, partnerUid) { return get(/databases/$(database)/documents/links/$(trackedUid + '_' + partnerUid)); }
+    function isPartnerOf(trackedUid) {
+      return signedIn() && exists(/databases/$(database)/documents/links/$(trackedUid + '_' + request.auth.uid))
+        && linkDoc(trackedUid, request.auth.uid).data.status == 'active';
+    }
+    function partnerSeesReport(trackedUid) { return isPartnerOf(trackedUid) && linkDoc(trackedUid, request.auth.uid).data.share == 'report'; }
+
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+
+      match /contact/{doc} { allow read, write: if isOwner(uid); }
+      match /events/{id} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && request.resource.data.keys().hasAll(['type', 'ts']);
+      }
+      match /reports/{date} {
+        allow write: if isOwner(uid);
+        allow read: if isOwner(uid) || partnerSeesReport(uid);
+      }
+      match /schedule/{doc} { allow read, write: if isOwner(uid); }
+      match /checkins/{date} {
+        allow write: if isOwner(uid);
+        allow read: if isOwner(uid) || isPartnerOf(uid);
+      }
+    }
+
+    match /links/{linkId} {
+      allow read: if signedIn() && request.auth.uid in resource.data.participants;
+      // Tracked user controls what the partner sees; partner controls how they are notified. Nothing else changes.
+      allow update: if signedIn() && request.auth.uid in resource.data.participants
+        && (
+          (request.auth.uid == resource.data.trackedUid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['share']))
+          || (request.auth.uid == resource.data.partnerUid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['partnerPrefs']))
+        );
+      allow create, delete: if false;
+
+      match /messages/{id} {
+        allow read: if signedIn() && request.auth.uid in get(/databases/$(database)/documents/links/$(linkId)).data.participants;
+        allow write: if false;
+      }
+      match /reactions/{id} {
+        allow read: if signedIn() && request.auth.uid in get(/databases/$(database)/documents/links/$(linkId)).data.participants;
+        allow create: if signedIn()
+          && request.auth.uid == get(/databases/$(database)/documents/links/$(linkId)).data.partnerUid
+          && request.resource.data.fromUid == request.auth.uid
+          && request.resource.data.trackedUid == get(/databases/$(database)/documents/links/$(linkId)).data.trackedUid
+          && request.resource.data.kind in ['thumbs_up', 'proud', 'call_me', 'take_a_walk']
+          && (!('reply' in request.resource.data) || request.resource.data.reply.size() <= 280);
+        allow update, delete: if false;
+      }
+    }
+
+    match /groups/{groupId} {
+      // Reserved for the group UI (phase 5); the data model supports it from day one.
+      allow read: if signedIn() && request.auth.uid in resource.data.memberIds;
+      allow write: if false;
+    }
+
+    match /invites/{code} { allow read, write: if false; }
+    match /modelRecommendation/{doc} { allow read: if signedIn(); allow write: if false; }
+  }
+}
