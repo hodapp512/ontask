@@ -10,6 +10,7 @@ rules_version = '2';
 //     messages/{id}                 messages delivered to partner (functions only)
 //     reactions/{id}                partner reactions             (partner creates)
 //   invites/{code}                  functions only
+//   linkCodes/{code}                functions only (5-minute Mac link codes)
 //   modelRecommendation/latest      public read, functions write
 // The raw activity log is never uploaded.
 service cloud.firestore {
@@ -83,6 +84,7 @@ service cloud.firestore {
     }
 
     match /invites/{code} { allow read, write: if false; }
+    match /linkCodes/{code} { allow read, write: if false; }
     match /modelRecommendation/{doc} { allow read: if signedIn(); allow write: if false; }
   }
 }

@@ -88,3 +88,18 @@ describe("model recommendation", () => {
     expect((await validateCandidates([{ id: "x", source: "ollama", sizeGb: 1, rationale: "", sources: [] }], async () => { throw new Error("net"); })).dropped).toEqual(["x"]);
   });
 });
+
+import { LINK_ALPHABET, makeLinkCode, normalizeLinkCode } from "../src/logic/linkcode";
+import { randomBytes } from "node:crypto";
+
+describe("link codes", () => {
+  it("are 5 easy-to-read characters", () => {
+    for (let i = 0; i < 200; i++) expect(makeLinkCode((n) => randomBytes(n))).toMatch(new RegExp(`^[${LINK_ALPHABET}]{5}$`));
+    expect(LINK_ALPHABET).not.toMatch(/[01OI]/);
+  });
+  it("accept sloppy input but reject malformed codes", () => {
+    expect(normalizeLinkCode(" k7m-2q ")).toBe("K7M2Q");
+    expect(normalizeLinkCode("K7M2")).toBeNull();
+    expect(normalizeLinkCode("K7M2O")).toBeNull();
+  });
+});

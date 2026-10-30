@@ -21,7 +21,7 @@ import java.time.Duration
 
 class CloudException(msg: String, val status: Int = 0) : Exception(msg)
 
-/** Where the cloud lives. Everything comes from preferences / Keychain — nothing about a real project is in the repo. */
+/** Where the cloud lives: the bundled project (resources/cloud.properties), overridable in prefs for development. */
 open class CloudConfig(val projectId: String, val apiKey: String, val region: String = "us-central1", val emulator: Boolean = false, val webUrl: String? = null) {
     override fun equals(other: Any?) = other is CloudConfig && other.projectId == projectId && other.apiKey == apiKey && other.region == region && other.emulator == emulator && other.webUrl == webUrl
     override fun hashCode() = listOf(projectId, apiKey, region, emulator, webUrl).hashCode()
@@ -33,9 +33,16 @@ open class CloudConfig(val projectId: String, val apiKey: String, val region: St
     private fun enc(s: String) = URLEncoder.encode(s, Charsets.UTF_8)
 
     companion object {
+        /** Built-in project (resources/cloud.properties); prefs override it only for development (emulators, forks). */
+        private val bundled: java.util.Properties by lazy {
+            java.util.Properties().apply { CloudConfig::class.java.getResourceAsStream("/cloud.properties")?.use { load(it) } }
+        }
+
         fun fromPrefs(p: Prefs): CloudConfig? {
-            val project = p.get("cloud.project")?.takeIf { it.isNotBlank() } ?: return null
-            return CloudConfig(project, p.str("cloud.api_key", "unused"), p.str("cloud.region", "us-central1"), p.bool("cloud.emulator", false), p.get("cloud.web_url")?.takeIf { it.isNotBlank() })
+            val emulator = p.bool("cloud.emulator", false)
+            val project = p.get("cloud.project")?.takeIf { it.isNotBlank() } ?: (if (emulator) "demo-ontask" else bundled.getProperty("projectId")) ?: return null
+            val apiKey = p.get("cloud.api_key")?.takeIf { it.isNotBlank() } ?: bundled.getProperty("apiKey") ?: "unused"
+            return CloudConfig(project, apiKey, p.str("cloud.region", bundled.getProperty("region") ?: "us-central1"), emulator, p.get("cloud.web_url")?.takeIf { it.isNotBlank() } ?: bundled.getProperty("webUrl"))
         }
     }
 }
@@ -116,6 +123,10 @@ class CloudClient(private val cfg: CloudConfig, private val keychain: Keychain? 
         if (r.statusCode() !in 200..299) throw CloudException("Query ${r.statusCode()}: ${r.body().take(300)}", r.statusCode())
         return (json.parseToJsonElement(r.body()) as JsonArray).mapNotNull { (it.jsonObject["document"] as? JsonObject)?.get("fields") as? JsonObject }.map { FsValue.decodeFields(it) }
     }
+
+    /** Calls a callable that needs no sign-in (redeeming a link code). */
+    fun callAnonymous(name: String, data: JsonObject): JsonObject =
+        post(cfg.callable(name), buildJsonObject { put("data", data) }.toString())["result"] as? JsonObject ?: JsonObject(emptyMap())
 
     /** Calls an HTTPS callable function; returns its `result`. */
     fun call(name: String, data: JsonObject = JsonObject(emptyMap())): JsonObject =

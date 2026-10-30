@@ -20,7 +20,7 @@ await setDoc(doc(a.db, "users", a.uid), { displayName: "Alice", createdAt: Date.
 await setDoc(doc(b.db, "users", b.uid), { displayName: "Bob", createdAt: Date.now(), lastSeenMs: Date.now(), fcmTokens: { "fake-token": Date.now() } });
 const { code } = (await httpsCallable(a.fns, "createInvite")({})).data;
 const { linkId } = (await httpsCallable(b.fns, "acceptInvite")({ code })).data;
-const { token } = (await httpsCallable(a.fns, "createDeviceToken")({})).data;
-writeFileSync("/tmp/ontask-e2e.json", JSON.stringify({ trackedUid: a.uid, partnerUid: b.uid, linkId, token }));
+const { code: linkCode } = (await httpsCallable(a.fns, "createLinkCode")({})).data;
+writeFileSync("/tmp/ontask-e2e.json", JSON.stringify({ trackedUid: a.uid, partnerUid: b.uid, linkId, linkCode }));
 console.log("paired", linkId);
 process.exit(0);

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -23,7 +24,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
@@ -52,51 +52,58 @@ fun CloudSettings(app: App) {
 @Composable
 fun CloudSettingsBody(app: App) {
     val scope = rememberCoroutineScope()
-    var project by remember { mutableStateOf(app.prefs.str("cloud.project", "")) }
-    var apiKey by remember { mutableStateOf(app.prefs.str("cloud.api_key", "")) }
-    var emulator by remember { mutableStateOf(app.prefs.bool("cloud.emulator", false)) }
-    var token by remember { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
     var msg by remember { mutableStateOf("") }
     var invite by remember { mutableStateOf<Pair<String, String>?>(null) }
     var tick by remember { mutableStateOf(0) }
     val signedIn = remember(tick) { app.cloud.signedIn }
+    val web = app.cloud.config?.webBase
 
-    fun saveCfg() { app.prefs.set("cloud.project", project.trim().ifEmpty { null }); app.prefs.set("cloud.api_key", apiKey.trim().ifEmpty { null }); app.prefs.set("cloud.emulator", emulator) }
-
-    if (!app.cloud.configured) Text("Not connected yet. Enter your Firebase project below (SETUP.md explains how to create it).", style = MaterialTheme.typography.bodyMedium)
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(project, { project = it; saveCfg() }, label = { Text("Firebase project ID") }, singleLine = true, modifier = Modifier.weight(1f))
-        OutlinedTextField(apiKey, { apiKey = it; saveCfg() }, label = { Text("Web API key") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.weight(1f))
+    fun link() {
+        if (busy) return
+        busy = true; msg = "Linking…"
+        scope.launch(Dispatchers.IO) {
+            msg = try { app.cloud.linkWithCode(code); app.cloud.syncOnce(App.nowSec(), force = true); code = ""; "Linked! Your phone and partner will now hear from this Mac." } catch (e: Exception) { e.message ?: "Couldn't link" }
+            busy = false; tick++
+        }
     }
-    SwitchSetting("Use local emulators", "For development: talk to the Firebase emulator suite on this Mac instead of the cloud.", emulator) { emulator = it; saveCfg() }
 
-    KV("Status", if (signedIn) "This Mac is linked" + (app.cloud.lastSyncTs.takeIf { it > 0 }?.let { " · last sync ${fmtTime(it)}" } ?: "") else "Not linked")
-    app.cloud.lastError?.let { KV("Last sync error", it) }
     if (!signedIn) {
-        Text("In the OnTask web app: Me → Link my Mac → Create link code, then paste it here.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(token, { token = it }, label = { Text("Link code") }, singleLine = true, modifier = Modifier.weight(1f))
-            Button({
-                scope.launch(Dispatchers.IO) { msg = try { app.cloud.linkThisMac(token); token = ""; "Linked." } catch (e: Exception) { e.message ?: "Failed" }; tick++ }
-            }, enabled = token.isNotBlank() && app.cloud.configured) { Text("Link this Mac") }
+        Text("Connect your phone", style = MaterialTheme.typography.titleMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.CenterVertically) {
+            web?.let { QrCode(it, 140) }
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("1. Scan the code with your phone's camera${web?.let { " (or open $it)" } ?: ""} and sign in.", style = MaterialTheme.typography.bodyMedium)
+                Text("2. Tap Me → Link my Mac → Show code.", style = MaterialTheme.typography.bodyMedium)
+                Text("3. Type the 5-character code here:", style = MaterialTheme.typography.bodyMedium)
+                OutlinedTextField(
+                    code,
+                    { v -> code = v.uppercase().filter { it.isLetterOrDigit() }.take(5); if (code.length == 5) link() },
+                    placeholder = { Text("K7M2Q") }, singleLine = true, enabled = !busy,
+                    textStyle = MaterialTheme.typography.headlineSmall, modifier = Modifier.width(180.dp),
+                )
+            }
         }
     } else {
+        KV("Status", "This Mac is linked" + (app.cloud.lastSyncTs.takeIf { it > 0 }?.let { " · last sync ${fmtTime(it)}" } ?: ""))
+        app.cloud.lastError?.let { KV("Last sync problem", it) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button({
                 scope.launch(Dispatchers.IO) {
                     msg = try {
-                        val code = app.cloud.client()!!.call("createInvite")["code"]!!.jsonPrimitive.content
-                        invite = code to "${app.cloud.config!!.webBase}/#/join/$code"; "Invite created."
+                        val c = app.cloud.client()!!.call("createInvite")["code"]!!.jsonPrimitive.content
+                        invite = c to "${app.cloud.config!!.webBase}/#/join/$c"; ""
                     } catch (e: Exception) { e.message ?: "Failed" }
                 }
             }) { Text("Invite a partner") }
             OutlinedButton({ scope.launch(Dispatchers.IO) { app.cloud.syncOnce(App.nowSec(), force = true); tick++; msg = app.cloud.lastError ?: "Synced." } }) { Text("Sync now") }
             TextButton({ app.cloud.signOut(); tick++ }) { Text("Unlink") }
         }
-        invite?.let { (code, link) ->
+        invite?.let { (c, link) ->
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 QrCode(link)
-                Column { Text(code, style = MaterialTheme.typography.headlineMedium); Text(link, style = MaterialTheme.typography.bodySmall); Text("Send this to your partner. It works once and expires in 7 days.", style = MaterialTheme.typography.bodySmall) }
+                Column { Text(c, style = MaterialTheme.typography.headlineMedium); Text(link, style = MaterialTheme.typography.bodySmall); Text("Send this to your partner. It works once and expires in 7 days.", style = MaterialTheme.typography.bodySmall) }
             }
         }
     }
@@ -105,7 +112,19 @@ fun CloudSettingsBody(app: App) {
         Text("Recent encouragement", style = MaterialTheme.typography.titleSmall)
         reactions.takeLast(5).reversed().forEach { Text(reactionLabel(it.kind) + (it.reply?.let { r -> " — \"$r\"" } ?: "")) }
     }
-    if (msg.isNotBlank()) Text(msg, style = MaterialTheme.typography.bodySmall)
+    if (msg.isNotBlank()) Text(msg, style = MaterialTheme.typography.bodyMedium, color = if (msg.startsWith("Linked") || msg == "Synced." || msg == "Linking…") MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error)
+    DevServerSettings(app) { tick++ }
+}
+
+/** Development only: point at the local emulators or another Firebase project. Hidden under an expander. */
+@Composable
+private fun DevServerSettings(app: App, changed: () -> Unit) {
+    var emulator by remember { mutableStateOf(app.prefs.bool("cloud.emulator", false)) }
+    var project by remember { mutableStateOf(app.prefs.str("cloud.project", "")) }
+    Expander("Advanced: developer server settings") {
+        SwitchSetting("Use local emulators", "For development: talk to the Firebase emulator suite on this Mac instead of the OnTask server.", emulator) { emulator = it; app.prefs.set("cloud.emulator", it); changed() }
+        OutlinedTextField(project, { project = it; app.prefs.set("cloud.project", it.trim().ifEmpty { null }); changed() }, label = { Text("Other Firebase project ID (leave empty for OnTask's)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+    }
 }
 
 private fun reactionLabel(kind: String) = when (kind) { "thumbs_up" -> "👍"; "proud" -> "Proud of you"; "call_me" -> "Call me when you can"; "take_a_walk" -> "Take a walk"; else -> kind }

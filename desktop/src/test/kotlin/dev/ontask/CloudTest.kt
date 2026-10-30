@@ -129,7 +129,7 @@ class EmulatorE2E {
         val db = Db.memory(); val prefs = Prefs(db); val events = Events(db)
         prefs.set("cloud.project", "demo-ontask"); prefs.set("cloud.emulator", true); prefs.set("cloud.api_key", "demo")
         val sync = CloudSync(prefs, events, Reports(db), { Settings() }, Habits(prefs), Checkins(db), clientFactory = { CloudClient(it, null) })
-        sync.linkThisMac(cfg["token"]!!.jsonPrimitive.content)
+        sync.linkWithCode(cfg["linkCode"]!!.jsonPrimitive.content)
         events.emit("work_unblock", 1000, "domain" to "youtube.com", "minutes" to 45, "purpose" to "Acme onboarding videos")
         events.emit("work_hours_change", 1001, "reason" to "Dentist", "meaning" to "Blocking off for 1h.")
         assertTrue(sync.syncOnce(2000, force = true), sync.lastError ?: "sync failed")

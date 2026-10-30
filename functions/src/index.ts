@@ -10,6 +10,7 @@ import { localParts } from "./logic/routing";
 import { buildPrompt, ollamaLibraryUrl, parseCandidates, validateCandidates, type Recommendation } from "./logic/modelrec";
 import type { ScheduleDoc } from "./logic/types";
 import { realSenders, type Secrets } from "./senders";
+import { makeLinkCode, normalizeLinkCode } from "./logic/linkcode";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -53,6 +54,9 @@ async function tokensOf(uid: string): Promise<string[]> {
 
 // ---- Callable: pairing and device linking ---------------------------------------------------------------------
 
+const LINK_CODE_TTL_MS = 5 * 60_000;
+const linkCode = () => makeLinkCode((n) => randomBytes(n));
+
 const code8 = () => randomBytes(5).toString("hex").toUpperCase().slice(0, 8);
 
 /** Callables check req.auth themselves; Cloud Run must still let the browser reach them. */
@@ -85,10 +89,35 @@ export const acceptInvite = onCall(PUBLIC, async (req) => {
   });
 });
 
-/** The Mac signs in with a custom token minted for the signed-in PWA user (no passwords on the Mac). */
-export const createDeviceToken = onCall(PUBLIC, async (req) => {
+/**
+ * Linking a Mac: the signed-in phone asks for a short code, the Mac redeems it once for a sign-in token.
+ * Codes are 5 characters, expire after 5 minutes and work once.
+ */
+export const createLinkCode = onCall(PUBLIC, async (req) => {
   if (!req.auth) throw new HttpsError("unauthenticated", "Sign in first");
-  return { token: await admin.auth().createCustomToken(req.auth.uid, { device: "mac" }) };
+  const now = Date.now();
+  // Drop this user's older unused codes so only the newest one works.
+  const old = await db.collection("linkCodes").where("uid", "==", req.auth.uid).get();
+  const batch = db.batch(); old.docs.forEach((d) => batch.delete(d.ref));
+  let code = linkCode();
+  for (let i = 0; i < 5 && (await db.doc(`linkCodes/${code}`).get()).exists; i++) code = linkCode();
+  batch.set(db.doc(`linkCodes/${code}`), { uid: req.auth.uid, createdAt: now, expiresAt: now + LINK_CODE_TTL_MS });
+  await batch.commit();
+  return { code, expiresAt: now + LINK_CODE_TTL_MS };
+});
+
+/** Called by the Mac without signing in: trades a valid code for a custom token for that user. */
+export const redeemLinkCode = onCall(PUBLIC, async (req) => {
+  const code = normalizeLinkCode(String(req.data?.code ?? ""));
+  if (!code) throw new HttpsError("invalid-argument", "Enter the 5-character code shown on your phone");
+  const ref = db.doc(`linkCodes/${code}`);
+  const uid = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists || (snap.get("expiresAt") as number) < Date.now()) throw new HttpsError("not-found", "That code is wrong or has expired. Make a new one on your phone.");
+    tx.delete(ref);
+    return snap.get("uid") as string;
+  });
+  return { token: await admin.auth().createCustomToken(uid, { device: "mac" }) };
 });
 
 export const sendTestMessage = onCall({ ...PUBLIC, secrets: MSG_SECRETS }, async (req) => {

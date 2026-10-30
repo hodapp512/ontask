@@ -96,13 +96,15 @@ Done once per Firebase project. In the console (<https://console.firebase.google
 
 ### Connecting the apps
 
-1. On your phone, open `https://<project-id>.web.app`, sign in. On iPhone: Share → **Add to Home Screen**, open it from
-   there, then Settings → **Turn on notifications**.
-2. Mac app → Settings → Accountability partner: enter the **project ID** and **web API key** (the `apiKey` value from
-   step 4).
-3. Phone → Me → **Link my Mac** → **Create link code**; type the code into the Mac app.
-4. Phone → Me → **Invite a partner**: send the link/QR code. Your partner opens it, signs in, and chooses how they want
+1. On your phone, open `https://<project-id>.web.app` (the Mac app shows a QR code for it) and sign in. On iPhone:
+   Share → **Add to Home Screen**, open it from there, then Settings → **Turn on notifications**.
+2. Phone → Me → Link my Mac → **Show code**. Type the 5-character code into OnTask on the Mac (Settings → Phone &
+   partner). Codes expire after 5 minutes and work once.
+3. Phone → Me → **Invite a partner**: send the link/QR code. Your partner opens it, signs in, and chooses how they want
    to be notified (push, text, email). Use **Send test message** to check delivery.
+
+The Mac app has the project built in (`desktop/src/main/resources/cloud.properties`); if you run your own Firebase
+project, put its ID, web API key and URL there before building.
 
 ## 4. Releases and updates
 

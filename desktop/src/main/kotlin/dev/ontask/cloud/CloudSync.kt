@@ -57,7 +57,15 @@ class CloudSync(
 
     val config: CloudConfig? get() = CloudConfig.fromPrefs(prefs)
 
-    fun linkThisMac(deviceToken: String) { client()?.signInWithCustomToken(deviceToken) ?: throw CloudException("Enter your Firebase project details first") }
+    /** Links this Mac with the 5-character code shown on the phone (Me → Link my Mac). */
+    fun linkWithCode(code: String) {
+        val c = client() ?: throw CloudException("OnTask isn't connected to a server")
+        val clean = code.uppercase().filter { it.isLetterOrDigit() }
+        val res = try { c.callAnonymous("redeemLinkCode", buildJsonObject { put("code", clean) }) }
+            catch (e: CloudException) { throw CloudException(if (e.status == 404) "That code is wrong or has expired. Make a new one on your phone." else e.message ?: "Couldn't link") }
+        c.signInWithCustomToken(res["token"]?.jsonPrimitive?.content ?: throw CloudException("Couldn't link"))
+    }
+    fun linkThisMac(deviceToken: String) { client()?.signInWithCustomToken(deviceToken) ?: throw CloudException("OnTask isn't connected to a server") }
     fun signOut() { client()?.signOut() }
     val signedIn: Boolean get() = client()?.signedIn == true
 

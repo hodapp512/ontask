@@ -26,9 +26,17 @@ export async function meView(u: User): Promise<HTMLElement> {
   };
 
   const device = h("div", {});
-  const makeToken = async () => {
-    const r = await httpsCallable<unknown, { token: string }>(fns, "createDeviceToken")({});
-    device.replaceChildren(h("p", { class: "muted" }, "Paste this into OnTask on your Mac (Settings → Accountability partner → Link this Mac). It's valid for one hour."), h("code", { class: "big", style: "font-size:11px;letter-spacing:0" }, r.data.token));
+  let countdown: number | undefined;
+  const makeCode = async () => {
+    const r = await httpsCallable<unknown, { code: string; expiresAt: number }>(fns, "createLinkCode")({});
+    const left = h("p", { class: "muted" });
+    const tick = () => {
+      const s = Math.max(0, Math.round((r.data.expiresAt - Date.now()) / 1000));
+      left.textContent = s > 0 ? `Expires in ${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}` : "Expired — make a new code.";
+      if (s === 0) clearInterval(countdown);
+    };
+    clearInterval(countdown); countdown = window.setInterval(tick, 1000); tick();
+    device.replaceChildren(h("p", {}, "On your Mac, open OnTask and type this code:"), h("code", { class: "big" }, r.data.code), left);
   };
 
   const habits = ((sched.data()?.habits ?? []) as any[]);
@@ -38,7 +46,7 @@ export async function meView(u: User): Promise<HTMLElement> {
       h("button", { class: "primary", onclick: makeInvite }, "Invite a partner"), invite),
     h("div", { class: "card" }, h("h2", {}, "Join as a partner"), h("p", { class: "muted" }, "Got a code from someone?"),
       h("div", { class: "row" }, (() => { const i = h("input", { placeholder: "CODE", class: "grow" }) as HTMLInputElement; return [i, h("button", { onclick: () => { if (i.value.trim()) location.hash = `#/join/${i.value.trim().toUpperCase()}`; } }, "Join")]; })())),
-    h("div", { class: "card" }, h("h2", {}, "Link my Mac"), h("button", { onclick: makeToken }, "Create link code"), device),
+    h("div", { class: "card" }, h("h2", {}, "Link my Mac"), h("button", { onclick: makeCode }, "Show code"), device),
     h("div", { class: "card" }, h("h2", {}, "Habit prompts"), h("p", { class: "muted" }, "Set on your Mac; delivered here even when you're away from it."),
       habits.length ? habits.map((x) => h("p", {}, `${x.time}  ${x.name}`)) : h("p", { class: "muted" }, "None yet.")),
     out,
