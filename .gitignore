@@ -1,0 +1,11 @@
+.gradle/
+build/
+.build/
+.swiftpm/
+*.db
+*.db-wal
+*.db-shm
+.idea/
+.DS_Store
+local.properties
+.env
