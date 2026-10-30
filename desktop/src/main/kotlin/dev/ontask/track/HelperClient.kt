@@ -13,6 +13,7 @@ import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.put
 import java.io.BufferedWriter
 import java.io.File
 
@@ -60,11 +61,15 @@ class HelperClient(private val binary: File) : SampleSource, AutoCloseable {
     }
 
     /** Sends one command; returns the `result` object or null on failure. */
-    suspend fun request(cmd: String, timeoutMs: Long = 8000): JsonObject? = mutex.withLock {
+    suspend fun request(cmd: String, timeoutMs: Long = 8000, params: Map<String, Any> = emptyMap()): JsonObject? = mutex.withLock {
         if (!start()) return null
         val id = ++seq
         try {
-            writer!!.apply { write("""{"id":$id,"cmd":"$cmd"}"""); newLine(); flush() }
+            val req = kotlinx.serialization.json.buildJsonObject {
+                put("id", id); put("cmd", cmd)
+                params.forEach { (k, v) -> when (v) { is Boolean -> put(k, v); is Number -> put(k, v); else -> put(k, v.toString()) } }
+            }
+            writer!!.apply { write(req.toString()); newLine(); flush() }
             val resp = withTimeout(timeoutMs) {
                 var found: JsonObject? = null
                 while (found == null) {

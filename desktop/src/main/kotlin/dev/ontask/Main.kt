@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import dev.ontask.ui.AppOverlays
 import dev.ontask.ui.MainScreen
 import dev.ontask.ui.fmtDuration
 import java.awt.RenderingHints
@@ -44,6 +45,7 @@ fun main() {
                 Item("Quit", onClick = { app.shutdown(); exitApplication() })
             },
         )
+        AppOverlays(app)
         // The window is only composed while visible, so a hidden app holds no UI resources.
         if (visible) {
             Window(onCloseRequest = { visible = false }, title = "OnTask") { MainScreen(app) }

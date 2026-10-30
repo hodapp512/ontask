@@ -142,6 +142,12 @@ class AiService(
         }
     }
 
+    /** One short, honest sentence of context for a partner message. Best effort: null if the model is unavailable. */
+    fun contextLine(what: String, driftMin: Long, priorities: List<String>): String? = runCatching {
+        llm.chat(config(Tier.TEXT), "Write ONE short first-person sentence (max 20 words), honest and calm, for a message to an accountability partner. No greeting, no emoji.",
+            "I have been on $what for $driftMin minutes instead of working. My priorities today: ${priorities.joinToString("; ").ifEmpty { "not set" }}.", maxTokens = 50, timeoutSec = 15).text.trim().lines().first()
+    }.getOrNull()
+
     // ---- diagnostics ------------------------------------------------------------------------------------
 
     data class CallStats(val provider: String, val model: String, val tier: String, val calls: Int, val avgMs: Double, val failed: Int, val costUsd: Double)

@@ -79,6 +79,12 @@ fun DiagnosticsScreen(app: App) {
             }
         }
         stats?.let { s -> StatsSection(s) }
+        val aiStats = remember(refresh) { app.ai.stats(App.nowSec() - 86400) }
+        SectionCard("AI calls (last 24 h)", "Estimated cost uses rough list prices; local models are free.") {
+            if (aiStats.isEmpty()) Text("No AI calls yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            aiStats.forEach { a -> KV("${a.provider} · ${a.model} (${a.tier.lowercase()})", "${a.calls} calls, ${"%.0f".format(a.avgMs)} ms avg, ${a.failed} failed, ~$${"%.4f".format(a.costUsd)}") }
+            app.aiError?.let { KV("Last error", it) }
+        }
         RulesSection(app, rules) { rules = app.ruleStore.userRules() }
         SectionCard("Activity log (newest first)") {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {

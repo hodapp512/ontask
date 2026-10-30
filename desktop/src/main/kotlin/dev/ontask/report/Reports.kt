@@ -77,6 +77,17 @@ class Reports(private val db: Db, private val zone: ZoneId = ZoneId.systemDefaul
         }
     }
 
+    /** First non-away moment of [date] (the anchor of the daily rhythm), and the most recent one. */
+    fun presence(date: LocalDate): Pair<Long?, Long?> {
+        val start = date.atStartOfDay(zone).toEpochSecond(); val end = date.plusDays(1).atStartOfDay(zone).toEpochSecond()
+        return db.use { c ->
+            c.prepareStatement("SELECT MIN(start_ts), MAX(end_ts) FROM ticks WHERE level != 'AWAY' AND start_ts >= ? AND start_ts < ?").use { ps ->
+                ps.setLong(1, start); ps.setLong(2, end)
+                ps.executeQuery().use { rs -> rs.next(); rs.getLong(1).takeIf { !rs.wasNull() } to rs.getLong(2).takeIf { !rs.wasNull() } }
+            }
+        }
+    }
+
     /** Today's totals as the tracker's in-memory counters want them. */
     fun totals(date: LocalDate): Map<Level, Long> = daily(date).totalsAll
 }
