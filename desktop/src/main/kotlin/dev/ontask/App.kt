@@ -2,6 +2,7 @@ package dev.ontask
 
 import dev.ontask.classify.Classifier
 import dev.ontask.db.Db
+import dev.ontask.db.Prefs
 import dev.ontask.db.Retention
 import dev.ontask.db.RuleStore
 import dev.ontask.db.Settings
@@ -22,8 +23,9 @@ import java.nio.file.Path
 import java.time.LocalDate
 
 /** Wires the pieces together and owns the tracking loop. */
-class App {
-    val db: Db = Db.open(dataDir().resolve("ontask.db"))
+class App(val dir: Path = dataDir()) {
+    val db: Db = Db.open(dir.resolve("ontask.db"))
+    val prefs = Prefs(db)
     val ruleStore = RuleStore(db)
     val settingsStore = SettingsStore(db)
     val reports = Reports(db)

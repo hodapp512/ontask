@@ -2,6 +2,7 @@ package dev.ontask
 
 import dev.ontask.classify.Classifier
 import dev.ontask.classify.TimeRange
+import dev.ontask.classify.WorkSchedule
 import dev.ontask.classify.WorkWeek
 import dev.ontask.db.Db
 import dev.ontask.db.Settings
@@ -42,7 +43,7 @@ class SessionsAndTrackerTest {
     }
 
     @Test fun workWeekTemplate() {
-        val w = WorkWeek(mapOf(1 to listOf(TimeRange(9 * 60, 17 * 60))))
+        val w = WorkSchedule(WorkWeek(mapOf(1 to listOf(TimeRange(9 * 60, 17 * 60)))))
         val mon10 = java.time.ZonedDateTime.of(2026, 10, 26, 10, 0, 0, 0, ZoneOffset.UTC).toEpochSecond()
         val mon17 = java.time.ZonedDateTime.of(2026, 10, 26, 17, 0, 0, 0, ZoneOffset.UTC).toEpochSecond()
         val tue10 = mon10 + 86_400
@@ -52,7 +53,7 @@ class SessionsAndTrackerTest {
     @Test fun trackerMergesIdenticalTicksAndSplitsOnChange() {
         val db = Db.memory()
         val cls = Classifier(emptyList())
-        val tr = Tracker(TickStore(db), { cls }, { Settings(tickSec = 5, workWeek = WorkWeek()) }, ZoneOffset.UTC)
+        val tr = Tracker(TickStore(db), { cls }, { Settings(tickSec = 5, schedule = WorkSchedule(WorkWeek())) }, ZoneOffset.UTC)
         val t0 = 1_800_000_000L - 1_800_000_000L % 3600 + 10 // early in an hour
         val xcode = Sample(app = "Xcode", idleSec = 1.0)
         repeat(4) { tr.onSample(xcode, t0 + it * 5, 3) }

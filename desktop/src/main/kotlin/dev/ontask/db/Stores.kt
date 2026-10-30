@@ -3,7 +3,10 @@ package dev.ontask.db
 import dev.ontask.Category
 import dev.ontask.classify.Rule
 import dev.ontask.classify.RuleKind
+import dev.ontask.classify.TimeRange
+import dev.ontask.classify.WorkSchedule
 import dev.ontask.classify.WorkWeek
+import java.time.LocalDate
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -96,7 +99,7 @@ data class Settings(
     val tickSec: Int = 5,
     val awayAfterSec: Int = 180,
     val retentionDays: Int = 90,
-    val workWeek: WorkWeek = WorkWeek.DEFAULT,
+    val schedule: WorkSchedule = WorkSchedule(),
 )
 
 class SettingsStore(private val db: Db) {
@@ -109,19 +112,57 @@ class SettingsStore(private val db: Db) {
             }
         }
         val d = Settings()
+        val week = m["work_week"]?.let { runCatching { json.decodeFromString<WorkWeek>(it) }.getOrNull() } ?: d.schedule.week
         return Settings(
             tickSec = m["tick_sec"]?.toIntOrNull()?.coerceIn(1, 60) ?: d.tickSec,
             awayAfterSec = m["away_after_sec"]?.toIntOrNull()?.coerceIn(30, 3600) ?: d.awayAfterSec,
             retentionDays = m["retention_days"]?.toIntOrNull()?.coerceIn(1, 3650) ?: d.retentionDays,
-            workWeek = m["work_week"]?.let { runCatching { json.decodeFromString<WorkWeek>(it) }.getOrNull() } ?: d.workWeek,
+            schedule = WorkSchedule(week, exceptions()),
         )
+    }
+
+    fun exceptions(): Map<LocalDate, List<TimeRange>> = db.use { c ->
+        c.createStatement().use { st ->
+            st.executeQuery("SELECT date, ranges FROM work_exceptions").use { rs ->
+                buildMap { while (rs.next()) put(LocalDate.parse(rs.getString(1)), json.decodeFromString<List<TimeRange>>(rs.getString(2))) }
+            }
+        }
+    }
+
+    fun saveException(date: LocalDate, ranges: List<TimeRange>?) = db.use { c ->
+        if (ranges == null) c.prepareStatement("DELETE FROM work_exceptions WHERE date=?").use { it.setString(1, date.toString()); it.executeUpdate() }
+        else c.prepareStatement("INSERT INTO work_exceptions(date,ranges) VALUES (?,?) ON CONFLICT(date) DO UPDATE SET ranges=excluded.ranges")
+            .use { it.setString(1, date.toString()); it.setString(2, json.encodeToString(ranges)); it.executeUpdate() }
     }
 
     fun save(s: Settings) = db.tx { c ->
         c.prepareStatement("INSERT INTO settings(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").use { ps ->
             fun put(k: String, v: String) { ps.setString(1, k); ps.setString(2, v); ps.executeUpdate() }
             put("tick_sec", s.tickSec.toString()); put("away_after_sec", s.awayAfterSec.toString())
-            put("retention_days", s.retentionDays.toString()); put("work_week", json.encodeToString(s.workWeek))
+            put("retention_days", s.retentionDays.toString()); put("work_week", json.encodeToString(s.schedule.week))
         }
     }
+}
+
+/** Free-form string preferences (theme, blocking mode, AI choices, ...). Small; cached in memory. */
+class Prefs(private val db: Db) {
+    private val cache: MutableMap<String, String> = db.use { c ->
+        c.createStatement().use { st ->
+            st.executeQuery("SELECT key,value FROM settings").use { rs -> HashMap<String, String>().also { while (rs.next()) it[rs.getString(1)] = rs.getString(2) } }
+        }
+    }
+
+    @Synchronized fun get(key: String): String? = cache[key]
+    @Synchronized fun str(key: String, default: String) = cache[key] ?: default
+    @Synchronized fun int(key: String, default: Int) = cache[key]?.toIntOrNull() ?: default
+    @Synchronized fun bool(key: String, default: Boolean) = cache[key]?.let { it == "1" } ?: default
+    @Synchronized fun long(key: String, default: Long) = cache[key]?.toLongOrNull() ?: default
+
+    @Synchronized fun set(key: String, value: String?) {
+        if (value == null) { cache.remove(key); db.use { c -> c.prepareStatement("DELETE FROM settings WHERE key=?").use { it.setString(1, key); it.executeUpdate() } }; return }
+        cache[key] = value
+        db.use { c -> c.prepareStatement("INSERT INTO settings(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").use { it.setString(1, key); it.setString(2, value); it.executeUpdate() } }
+    }
+    fun set(key: String, value: Boolean) = set(key, if (value) "1" else "0")
+    fun set(key: String, value: Int) = set(key, value.toString())
 }

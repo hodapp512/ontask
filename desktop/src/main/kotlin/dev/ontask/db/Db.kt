@@ -99,6 +99,23 @@ object Schema {
         );
         CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
         """,
+        // Phase 2: blocking
+        """
+        CREATE TABLE work_exceptions (date TEXT PRIMARY KEY, ranges TEXT NOT NULL);
+        CREATE TABLE blocklist (domain TEXT PRIMARY KEY, added_ts INTEGER NOT NULL);
+        CREATE TABLE unblocks (
+            id INTEGER PRIMARY KEY, ts INTEGER NOT NULL, kind TEXT NOT NULL, domain TEXT NOT NULL,
+            purpose TEXT, expires_ts INTEGER NOT NULL, ended_ts INTEGER, end_reason TEXT
+        );
+        CREATE TABLE focus_sessions (
+            id INTEGER PRIMARY KEY, start_ts INTEGER NOT NULL, planned_end_ts INTEGER NOT NULL,
+            ended_ts INTEGER, completed INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE events (
+            id INTEGER PRIMARY KEY, ts INTEGER NOT NULL, type TEXT NOT NULL, payload TEXT NOT NULL,
+            synced INTEGER NOT NULL DEFAULT 0
+        );
+        """,
     )
 
     fun migrate(db: Db) = db.use { c ->

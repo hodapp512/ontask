@@ -2,6 +2,7 @@ package dev.ontask.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -59,20 +60,16 @@ fun DiagnosticsScreen(app: App) {
         }
     }
 
-    Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Diagnostics", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-            Button({ refresh++ }) { Text("Refresh") }
-        }
+    Page("Diagnostics", "How OnTask is doing: accuracy, resource use and the raw activity log. Computed when you open it.", actions = { Button({ refresh++ }) { Text("Refresh") } }) {
         res?.let { r ->
-            Section("Resources (budget: ~250 MB, <1% CPU)") {
+            SectionCard("Resources (budget: ~250 MB, <1% CPU)") {
                 KV("App RSS", r.self.rssMb?.let { "%.0f MB".format(it) } ?: "?")
                 KV("JVM heap in use", "%.0f MB".format(r.heapMb))
                 KV("App CPU (since last refresh / avg since start)", "%.2f%% / %.2f%%".format(r.jvmRecent, r.jvmAvg))
                 KV("Helper RSS / CPU", "${r.helper.rssMb?.let { "%.0f MB".format(it) } ?: "—"} / ${r.helper.cpuPct?.let { "%.1f%%".format(it) } ?: "—"}")
             }
         }
-        Section("Helper") {
+        SectionCard("Helper") {
             KV("Status", app.helper.status)
             KV("Restarts / failed samples", "${app.helper.restarts} / ${app.helper.failures}")
             KV("Accessibility permission", if (app.tracker.live.value.sample?.accessibilityTrusted == true) "granted" else "not granted (window titles unavailable)")
@@ -82,10 +79,8 @@ fun DiagnosticsScreen(app: App) {
             }
         }
         stats?.let { s -> StatsSection(s) }
-        HorizontalDivider()
         RulesSection(app, rules) { rules = app.ruleStore.userRules() }
-        HorizontalDivider()
-        Section("Activity log (newest first)") {
+        SectionCard("Activity log (newest first)") {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(filter.text, { filter = filter.copy(text = it) }, label = { Text("app / domain / title") }, singleLine = true, modifier = Modifier.weight(1f))
                 Picker("Level: ${filter.level?.label ?: "all"}", listOf<Level?>(null) + Level.entries, { it?.label ?: "all" }) { filter = filter.copy(level = it) }
@@ -108,15 +103,15 @@ fun DiagnosticsScreen(app: App) {
 
 
 @Composable
-private fun StatsSection(s: DiagStats) {
-    Section("Classification") {
+private fun ColumnScope.StatsSection(s: DiagStats) {
+    SectionCard("Classification") {
         Source.entries.forEach { src ->
             val n = s.sourceTicks[src] ?: 0
             KV(src.label, if (s.totalTicks > 0) "%.1f%%  (%d ticks)".format(n * 100.0 / s.totalTicks, n) else "—")
         }
         KV("Classifier vs. your labels", if (s.labels > 0) "%d of %d labels disagreed (%.0f%%)".format(s.disagreements, s.labels, s.disagreements * 100.0 / s.labels) else "no labels yet")
     }
-    Section("Ticks") {
+    SectionCard("Ticks") {
         KV("Total ticks", s.totalTicks.toString())
         KV("Skipped — away/idle", s.skippedIdle.toString())
         KV("Skipped — unchanged (reused classification)", s.skippedUnchanged.toString())
@@ -131,7 +126,7 @@ private fun StatsSection(s: DiagStats) {
 private fun RulesSection(app: App, userRules: List<dev.ontask.classify.Rule>, onChange: () -> Unit) {
     var kind by remember { mutableStateOf(RuleKind.DOMAIN) }
     var pattern by remember { mutableStateOf("") }
-    Section("Rules (yours override built-in)") {
+    SectionCard("Rules (yours override built-in)") {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Picker(kind.name.lowercase(), RuleKind.entries, { it.name.lowercase() }) { kind = it }
             OutlinedTextField(pattern, { pattern = it }, label = { Text("pattern") }, singleLine = true, modifier = Modifier.weight(1f))
