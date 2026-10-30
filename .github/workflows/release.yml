@@ -1,0 +1,34 @@
+name: Release
+# Push a tag like v1.2.0 to build the .dmg on a macOS runner and publish it to GitHub Releases.
+# The app's update check reads these releases.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  dmg:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Version from tag
+        run: echo "APP_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+      - name: Build helper
+        run: swift build -c release
+        working-directory: helper
+      - name: Test
+        run: ./gradlew test --console=plain
+        working-directory: desktop
+      - name: Package
+        run: ./gradlew packageDmg -PappVersion="$APP_VERSION" --console=plain
+        working-directory: desktop
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: desktop/build/compose/binaries/main/dmg/*.dmg
+          generate_release_notes: true

@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "dev.ontask"
-version = "0.1.0"
+version = (findProperty("appVersion") as String?) ?: "0.1.0"
 
 
 dependencies {
@@ -67,7 +67,8 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg)
             packageName = "OnTask"
-            packageVersion = "1.0.0"
+            // jpackage requires MAJOR.MINOR.PATCH with MAJOR >= 1 on macOS.
+            packageVersion = ((findProperty("appVersion") as String?) ?: "1.0.0").let { v -> if (v.substringBefore(".").toIntOrNull() == 0) "1.${v.substringAfter(".")}" else v }.substringBefore("-")
             description = "Focus tracking, blocking and accountability"
             modules("java.sql", "java.net.http", "java.management", "jdk.management", "jdk.unsupported")
             // Bundles daemon/ and helper/ (see stageResources) next to the app.

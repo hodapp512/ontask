@@ -1,40 +1,66 @@
 # OnTask
 
-A personal macOS productivity tool: blocks distractions, adds friction to unblocking, tracks focus, and supports an accountability partner. Successor to BlockMe. See [DESIGN.md](DESIGN.md) for the full design.
+A personal macOS productivity tool: blocks distractions with friction, tracks focus and drift, and supports an
+accountability partner through a phone app. Successor to BlockMe. Design: [DESIGN.md](DESIGN.md).
+Everything you must do by hand (accounts, secrets, cutover): [SETUP.md](SETUP.md).
 
-**Status: phase 1 (tracking only).** OnTask records what you're doing and reports on it. It never touches `/etc/hosts`, so it runs fine alongside BlockMe.
+## Status
+
+| Phase | What | State |
+|---|---|---|
+| 1 | Tracking, classification rules, report, diagnostics | done |
+| 2 | Hosts blocking (daemon), escalating/purpose unblocks, work-hours calendar, Focus, setup wizard, `.dmg` | done; runs in **dry-run** until you cut over |
+| 3 | OCR/screenshots, AI providers, intervention ladder, planning, evening reflection, battery prompt | done; AI is opt-in |
+| 4 | Firebase rules/functions, PWA, pairing, partner messages, scheduled pushes, update check, release workflow | done; verified on emulators, not deployed |
 
 ## Layout
 
 | Dir | What |
 |---|---|
-| `desktop/` | Kotlin + Compose Desktop app (Gradle). Tray icon, report, diagnostics, settings. SQLite storage. |
-| `helper/` | Swift command-line helper: active app, window title, browser URL, idle time, lock/sleep state. JSON lines over stdin/stdout. |
+| `desktop/` | Kotlin + Compose Desktop app (Gradle). Tray icon, SQLite, all Mac-side logic. |
+| `helper/` | Swift helper: active app/title/URL, idle, lock, media, OCR, screenshots, battery. JSON lines over stdio. |
+| `daemon/` | Root hosts daemon + install/uninstall scripts (ported from BlockMe, hardened). |
+| `functions/` | Firebase Cloud Functions (TypeScript): message routing, schedules, pairing, model recommendations. |
+| `firebase/` | Firestore rules, indexes, emulator/hosting config, rules tests. |
+| `web/` | The PWA for partners and phone use (Vite + TypeScript). |
+| `.github/workflows/` | CI, and the tag-triggered `.dmg` release. |
 
-`daemon/`, `web/`, `functions/` and `firebase/` arrive in later phases.
-
-## Run
-
-Requires macOS 14+, a JDK (17+), and the Swift toolchain (Xcode or Command Line Tools).
+## Run and test
 
 ```bash
-cd desktop
-./gradlew run     # builds the helper (swift build -c release), then launches the app
-./gradlew test
+cd desktop && ./gradlew run          # builds the helper, launches the app
+cd desktop && ./gradlew test         # unit + UI-render tests (PNGs land in desktop/build/ui-shots)
+cd desktop && ./gradlew packageDmg   # installable app with bundled helper and daemon
+
+cd functions && npm ci && npm test   # pure-logic tests
+cd firebase && npm ci && npm test    # Firestore rules (needs Java for the emulator)
+cd web && npm ci && npm test && npm run build
 ```
 
-Data lives in `~/Library/Application Support/OnTask/ontask.db` (override with `-Dontask.data=<dir>`).
+Opt-in integration checks: `ONTASK_OLLAMA_MODEL=<model> ./gradlew test --tests '*OllamaSmoke*'` (real Ollama), and
+`firebase/e2e/pair.mjs` + `ONTASK_E2E_FILE=... ./gradlew test --tests '*EmulatorE2E*'` (Mac → Firestore → Cloud
+Function → partner message, against the emulators).
 
-### Permissions
+## Safety and privacy
 
-- **Accessibility** (optional): needed for window titles of non-browser apps. Grant it to the process that launches the helper (your terminal or IDE when using `./gradlew run`, the app itself once packaged). Diagnostics has a button that opens the system prompt.
-- **Automation** (optional): the first time Chrome/Safari/Brave/Edge/Arc is frontmost, macOS asks whether the helper may control it. This is how the page URL and title are read.
+* The app never writes `/etc/hosts` unless you install the root helper **and** switch the mode to Live.
+  The installer refuses to run while BlockMe's daemon is present.
+* No personal data in the repo: contact details live in your Firebase account, API keys in the macOS Keychain or
+  Firebase Secret Manager, project settings in the app's local database / `web/.env.local` (gitignored).
+* Screenshots and OCR text are held in memory only for the length of one classification call.
+* The raw activity log is never uploaded; only events, daily aggregates, your schedule and check-in status.
 
-Without either, tracking still works with app names only.
+## Known gaps
 
-## Helper protocol
-
-One JSON object per line. Request `{"id":1,"cmd":"sample"}` → `{"id":1,"ok":true,"result":{...}}`. Commands: `ping`, `sample`, `request_accessibility`. New commands (screenshot, OCR) are added to the `handlers` table in `helper/Sources/ontask-helper/main.swift`.
+* Releases are not code-signed or notarized.
+* The 5 min sweep and the weekly Gemini recommendation are untested against real Google services
+  (logic is unit-tested; the Gemini request shape and the Ollama/Hugging Face existence checks are untested live).
+* Web push is untested on real iOS/Android devices; the service worker loads Firebase from gstatic.
+* llama.cpp: no `llama-server` is bundled; GGUF repo IDs in the model catalog are unverified.
+* "Drifting off-purpose ends a work unblock early" is not wired (the unblock records its purpose; the AI doesn't yet
+  compare screen content against it).
+* No habit editing on the phone, group UI, browser extension or Windows port (phase 5).
+* Weekly report is a simple self-rating vs. measured table, not a full report.
 
 ## License
 

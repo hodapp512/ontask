@@ -32,7 +32,7 @@ PLIST="$PREFIX/Library/LaunchDaemons/$LABEL.plist"
 
 run() { if [ "$DRY" = 1 ]; then echo "[dry-run] $*"; else "$@"; fi; }
 
-if [ -z "$PREFIX" ] && [ "$ALLOW_BLOCKME" = 0 ] && [ -e /Library/LaunchDaemons/com.dhodapp.blockme-daemon.plist ]; then
+if [ -z "$PREFIX" ] && [ "$ALLOW_BLOCKME" = 0 ] && ls /Library/LaunchDaemons 2>/dev/null | grep -qi blockme; then
   echo "BlockMe's daemon is installed. Disable BlockMe first (both would overwrite /etc/hosts), or pass --allow-blockme." >&2
   exit 3
 fi
