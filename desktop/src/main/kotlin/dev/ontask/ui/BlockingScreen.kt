@@ -136,10 +136,10 @@ private fun BlocklistCard(app: App, changed: () -> Unit) {
             Button({ val n = app.blocking.blocklist.add(text.split(',', ' ', '\n'), App.nowSec()); msg = if (n == 0) "Nothing new added (invalid or already listed)." else "Added $n."; text = ""; reload() }, enabled = text.isNotBlank()) { Text("Add") }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton({ val n = app.blocking.blocklist.importFromBlockMe(now = App.nowSec()); msg = if (n == 0) "No new sites found in BlockMe's list." else "Imported $n sites from BlockMe (read-only)."; reload() }) { Text("Import from BlockMe") }
+            OutlinedButton({ pickTextFile("Import sites to block")?.let { val n = app.blocking.blocklist.importFile(it, App.nowSec()); msg = if (n == 0) "No new sites found in that file." else "Imported $n sites."; reload() } }) { Text("Import from file…") }
             Text(msg, style = MaterialTheme.typography.bodySmall)
         }
-        if (list.value.isEmpty()) EmptyState("No sites yet", "Add a site above or import BlockMe's list.")
+        if (list.value.isEmpty()) EmptyState("No sites yet", "Add a site above or import a list from a file.")
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             list.value.forEach { d -> InputChip(false, { app.blocking.blocklist.remove(d); reload() }, label = { Text(d) }, trailingIcon = { Text("✕") }) }
         }
@@ -160,10 +160,10 @@ private fun BlockingSetup(app: App, mode: BlockMode, onMode: (BlockMode) -> Unit
         KV("Root helper installed", if (helper.installed) "yes" else "no")
         KV("Staged hosts file", app.blocking.stagedFile.toString())
         KV("Daemon port", app.blocking.port.toString())
-        if (helper.blockMeDaemonPresent) Notice("BlockMe's daemon is installed. OnTask won't install its helper until you disable BlockMe — both would overwrite /etc/hosts.", error = true)
+        Notice("If another app or script manages /etc/hosts, turn it off before installing — both would overwrite the same file.")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Button({ confirm = true }, enabled = helper.available && !helper.blockMeDaemonPresent) { Text(if (helper.installed) "Reinstall helper…" else "Install helper…") }
-            OutlinedButton({ msg = helper.install(app.blocking.stagedFile, app.blocking.port, dryRun = true).output }) { Text("Dry run") }
+            Button({ confirm = true }, enabled = helper.available) { Text(if (helper.installed) "Reinstall helper…" else "Install helper…") }
+            OutlinedButton({ msg = helper.install(app.blocking.stagedFile, app.blocking.port, dryRun = true).output }) { Text("Preview install") }
             if (helper.installed) TextButton({ msg = helper.uninstall().output }) { Text("Uninstall") }
         }
         if (msg.isNotBlank()) Text(msg, style = MaterialTheme.typography.bodySmall)
@@ -171,7 +171,7 @@ private fun BlockingSetup(app: App, mode: BlockMode, onMode: (BlockMode) -> Unit
     if (confirm) AlertDialog(
         onDismissRequest = { confirm = false },
         title = { Text("Install the blocking helper?") },
-        text = { Text("macOS will ask for your administrator password. This installs a small background daemon that copies OnTask's hosts file to /etc/hosts. Then switch the mode to Live.") },
+        text = { Text("macOS will ask for your administrator password. This installs a small background daemon that copies OnTask's hosts file to /etc/hosts. Then switch the blocking mode to On.") },
         confirmButton = { TextButton({ confirm = false; msg = helper.install(app.blocking.stagedFile, app.blocking.port).output.ifBlank { "Done." } }) { Text("Install") } },
         dismissButton = { TextButton({ confirm = false }) { Text("Cancel") } },
     )

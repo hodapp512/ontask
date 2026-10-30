@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Embedded into the binary (__TEXT,__info_plist) so the helper has a bundle identity for code signing and TCC. -->
+    <key>CFBundleIdentifier</key>
+    <string>dev.ontask.helper</string>
+    <key>CFBundleName</key>
+    <string>OnTask Helper</string>
+    <key>CFBundleDisplayName</key>
+    <string>OnTask Helper</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>OnTask reads the current page URL and title of your browser to classify what you're doing.</string>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>OnTask can read on-screen text to classify your activity. Screenshots are never stored.</string>
+</dict>
+</plist>

@@ -57,9 +57,7 @@ class AiService(
     fun defaultModel(kind: ProviderKind): String = when (kind) {
         ProviderKind.OLLAMA -> ModelCatalog.all.first { it.default }.ollamaTag
         ProviderKind.LLAMACPP -> ModelCatalog.all.first { it.default }.gguf
-        ProviderKind.CLAUDE -> "claude-haiku-4-5"
-        ProviderKind.OPENAI -> "gpt-4o-mini"
-        ProviderKind.GEMINI -> "gemini-2.5-flash-lite"
+        ProviderKind.CLAUDE, ProviderKind.OPENAI, ProviderKind.GEMINI -> CloudModels.of(kind).first().first
     }
 
     fun cloudAcknowledged(kind: ProviderKind) = kind.local || prefs.bool("ai.notice.${kind.name}", false)

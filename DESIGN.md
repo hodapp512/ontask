@@ -1,6 +1,6 @@
 # OnTask — Design
 
-OnTask is a personal productivity tool for Mac + phone, the successor to BlockMe (`~/workspace/blockme`, left untouched). Open source, MIT licensed, public repo.
+OnTask is a personal productivity tool for Mac + phone. Open source, MIT licensed, public repo.
 
 ## Philosophy
 
@@ -8,11 +8,11 @@ OnTask is a personal productivity tool for Mac + phone, the successor to BlockMe
 - **Measurement** catches drift *in the moment* (not just after the fact) and feeds reports.
 - **Accountability** is optimized for the user taking the initiative with their partner. The partner is never burdened with approving anything.
 - **Resource-light**, especially when idle.
-- **No personal data in the repo.** Phone numbers, emails, API keys, etc. live in settings, macOS Keychain, or Firebase Secret Manager. (BlockMe's `PersonalConfig.java` is not ported.)
+- **No personal data in the repo.** Phone numbers, emails, API keys, etc. live in settings, macOS Keychain, or Firebase Secret Manager.
 
 ## Blocking (Mac)
 
-- **Mechanism:** `/etc/hosts`, written by a root bash daemon ported from BlockMe. Tamper monitor/restore is dropped. A browser extension (path-level rules) is deferred until clearly needed.
+- **Mechanism:** `/etc/hosts`, written by a small root bash daemon. Tamper monitor/restore is dropped. A browser extension (path-level rules) is deferred until clearly needed.
 - **Work hours = strict mode by default.** No opt-in focus mode. An on-demand **Focus session** applies work-hours rules for a chosen duration outside work hours, logged as a deep-work attempt.
 - **Work hours** are built in: weekly template + per-day exceptions, edited via a visual calendar UI. Configured at first run, editable anytime in settings.
   - Removing/shortening work hours (any time) → asks for a reason → partner is notified with the reason and its meaning.
@@ -115,7 +115,7 @@ Activity log with filters; classification source per tick (rule / metadata / OCR
 ## Resource budget & storage
 
 - App RSS ≲ 250 MB idle; < 1% average CPU outside classification ticks.
-- **SQLite** on the Mac, batched writes. Only today's running totals held in memory. (Fixes BlockMe's `HistoryService`, which loaded all history into memory and rewrote the whole CSV on every change.)
+- **SQLite** on the Mac, batched writes. Only today's running totals held in memory.
 - Retention: raw ticks 90 days → rolled into per-hour summaries kept forever. OCR text never persisted.
 
 ## Phone & partner (PWA)
@@ -144,7 +144,7 @@ Activity log with filters; classification source per tick (rule / metadata / OCR
 ontask/
   desktop/    Kotlin + Compose Multiplatform (desktop JVM), Gradle Kotlin DSL, no Spring
   helper/     Swift helper: ScreenCaptureKit, Vision OCR, active window, idle; JSON over stdin/stdout, long-lived
-  daemon/     root bash hosts daemon (ported from BlockMe)
+  daemon/     root bash hosts daemon
   web/        PWA (TypeScript)
   functions/  Firebase Cloud Functions (TypeScript)
   firebase/   Firestore rules, indexes, hosting config
@@ -154,7 +154,6 @@ ontask/
 - Platform-specific code (hosts, helper, notifications) behind interfaces so a Windows port is possible later.
 - **Packaging:** `./gradlew packageDmg` → `.dmg` with bundled JRE. On first launch the app installs its root helper (one admin prompt) and registers a login item. Uninstall from settings.
 - **Releases:** GitHub Action on a version tag builds the `.dmg` on a macOS runner and publishes to GitHub Releases; the app checks Releases and offers updates.
-- **Port from BlockMe:** hosts logic, daemon + install logic, message templates, blocklists (`custom-hosts-default`), TextBelt/email logic (moved server-side).
 
 ## First-run setup
 
@@ -162,7 +161,7 @@ Sensible defaults; every step skippable and finishable later in settings except 
 
 1. Role
 2. Work-hours weekly template
-3. Import blocklists from BlockMe's custom hosts
+3. Block list (built-in defaults, optional import from a file)
 4. Habit prompts (e.g. morning prayer + time)
 5. Planning / midday / evening times
 6. Pair with partner (skippable)
@@ -172,8 +171,8 @@ Sensible defaults; every step skippable and finishable later in settings except 
 
 ## Build phases
 
-1. **Tracking-only** — desktop shell, SQLite, Swift helper (active window, idle), metadata classification + rules, daily report, diagnostics. Runs alongside BlockMe, which still owns the hosts file.
-2. **Take over blocking** — daemon, escalating delay, expiring + purpose-bound unblocks, work-hours calendar, Focus session, first-run setup, installer. Retire BlockMe.
+1. **Tracking-only** — desktop shell, SQLite, Swift helper (active window, idle), metadata classification + rules, daily report, diagnostics. Never touches the hosts file.
+2. **Take over blocking** — daemon, escalating delay, expiring + purpose-bound unblocks, work-hours calendar, Focus session, first-run setup, installer.
 3. **Intelligence** — OCR, text + vision models, provider options, intervention ladder, planning, evening reflection, battery prompt.
 4. **Firebase + PWA** — auth, pairing, server-sent messages, scheduled pushes, partner view/settings/reactions, model recommendations, releases/update check.
 5. **Later** — group UI, browser extension, Windows / native Android if needed.

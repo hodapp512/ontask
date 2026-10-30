@@ -11,12 +11,25 @@ object HostsBuilder {
         ::1 localhost
     """.trimIndent()
 
-    /** [blocked] = domains to block right now (already minus unblocked ones). Empty = nothing blocked. */
-    fun build(blocked: Collection<String>): String = buildString {
+    private const val ADS_BEGIN = "# --- OnTask ad blocking begin ---"
+    private const val ADS_END = "# --- OnTask ad blocking end ---"
+
+    /**
+     * [blocked] = domains to block right now (already minus unblocked ones). Empty = nothing blocked.
+     * [ads] = ready-made `0.0.0.0 host` lines from the ad-blocking list (empty when ad blocking is off).
+     */
+    fun build(blocked: Collection<String>, ads: List<String> = emptyList()): String = buildString {
         appendLine(SYSTEM)
         appendLine()
         appendLine(BEGIN)
         blocked.toSortedSet().forEach { d -> appendLine("0.0.0.0 $d"); appendLine("0.0.0.0 www.$d") }
         appendLine(END)
+        if (ads.isNotEmpty()) {
+            val own = blocked.flatMap { listOf("0.0.0.0 $it", "0.0.0.0 www.$it") }.toSet()
+            appendLine()
+            appendLine(ADS_BEGIN)
+            ads.forEach { if (it !in own) appendLine(it) }
+            appendLine(ADS_END)
+        }
     }
 }

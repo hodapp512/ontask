@@ -1,4 +1,4 @@
-import { GoogleAuthProvider, isSignInWithEmailLink, sendSignInLinkToEmail, signInAnonymously, signInWithEmailLink, signInWithPopup } from "firebase/auth";
+import { GoogleAuthProvider, isSignInWithEmailLink, sendSignInLinkToEmail, signInAnonymously, signInWithEmailLink, signInWithPopup, signInWithRedirect } from "firebase/auth";
 import { auth, useEmulators } from "../firebase";
 import { h } from "../dom";
 
@@ -14,18 +14,28 @@ export function loginView(): HTMLElement {
     signInWithEmailLink(auth, addr, location.href).then(() => { localStorage.removeItem("ontask.emailForSignIn"); history.replaceState({}, "", location.pathname + location.hash); }).catch((e) => say(String(e.message), true));
   }
 
+  const google = async () => {
+    const provider = new GoogleAuthProvider();
+    try { await signInWithPopup(auth, provider); }
+    catch (e: any) {
+      // Home-screen apps on iOS can block popups; fall back to a full-page redirect.
+      if (e?.code === "auth/popup-blocked" || e?.code === "auth/operation-not-supported-in-this-environment") await signInWithRedirect(auth, provider);
+      else if (e?.code !== "auth/popup-closed-by-user") say(e.message, true);
+    }
+  };
+
   return h("main", {},
     h("h1", {}, "OnTask"),
     h("p", { class: "muted" }, "Stay on task together. Sign in to get started."),
     h("div", { class: "card" },
-      h("button", { class: "primary", onclick: () => signInWithPopup(auth, new GoogleAuthProvider()).catch((e) => say(e.message, true)) }, "Continue with Google"),
-      h("label", {}, "Or get a sign-in link by email", email),
+      h("button", { class: "primary", onclick: google }, "Continue with Google"),
+      h("label", {}, "Or get a sign-in link by email (no password)", email),
       h("button", {
         onclick: async () => {
           try {
             await sendSignInLinkToEmail(auth, email.value.trim(), { url: location.origin + "/", handleCodeInApp: true });
             localStorage.setItem("ontask.emailForSignIn", email.value.trim());
-            say("Check your inbox for the link.");
+            say("Check your inbox for the link. Open it on this device.");
           } catch (e: any) { say(e.message, true); }
         },
       }, "Email me a link"),

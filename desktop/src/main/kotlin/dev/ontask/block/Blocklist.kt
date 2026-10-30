@@ -7,6 +7,9 @@ import java.nio.file.Path
 fun normalizeDomain(raw: String): String? {
     var s = raw.trim().lowercase()
     if (s.isEmpty() || s.startsWith("#")) return null
+    s = s.substringBefore('#').trim()
+    // hosts-file lines ("0.0.0.0 example.com") → the host name
+    Regex("^(\\d{1,3}(\\.\\d{1,3}){3}|::1?)\\s+(\\S+)$").find(s)?.let { s = it.groupValues[3] }
     s = s.removePrefix("http://").removePrefix("https://").substringBefore('/').substringBefore('?').removePrefix("www.")
     return s.takeIf { Regex("^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$").matches(it) }
 }
@@ -27,11 +30,11 @@ class Blocklist(private val db: Db) {
 
     fun remove(domain: String) = db.use { c -> c.prepareStatement("DELETE FROM blocklist WHERE domain=?").use { it.setString(1, domain); it.executeUpdate() } }
 
-    /** Default list shipped with the app (ported from BlockMe's custom-hosts-default). */
+    /** Default list shipped with the app. */
     fun seedDefault(now: Long): Int =
         javaClass.getResourceAsStream("/blocklist-default")?.bufferedReader()?.readLines()?.let { add(it, now) } ?: 0
 
-    /** Reads BlockMe's custom list (read-only). */
-    fun importFromBlockMe(path: Path = Path.of(System.getProperty("user.home"), ".blockme", "sources", "custom-hosts"), now: Long): Int =
+    /** Imports a text file with one domain per line, or a hosts file. Returns how many were new. */
+    fun importFile(path: Path, now: Long): Int =
         if (Files.exists(path)) add(Files.readAllLines(path), now) else 0
 }

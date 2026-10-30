@@ -12,8 +12,8 @@ import java.nio.file.StandardCopyOption
 
 enum class BlockMode(val label: String, val explain: String) {
     OFF("Off", "OnTask never writes a hosts file."),
-    DRY_RUN("Dry run", "OnTask writes its hosts file to its own folder only. Safe next to BlockMe; nothing is blocked."),
-    LIVE("Live", "OnTask tells the root daemon to copy its hosts file to /etc/hosts. Disable BlockMe first."),
+    DRY_RUN("Test mode", "OnTask writes its hosts file to its own folder only, so nothing is actually blocked. Useful to check what would be blocked."),
+    LIVE("On", "OnTask's helper applies the block list to your Mac (/etc/hosts). Needs the helper installed."),
 }
 
 /**
@@ -27,6 +27,7 @@ class BlockingService(
     val unblocks: Unblocks,
     val focus: Focus,
     private val zone: java.time.ZoneId = java.time.ZoneId.systemDefault(),
+    val adBlock: AdBlock? = null,
     private val settings: () -> Settings,
 ) {
     /** File the daemon copies to /etc/hosts. */
@@ -35,12 +36,14 @@ class BlockingService(
     val dryRunTarget: Path get() = dir.resolve("hosts.dry-run-applied")
 
     private var lastApplied: String? = null
+    /** What [lastApplied] was built from, so the (large, with ad blocking) hosts file is only rebuilt on change. */
+    private var lastKey: Any? = null
     @Volatile var lastError: String? = null; private set
 
     var mode: BlockMode
         get() = runCatching { BlockMode.valueOf(prefs.str("blocking.mode", "DRY_RUN")) }.getOrDefault(BlockMode.DRY_RUN)
-        set(v) { prefs.set("blocking.mode", v.name); lastApplied = null }
-    val port: Int get() = prefs.int("blocking.port", 12901) // BlockMe uses 12900
+        set(v) { prefs.set("blocking.mode", v.name); lastApplied = null; lastKey = null }
+    val port: Int get() = prefs.int("blocking.port", 12901)
 
     /** Strict mode: work hours, or a running Focus session. */
     fun strictNow(now: Long): Boolean = settings().schedule.isWork(now, zone) || focus.active(now) != null
@@ -56,8 +59,11 @@ class BlockingService(
     fun tick(now: Long): Boolean {
         focus.settle(now)
         if (mode == BlockMode.OFF) return false
-        val content = HostsBuilder.build(currentlyBlocked(now))
-        if (content == lastApplied) return false
+        val blocked = currentlyBlocked(now)
+        val key = blocked to (adBlock?.let { if (it.enabled) it.version else -1 } ?: -1)
+        if (lastApplied != null && key == lastKey) return false
+        val content = HostsBuilder.build(blocked, adBlock?.section() ?: emptyList())
+        if (content == lastApplied) { lastKey = key; return false }
         return try {
             Files.createDirectories(dir)
             val tmp = Files.createTempFile(dir, "hosts", ".tmp")
@@ -68,7 +74,7 @@ class BlockingService(
                 BlockMode.LIVE -> notifyDaemon()
                 BlockMode.OFF -> {}
             }
-            lastApplied = content; lastError = null; true
+            lastApplied = content; lastKey = key; lastError = null; true
         } catch (e: Exception) {
             lastError = e.message; false
         }

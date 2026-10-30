@@ -27,7 +27,7 @@ export function withClose(type: MessageType, text: string): string {
   return type === "binge_alert" || type === "checkin" ? (text.includes("No need to reply") ? text : `${text}\n${GENTLE_CLOSE}`) : text;
 }
 
-/** TextBelt rejects URLs; BlockMe replaced "." with ",". Same here. */
+/** TextBelt rejects URLs, so "." is replaced with ",". */
 export function textBeltSafe(text: string): string {
   return text.replace(/\./g, ",");
 }

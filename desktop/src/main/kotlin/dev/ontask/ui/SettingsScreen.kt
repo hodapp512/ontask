@@ -37,6 +37,7 @@ fun SettingsScreen(app: App, theme: ThemeMode, onTheme: (ThemeMode) -> Unit) {
                 s.awayAfterSec / 60, 1..30, "minutes",
             ) { update(s.copy(awayAfterSec = it * 60)) }
         }
+        PermissionsSettings(app)
         SectionCard("Your data") {
             SliderSetting(
                 "Keep detailed history", "Keep detailed history for this many days. Older data is kept forever as hourly summaries.",

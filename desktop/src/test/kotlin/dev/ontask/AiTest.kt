@@ -70,6 +70,20 @@ class AiTest {
         val p = AiService.userPrompt(Sample(app = "Chrome", url = "https://www.example.com/x", title = "T"), "ocr text", listOf("P1"), listOf(FewShot("DOMAIN", "example.com", Category.NEWS)))
         assertTrue("example.com" in p && "P1" in p && "ocr text" in p && "NEWS" in p)
     }
+
+    @Test fun parsesOllamaTagsAndMatchesNames() {
+        val body = """{"models":[{"name":"qwen3-vl:4b","size":3300000000,"capabilities":["completion","vision"]},{"name":"mistral-nemo:latest","size":7071713227,"capabilities":["completion","tools"]},{"name":"old","size":1}]}"""
+        val ms = OllamaAdmin.parseTags(body)
+        assertEquals(listOf("qwen3-vl:4b", "mistral-nemo:latest", "old"), ms.map { it.name })
+        assertTrue(ms[0].vision && !ms[1].vision && ms[2].capabilities.isEmpty())
+        assertTrue(ms[1].matches("mistral-nemo") && ms[0].matches("qwen3-vl:4b") && !ms[0].matches("qwen3-vl"))
+        assertEquals(emptyList(), OllamaAdmin.parseTags("not json"))
+    }
+
+    @Test fun cloudDefaultsComeFromTheCatalog() {
+        val s = svc()
+        listOf(ProviderKind.CLAUDE, ProviderKind.OPENAI, ProviderKind.GEMINI).forEach { k -> assertEquals(CloudModels.of(k).first().first, s.defaultModel(k)) }
+    }
 }
 
 /** Opt-in: ONTASK_OLLAMA_MODEL=qwen2.5:0.5b ./gradlew test --tests '*OllamaSmoke*' */

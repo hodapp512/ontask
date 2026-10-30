@@ -175,3 +175,11 @@ fun Notice(text: String, error: Boolean = false) {
         colors = CardDefaults.cardColors(containerColor = if (error) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer),
     ) { Text(text, Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium) }
 }
+
+/** Native macOS file chooser for a text or hosts file; null if cancelled. */
+fun pickTextFile(title: String): java.nio.file.Path? {
+    val d = java.awt.FileDialog(null as java.awt.Frame?, title, java.awt.FileDialog.LOAD)
+    d.isVisible = true
+    val f = d.file ?: return null
+    return java.nio.file.Path.of(d.directory, f)
+}

@@ -1,7 +1,7 @@
 # OnTask
 
 A personal macOS productivity tool: blocks distractions with friction, tracks focus and drift, and supports an
-accountability partner through a phone app. Successor to BlockMe. Design: [DESIGN.md](DESIGN.md).
+accountability partner through a phone app. Design: [DESIGN.md](DESIGN.md).
 Everything you must do by hand (accounts, secrets, cutover): [SETUP.md](SETUP.md).
 
 ## Status
@@ -19,7 +19,7 @@ Everything you must do by hand (accounts, secrets, cutover): [SETUP.md](SETUP.md
 |---|---|
 | `desktop/` | Kotlin + Compose Desktop app (Gradle). Tray icon, SQLite, all Mac-side logic. |
 | `helper/` | Swift helper: active app/title/URL, idle, lock, media, OCR, screenshots, battery. JSON lines over stdio. |
-| `daemon/` | Root hosts daemon + install/uninstall scripts (ported from BlockMe, hardened). |
+| `daemon/` | Root hosts daemon + install/uninstall scripts. |
 | `functions/` | Firebase Cloud Functions (TypeScript): message routing, schedules, pairing, model recommendations. |
 | `firebase/` | Firestore rules, indexes, emulator/hosting config, rules tests. |
 | `web/` | The PWA for partners and phone use (Vite + TypeScript). |
@@ -43,8 +43,8 @@ Function → partner message, against the emulators).
 
 ## Safety and privacy
 
-* The app never writes `/etc/hosts` unless you install the root helper **and** switch the mode to Live.
-  The installer refuses to run while BlockMe's daemon is present.
+* The app never writes `/etc/hosts` unless you install the root helper **and** switch the blocking mode to On.
+  If another app manages `/etc/hosts`, turn it off first.
 * No personal data in the repo: contact details live in your Firebase account, API keys in the macOS Keychain or
   Firebase Secret Manager, project settings in the app's local database / `web/.env.local` (gitignored).
 * Screenshots and OCR text are held in memory only for the length of one classification call.

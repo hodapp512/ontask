@@ -14,7 +14,6 @@ class RootHelper(private val daemonDir: File = locateDaemonDir(), private val pr
 
     val available: Boolean get() = File(daemonDir, "install.sh").exists()
     val installed: Boolean get() = Files.exists(Path.of("/Library/LaunchDaemons/dev.ontask.daemon.plist"))
-    val blockMeDaemonPresent: Boolean get() = runCatching { File("/Library/LaunchDaemons").list()?.any { it.contains("blockme", ignoreCase = true) } == true }.getOrDefault(false)
 
     fun install(staged: Path, port: Int, dryRun: Boolean = false, prefix: Path? = null, target: String = "/etc/hosts"): Result {
         val args = mutableListOf("--staged", staged.toString(), "--port", port.toString(), "--target", target)

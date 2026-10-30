@@ -98,5 +98,8 @@ class HelperClient(private val binary: File) : SampleSource, AutoCloseable {
         return runCatching { json.decodeFromJsonElement(Sample.serializer(), r) }.getOrNull()
     }
 
+    /** Stops the helper; the next request starts a fresh one (macOS only reports a new Screen Recording grant to a new process). */
+    suspend fun restart() = mutex.withLock { kill() }
+
     override fun close() = kill()
 }

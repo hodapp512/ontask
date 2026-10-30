@@ -120,5 +120,13 @@ class BlockingTest {
     @Test fun domainNormalization() {
         assertEquals("reddit.com", normalizeDomain(" https://www.Reddit.com/r/x "))
         assertEquals(null, normalizeDomain("# comment")); assertEquals(null, normalizeDomain("localhost")); assertEquals(null, normalizeDomain("a b.com"))
+        assertEquals("ads.example.com", normalizeDomain("0.0.0.0 ads.example.com # tracker"))
+    }
+
+    @Test fun adBlockSanitize() {
+        val raw = "# c\n127.0.0.1 localhost\n0.0.0.0 0.0.0.0\n0.0.0.0 ads.example.com\n127.0.0.1 t.example.net # x\n1.2.3.4 evil.example\n0.0.0.0 ads.example.com"
+        assertEquals(listOf("0.0.0.0 ads.example.com", "0.0.0.0 t.example.net"), dev.ontask.block.AdBlock.sanitize(raw))
+        val hosts = dev.ontask.block.HostsBuilder.build(listOf("reddit.com"), listOf("0.0.0.0 ads.example.com", "0.0.0.0 reddit.com"))
+        assertTrue(hosts.contains("0.0.0.0 ads.example.com")); assertEquals(1, Regex("0.0.0.0 reddit.com\n").findAll(hosts).count())
     }
 }

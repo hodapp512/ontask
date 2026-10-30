@@ -55,7 +55,8 @@ class App(val dir: Path = dataDir()) {
     val blocklist = Blocklist(db)
     val unblocks = Unblocks(db, prefs, events)
     val focus = Focus(db, events)
-    val blocking = BlockingService(dir, prefs, blocklist, unblocks, focus, settings = { settings })
+    val adBlock = AdBlock(dir, prefs)
+    val blocking = BlockingService(dir, prefs, blocklist, unblocks, focus, adBlock = adBlock, settings = { settings })
     val workHours = WorkHoursEditor(settingsStore, events, { settings }) { settings = it }
 
     val priorities = Priorities(db)
@@ -99,6 +100,10 @@ class App(val dir: Path = dataDir()) {
         override fun removeEldestEntry(e: MutableMap.MutableEntry<String, dev.ontask.ai.AiResult?>) = size > 200
     }
     @Volatile private var aiBusy = false
+    @Volatile private var adBlockBusy = false
+
+    /** Re-downloads the ad-blocking list now (menu bar and settings). */
+    fun refreshAdBlock() { if (!adBlockBusy) { adBlockBusy = true; scope.launch(IO) { try { adBlock.refresh(nowSec()) } finally { adBlockBusy = false } } } }
     private var lastAi = 0L; private var lastBattery = 0L; private var lastRhythm = 0L
     private var batteryAsked = false
     private val snoozeUntil = HashMap<Prompt, Long>()
@@ -140,6 +145,7 @@ class App(val dir: Path = dataDir()) {
         if (cloud.configured && now - lastCloud >= 60) { lastCloud = now; scope.launch(IO) { cloud.syncOnce(now) } }
         if (prefs.get("update.repo") != null && now - lastUpdateCheck >= 7 * 86400) { lastUpdateCheck = now; scope.launch(IO) { checkForUpdates() } }
         if (ai.enabled && now - lastBattery >= 60) { lastBattery = now; scope.launch(IO) { batteryCheck() } }
+        if (adBlock.refreshDue(now) && !adBlockBusy) { adBlockBusy = true; scope.launch(IO) { try { adBlock.refresh(now) } finally { adBlockBusy = false } } }
         if (now - lastRhythm >= 30) { lastRhythm = now; runCatching { rhythmCheck(now, live.away) } }
     }
 

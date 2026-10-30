@@ -160,13 +160,73 @@ func sample(_ req: [String: Any]) -> Result<[String: Any], HelperError> {
     return .success(r)
 }
 
+// MARK: - Permissions
+//
+// macOS attributes these to the *responsible* process: OnTask.app when installed, the terminal (or IDE) under
+// `./gradlew run`. Calling the request APIs is what adds the app to the lists in System Settings.
+
+/// Automation status for one browser without prompting: granted / denied / not_asked / not_running.
+func automationStatus(_ bundleId: String, ask: Bool) -> String {
+    let target = NSAppleEventDescriptor(bundleIdentifier: bundleId)
+    guard let desc = target.aeDesc else { return "unknown" }
+    // 'core'/'getd' (get data) is what reading the URL needs; a wildcard event can't prompt.
+    let status = AEDeterminePermissionToAutomateTarget(desc, AEEventClass(kCoreEventClass), AEEventID(kAEGetData), ask)
+    switch Int(status) {
+    case Int(noErr): return "granted"
+    case -1743: return "denied" // errAEEventNotPermitted
+    case -1744: return "not_asked" // errAEEventWouldRequireUserConsent
+    case -600: return "not_running" // procNotFound
+    default: return "unknown"
+    }
+}
+
+func runningBrowsers() -> [NSRunningApplication] {
+    NSWorkspace.shared.runningApplications.filter { a in a.bundleIdentifier.map { chromiumLike.contains($0) || safariLike.contains($0) } ?? false }
+}
+
+func permissions(_ req: [String: Any]) -> Result<[String: Any], HelperError> {
+    let browsers: [[String: Any]] = runningBrowsers().map { a in
+        let bid = a.bundleIdentifier ?? ""
+        return ["bundleId": bid, "name": a.localizedName ?? bid, "status": automationStatus(bid, ask: false)]
+    }
+    return .success([
+        "accessibility": AXIsProcessTrusted(),
+        "screenRecording": CGPreflightScreenCaptureAccess(),
+        "automation": browsers,
+        "helperBundleId": Bundle.main.bundleIdentifier ?? NSNull(),
+        "helperPath": Bundle.main.executablePath ?? NSNull(),
+    ])
+}
+
+/// Shows the system prompt (first time only) and registers the app in Screen Recording.
+func requestScreenRecording(_ req: [String: Any]) -> Result<[String: Any], HelperError> {
+    if CGPreflightScreenCaptureAccess() { return .success(["granted": true]) }
+    let granted = CGRequestScreenCaptureAccess()
+    // Asking ScreenCaptureKit for content also adds the entry on versions where the CG call alone stays quiet.
+    if !granted { SCShareableContent.getExcludingDesktopWindows(true, onScreenWindowsOnly: true) { _, _ in } }
+    return .success(["granted": granted])
+}
+
+let settingsPanes: Set<String> = ["Privacy_Accessibility", "Privacy_ScreenCapture", "Privacy_Automation"]
+
+func openSettings(_ req: [String: Any]) -> Result<[String: Any], HelperError> {
+    let pane = (req["pane"] as? String) ?? ""
+    guard settingsPanes.contains(pane), let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") else {
+        return .failure(HelperError(message: "unknown_pane"))
+    }
+    return .success(["opened": NSWorkspace.shared.open(url)])
+}
+
 let handlers: [String: Handler] = [
     "ping": { _ in .success(["pong": true]) },
     "battery": battery,
     "screen_capture_status": { _ in .success(["granted": CGPreflightScreenCaptureAccess()]) },
-    "request_screen_capture": { _ in .success(["granted": CGRequestScreenCaptureAccess()]) },
+    "request_screen_capture": requestScreenRecording,
+    "request_screen_recording": requestScreenRecording,
+    "permissions": permissions,
+    "open_settings": openSettings,
     "sample": sample,
-    // Shows the system Accessibility prompt (once) so window titles become available.
+    // Shows the system Accessibility prompt (once) and adds the app to the Accessibility list.
     "request_accessibility": { _ in
         let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         return .success(["trusted": AXIsProcessTrustedWithOptions(opts)])
@@ -291,7 +351,19 @@ func battery(_ req: [String: Any]) -> Result<[String: Any], HelperError> {
     return .success(["hasBattery": false])
 }
 
-let asyncHandlers: [String: AsyncHandler] = ["ocr": ocr, "screenshot": screenshot]
+/// {"cmd":"request_automation","bundleId":"com.google.Chrome"}: asks for Automation of one browser. Blocks until the
+/// user answers, so it runs off the main thread.
+let requestAutomation: AsyncHandler = { req, done in
+    guard let bid = req["bundleId"] as? String, chromiumLike.contains(bid) || safariLike.contains(bid) else {
+        done(.failure(HelperError(message: "unknown_browser"))); return
+    }
+    DispatchQueue.global().async {
+        let status = automationStatus(bid, ask: true)
+        DispatchQueue.main.async { browserBackoffUntil[bid] = nil; done(.success(["status": status])) }
+    }
+}
+
+let asyncHandlers: [String: AsyncHandler] = ["ocr": ocr, "screenshot": screenshot, "request_automation": requestAutomation]
 
 func respond(_ obj: [String: Any]) {
     guard let data = try? JSONSerialization.data(withJSONObject: obj, options: []),

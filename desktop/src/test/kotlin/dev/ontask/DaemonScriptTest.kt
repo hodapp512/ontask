@@ -43,7 +43,7 @@ class RootHelperTest {
         assertTrue(r.ok, r.output)
         assertTrue(Files.exists(dir.resolve("root/Library/LaunchDaemons/dev.ontask.daemon.plist")))
         assertTrue(Files.readString(dir.resolve("root/Library/LaunchDaemons/dev.ontask.daemon.plist")).contains("12999"))
-        assertTrue(rh.install(dir.resolve("hosts"), 12999, dryRun = true).output.contains("dry-run") || rh.blockMeDaemonPresent)
+        assertTrue(rh.install(dir.resolve("hosts"), 12999, dryRun = true).output.contains("dry-run"))
         assertTrue(rh.uninstall(prefix = dir.resolve("root")).ok)
         assertTrue(!Files.exists(dir.resolve("root/Library/LaunchDaemons/dev.ontask.daemon.plist")))
     }

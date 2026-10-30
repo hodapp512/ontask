@@ -31,8 +31,6 @@ import java.util.Locale
 
 private class Step(val title: String, val blurb: String, val skippable: Boolean = true, val content: @Composable (App) -> Unit)
 
-private fun openSettings(pane: String) { runCatching { ProcessBuilder("open", "x-apple.systempreferences:com.apple.preference.security?$pane").start() } }
-
 /** First-run setup. Every step is skippable and can be finished later in Settings, except role and permissions. */
 @Composable
 fun SetupWizard(app: App, onDone: () -> Unit) {
@@ -79,11 +77,11 @@ private val hoursStep = Step("Work hours", "Pick your usual work days and hours.
     SliderSetting("End", "When your work day ends.", end, 12..23, "", format = { "%02d:00".format(it) }) { end = it.coerceAtLeast(start + 1); save() }
 }
 
-private val blocklistStep = Step("Block list", "Sites to block during work hours. Start from the built-in list and/or import BlockMe's.") { app ->
+private val blocklistStep = Step("Block list", "Sites to block during work hours. Start from the built-in list and optionally import your own.") { app ->
     var msg by remember { mutableStateOf("The built-in list (${app.blocklist.all().size} sites) is already loaded.") }
-    OutlinedButton({ val n = app.blocklist.importFromBlockMe(now = App.nowSec()); msg = if (n == 0) "Nothing new in BlockMe's list (or BlockMe isn't installed)." else "Imported $n sites from BlockMe (BlockMe is not modified)." }) { Text("Import from BlockMe") }
+    OutlinedButton({ pickTextFile("Import sites to block")?.let { val n = app.blocklist.importFile(it, App.nowSec()); msg = if (n == 0) "No new sites found in that file." else "Imported $n sites." } }) { Text("Import from file…") }
     Text(msg, style = MaterialTheme.typography.bodyMedium)
-    Text("Blocking starts in Dry run mode and never touches /etc/hosts until you switch it on (Blocking → Advanced).", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text("Blocking starts in Test mode and never touches /etc/hosts until you switch it on (Blocking → Advanced).", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 private val habitsStep = Step("Habit prompts", "Reminders at set times, like a morning prayer. They go to your phone even when you're away from the Mac.") { app ->
@@ -109,18 +107,7 @@ private val rhythmStep = Step("Daily rhythm", "OnTask anchors your day to when y
 private val partnerStep = Step("Accountability partner", "Pair with someone who supports you. They never have to approve anything — they just see what you choose to share. You can skip this.") { app -> PartnerSetupContent(app) }
 
 private val permissionsStep = Step("macOS permissions", "OnTask works with app names alone, but these unlock more. Grant what you're comfortable with.", skippable = false) { app ->
-    PermissionRow("Accessibility", "See window titles of apps.", { app.requestAccessibility() }) { openSettings("Privacy_Accessibility") }
-    PermissionRow("Screen Recording", "Read on-screen text (OCR) for smarter classification. Optional; the screenshot is never stored.", { }) { openSettings("Privacy_ScreenCapture") }
-    Text("Browser URLs need Automation permission: macOS asks the first time a browser is in front.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-}
-
-@Composable
-private fun PermissionRow(name: String, why: String, prompt: () -> Unit, open: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Column(Modifier.weight(1f)) { Text(name, style = MaterialTheme.typography.bodyLarge); Text(why, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        OutlinedButton(prompt) { Text("Ask") }
-        OutlinedButton(open) { Text("Open Settings") }
-    }
+    PermissionsBody(app)
 }
 
 private val aiStep = Step("Smarter classification (optional)", "Rules handle most things. An AI model can classify the rest from on-screen text. Local models keep everything on your Mac.") { app -> AiSetupContent(app) }

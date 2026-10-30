@@ -2,15 +2,14 @@
 #
 # Installs the OnTask hosts daemon as a root LaunchDaemon. Needs sudo (the app asks via the macOS admin prompt).
 #
-#   install.sh [--port 12901] [--staged <file>] [--target /etc/hosts] [--prefix <dir>] [--dry-run] [--allow-blockme]
+#   install.sh [--port 12901] [--staged <file>] [--target /etc/hosts] [--prefix <dir>] [--dry-run]
 #
 # --prefix <dir>   install into <dir> instead of / and skip chown/launchctl (for testing)
 # --dry-run        print what would happen; change nothing
-# Refuses to run when BlockMe's daemon is installed (both would overwrite /etc/hosts) unless --allow-blockme.
 
 set -eu
 
-PORT=12901; STAGED=""; TARGET="/etc/hosts"; PREFIX=""; DRY=0; ALLOW_BLOCKME=0
+PORT=12901; STAGED=""; TARGET="/etc/hosts"; PREFIX=""; DRY=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --port) PORT="$2"; shift 2 ;;
@@ -18,7 +17,6 @@ while [ $# -gt 0 ]; do
     --target) TARGET="$2"; shift 2 ;;
     --prefix) PREFIX="$2"; shift 2 ;;
     --dry-run) DRY=1; shift ;;
-    --allow-blockme) ALLOW_BLOCKME=1; shift ;;
     *) echo "unknown option $1" >&2; exit 2 ;;
   esac
 done
@@ -31,11 +29,6 @@ BIN="$BIN_DIR/$LABEL.sh"
 PLIST="$PREFIX/Library/LaunchDaemons/$LABEL.plist"
 
 run() { if [ "$DRY" = 1 ]; then echo "[dry-run] $*"; else "$@"; fi; }
-
-if [ -z "$PREFIX" ] && [ "$ALLOW_BLOCKME" = 0 ] && ls /Library/LaunchDaemons 2>/dev/null | grep -qi blockme; then
-  echo "BlockMe's daemon is installed. Disable BlockMe first (both would overwrite /etc/hosts), or pass --allow-blockme." >&2
-  exit 3
-fi
 
 run mkdir -p "$BIN_DIR" "$(dirname "$PLIST")"
 run cp "$HERE/ontask-daemon.sh" "$BIN"

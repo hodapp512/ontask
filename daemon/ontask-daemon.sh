@@ -1,11 +1,11 @@
 #!/bin/bash
 #
-# OnTask root hosts daemon (ported from BlockMe's BlockmeRootDaemon.sh).
+# OnTask root hosts daemon.
 #
 # Usage: ontask-daemon.sh <port> <staged_hosts_file> <target_hosts_file>
 # Tell it to apply the staged file:   echo "copy" | nc 127.0.0.1 <port>
 #
-# Differences from BlockMe: listens on loopback only, validates the staged file before copying it,
+# Listens on loopback only, validates the staged file before copying it,
 # and is meant to be installed (by install.sh) at a root-owned path so the user cannot edit what root runs.
 # Set ONTASK_DAEMON_SKIP_DNS=1 (tests) to skip flushing the DNS cache.
 

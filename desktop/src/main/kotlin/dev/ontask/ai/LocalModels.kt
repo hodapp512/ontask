@@ -1,6 +1,7 @@
 package dev.ontask.ai
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
@@ -27,7 +28,29 @@ object ModelCatalog {
     )
 }
 
-data class InstalledModel(val name: String, val sizeBytes: Long)
+/** Suggested model ids for the cloud providers; the settings also accept any other id. First entry is the default. */
+object CloudModels {
+    val byProvider: Map<ProviderKind, List<Pair<String, String>>> = mapOf(
+        ProviderKind.CLAUDE to listOf(
+            "claude-haiku-4-5" to "Claude Haiku 4.5", "claude-haiku-5-5" to "Claude Haiku 5.5 (fast, cheapest)",
+            "claude-sonnet-5-5" to "Claude Sonnet 5.5", "claude-opus-5-5" to "Claude Opus 5.5 (most capable, costly)",
+        ),
+        ProviderKind.OPENAI to listOf(
+            "gpt-4o-mini" to "GPT-4o mini", "gpt-5-nano" to "GPT-5 nano (cheapest)", "gpt-5-mini" to "GPT-5 mini", "gpt-4.1-mini" to "GPT-4.1 mini", "gpt-5" to "GPT-5",
+        ),
+        ProviderKind.GEMINI to listOf(
+            "gemini-2.5-flash-lite" to "Gemini 2.5 Flash-Lite (cheapest)", "gemini-2.5-flash" to "Gemini 2.5 Flash", "gemini-2.5-pro" to "Gemini 2.5 Pro",
+        ),
+    )
+    fun of(kind: ProviderKind) = byProvider[kind] ?: emptyList()
+}
+
+/** [capabilities] comes from Ollama ("completion", "vision", ...); empty when unknown. */
+data class InstalledModel(val name: String, val sizeBytes: Long, val capabilities: List<String> = emptyList()) {
+    val vision get() = "vision" in capabilities
+    /** Ollama names an untagged pull "name:latest". */
+    fun matches(tag: String) = name == tag || name == "$tag:latest"
+}
 
 /** Talks to a local Ollama (detect, list, pull, delete). */
 class OllamaAdmin(private val base: String = "http://127.0.0.1:11434", private val http: HttpClient = HttpClient.newBuilder().connectTimeout(Duration.ofMillis(800)).build()) {
@@ -41,12 +64,22 @@ class OllamaAdmin(private val base: String = "http://127.0.0.1:11434", private v
     fun list(): List<InstalledModel> {
         val r = get("/api/tags") ?: return emptyList()
         if (r.statusCode() != 200) return emptyList()
-        return Json.parseToJsonElement(r.body()).jsonObject["models"]?.jsonArray?.map {
-            val o = it.jsonObject; InstalledModel(o["name"]!!.jsonPrimitive.content, o["size"]?.jsonPrimitive?.longOrNull ?: 0)
-        } ?: emptyList()
+        return parseTags(r.body())
     }
 
-    fun has(tag: String) = list().any { it.name == tag || it.name == "$tag:latest" }
+    fun has(tag: String) = list().any { it.matches(tag) }
+
+    companion object {
+        fun parseTags(body: String): List<InstalledModel> = runCatching {
+            Json.parseToJsonElement(body).jsonObject["models"]?.jsonArray?.map {
+                val o = it.jsonObject
+                InstalledModel(
+                    o["name"]!!.jsonPrimitive.content, o["size"]?.jsonPrimitive?.longOrNull ?: 0,
+                    (o["capabilities"] as? JsonArray)?.map { c -> c.jsonPrimitive.content } ?: emptyList(),
+                )
+            }
+        }.getOrNull() ?: emptyList()
+    }
 
     fun delete(name: String): Boolean = try {
         val body = buildJsonObject { put("name", name) }.toString()
@@ -54,19 +87,26 @@ class OllamaAdmin(private val base: String = "http://127.0.0.1:11434", private v
             .method("DELETE", HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.discarding()).statusCode() == 200
     } catch (e: Exception) { false }
 
-    /** Streams progress (0..1) while pulling; blocks until done. Returns true on success. */
-    fun pull(name: String, onProgress: (Double, String) -> Unit): Boolean = try {
-        val body = buildJsonObject { put("name", name) }.toString()
+    /**
+     * Streams progress (0..1) and a status line while pulling; blocks until done. Returns true on success.
+     * Stops early (returning false) once [cancelled] turns true; Ollama keeps the partial download for a later resume.
+     */
+    fun pull(name: String, cancelled: () -> Boolean = { false }, onProgress: (Double, String) -> Unit): Boolean = try {
+        val body = buildJsonObject { put("model", name) }.toString()
         val resp = http.send(HttpRequest.newBuilder(URI.create("$base/api/pull")).header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofLines())
         var ok = false
-        resp.body().use { lines -> lines.forEach { l ->
-            val o = Json.parseToJsonElement(l) as JsonObject
-            val status = o["status"]?.jsonPrimitive?.content ?: ""
-            val total = o["total"]?.jsonPrimitive?.longOrNull; val done = o["completed"]?.jsonPrimitive?.longOrNull
-            onProgress(if (total != null && total > 0 && done != null) done.toDouble() / total else 0.0, status)
-            if (status == "success") ok = true
-        } }
+        resp.body().use { lines ->
+            val it = lines.iterator()
+            while (it.hasNext() && !cancelled()) {
+                val o = runCatching { Json.parseToJsonElement(it.next()) as JsonObject }.getOrNull() ?: continue
+                o["error"]?.jsonPrimitive?.content?.let { e -> onProgress(0.0, "error: $e"); return@use }
+                val status = o["status"]?.jsonPrimitive?.content ?: ""
+                val total = o["total"]?.jsonPrimitive?.longOrNull; val done = o["completed"]?.jsonPrimitive?.longOrNull
+                onProgress(if (total != null && total > 0 && done != null) done.toDouble() / total else 0.0, status)
+                if (status == "success") ok = true
+            }
+        }
         ok
     } catch (e: Exception) { false }
 }

@@ -8,6 +8,8 @@ import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,7 +28,9 @@ enum class Dest(val label: String, val glyph: String) {
 
 @Composable
 fun MainScreen(app: App, startAt: Dest = Dest.REPORT) {
-    var dest by remember { mutableStateOf(startAt) }
+    var dest by remember { mutableStateOf(Nav.requested.value ?: startAt) }
+    val requested by Nav.requested.collectAsState()
+    LaunchedEffect(requested) { requested?.let { dest = it; Nav.requested.value = null } }
     var mode by remember { mutableStateOf(runCatching { ThemeMode.valueOf(app.prefs.str("theme", "SYSTEM")) }.getOrDefault(ThemeMode.SYSTEM)) }
     OnTaskTheme(mode) {
         var setupDone by remember { mutableStateOf(app.prefs.bool("setup.done", false)) }

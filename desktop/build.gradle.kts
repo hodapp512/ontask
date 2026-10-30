@@ -27,6 +27,9 @@ tasks.processResources { filesMatching("version.properties") { expand("version" 
 
 // The Swift helper is built before `run` so the app can launch it.
 val helperDir = layout.projectDirectory.dir("../helper")
+// "-" is ad-hoc. Pass -PsigningIdentity="Apple Development: ..." (any code-signing certificate in your keychain) so macOS
+// privacy permissions survive rebuilds; ad-hoc grants are tied to one exact build.
+val signingIdentity = (findProperty("signingIdentity") as String?) ?: "-"
 val buildHelper = tasks.register<Exec>("buildHelper") {
     workingDir = helperDir.asFile
     commandLine("swift", "build", "-c", "release")
@@ -38,9 +41,16 @@ val buildHelper = tasks.register<Exec>("buildHelper") {
     doLast {
         print(out.toString())
         if (!out.toString().contains("Build complete!")) throw GradleException("swift build failed")
+        // SwiftPM only linker-signs it as "ontask-helper"; re-sign with a stable identifier (Package.swift embeds its Info.plist).
+        val helperBin = helperDir.file(".build/release/ontask-helper").asFile
+        val sign = ProcessBuilder("codesign", "--force", "-s", signingIdentity, "--identifier", "dev.ontask.helper", helperBin.path).redirectErrorStream(true).start()
+        val signOut = sign.inputStream.bufferedReader().readText()
+        if (sign.waitFor() != 0) throw GradleException("codesign of the helper failed: $signOut")
     }
     inputs.dir(helperDir.dir("Sources"))
     inputs.file(helperDir.file("Package.swift"))
+    inputs.file(helperDir.file("Info.plist"))
+    inputs.property("signingIdentity", signingIdentity)
     outputs.file(helperDir.file(".build/release/ontask-helper"))
 }
 tasks.matching { it.name == "run" }.configureEach { dependsOn(buildHelper) }
@@ -56,6 +66,20 @@ val stageResources = tasks.register<Copy>("stageResources") {
     from(layout.projectDirectory.dir("../daemon")) { into("daemon") }
 }
 tasks.matching { it.name.startsWith("prepareAppResources") || it.name == "createDistributable" || it.name == "packageDmg" }.configureEach { dependsOn(stageResources) }
+// jpackage ad-hoc signs OnTask.app, so Accessibility/Screen Recording grants are tied to that one build and have to be
+// re-granted after each rebuild. With -PsigningIdentity the app is re-signed with that certificate, which keeps them.
+// (For notarized releases use Compose's macOS signing with a Developer ID instead.)
+val appBundle = layout.buildDirectory.dir("compose/binaries/main/app/OnTask.app")
+tasks.matching { it.name == "createDistributable" }.configureEach {
+    doLast {
+        if (signingIdentity == "-") return@doLast
+        val p = ProcessBuilder(
+            "codesign", "--force", "--deep", "--options", "runtime", "--entitlements", file("entitlements.plist").path, "-s", signingIdentity, appBundle.get().asFile.path,
+        ).redirectErrorStream(true).start()
+        val o = p.inputStream.bufferedReader().readText()
+        if (p.waitFor() != 0) throw GradleException("codesign of OnTask.app failed: $o")
+    }
+}
 
 compose.desktop {
     application {
@@ -75,6 +99,8 @@ compose.desktop {
             appResourcesRootDir.set(layout.buildDirectory.dir("appres"))
             macOS {
                 bundleID = "dev.ontask.app"
+                entitlementsFile.set(project.file("entitlements.plist"))
+                runtimeEntitlementsFile.set(project.file("entitlements.plist"))
                 infoPlist {
                     extraKeysRawXml = """
                         <key>NSAppleEventsUsageDescription</key>

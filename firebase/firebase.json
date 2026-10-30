@@ -2,7 +2,7 @@
   "firestore": { "rules": "firestore.rules", "indexes": "firestore.indexes.json" },
   "functions": [{ "source": "../functions", "codebase": "default", "predeploy": ["npm --prefix \"$RESOURCE_DIR\" run build"], "ignore": ["node_modules", "src", "test", "*.md"] }],
   "hosting": {
-    "public": "../web/dist",
+    "public": "public",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [{ "source": "**", "destination": "/index.html" }],
     "headers": [{ "source": "/firebase-messaging-sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }]
