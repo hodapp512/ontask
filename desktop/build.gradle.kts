@@ -1,3 +1,4 @@
+import java.io.ByteArrayOutputStream
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
@@ -24,9 +25,18 @@ tasks.test { useJUnitPlatform() }
 
 // The Swift helper is built before `run` so the app can launch it.
 val helperDir = layout.projectDirectory.dir("../helper")
-val buildHelper by tasks.registering(Exec::class) {
+val buildHelper = tasks.register<Exec>("buildHelper") {
     workingDir = helperDir.asFile
     commandLine("swift", "build", "-c", "release")
+    // On some machines SwiftPM exits 1 with "accessing build database ... disk I/O error" *after* a successful
+    // build (seen under ~/workspace). Judge success by the "Build complete!" line instead of the exit code.
+    isIgnoreExitValue = true
+    val out = ByteArrayOutputStream()
+    standardOutput = out
+    doLast {
+        print(out.toString())
+        if (!out.toString().contains("Build complete!")) throw GradleException("swift build failed")
+    }
     inputs.dir(helperDir.dir("Sources"))
     inputs.file(helperDir.file("Package.swift"))
     outputs.file(helperDir.file(".build/release/ontask-helper"))
