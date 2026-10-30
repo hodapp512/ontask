@@ -3,11 +3,15 @@
   "private": true,
   "type": "commonjs",
   "main": "lib/index.js",
-  "engines": { "node": "22" },
+  "engines": {
+    "node": "22"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "serve": "npm run build && firebase emulators:start --only functions,firestore,auth --config ../firebase/firebase.json"
+    "serve": "npm run build && firebase emulators:start --only functions,firestore,auth --config ../firebase/firebase.json",
+    "test:emu": "vitest run --config vitest.emu.config.ts",
+    "test:all": "npm test && (cd ../firebase && npx firebase emulators:exec --only firestore --project demo-ontask \"npm --prefix ../functions run test:emu\")"
   },
   "dependencies": {
     "firebase-admin": "^13.0.0",
