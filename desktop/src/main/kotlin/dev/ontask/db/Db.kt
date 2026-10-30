@@ -1,0 +1,122 @@
+package dev.ontask.db
+
+import java.nio.file.Files
+import java.nio.file.Path
+import java.sql.Connection
+import java.sql.DriverManager
+
+/** A single SQLite connection guarded by a lock. All access goes through [use]. */
+class Db private constructor(private val conn: Connection, val path: Path?) : AutoCloseable {
+
+    @Synchronized
+    fun <T> use(block: (Connection) -> T): T = block(conn)
+
+    /** Runs [block] in a transaction. */
+    @Synchronized
+    fun <T> tx(block: (Connection) -> T): T {
+        conn.autoCommit = false
+        try {
+            val r = block(conn)
+            conn.commit()
+            return r
+        } catch (e: Throwable) {
+            conn.rollback()
+            throw e
+        } finally {
+            conn.autoCommit = true
+        }
+    }
+
+    @Synchronized
+    override fun close() = conn.close()
+
+    companion object {
+        fun open(path: Path): Db {
+            Files.createDirectories(path.parent)
+            val fresh = !Files.exists(path)
+            val c = DriverManager.getConnection("jdbc:sqlite:$path")
+            c.createStatement().use {
+                if (fresh) it.execute("PRAGMA auto_vacuum = INCREMENTAL")
+                it.execute("PRAGMA journal_mode = WAL")
+                it.execute("PRAGMA synchronous = NORMAL")
+            }
+            return Db(c, path).also { Schema.migrate(it) }
+        }
+
+        fun memory(): Db = Db(DriverManager.getConnection("jdbc:sqlite::memory:"), null).also { Schema.migrate(it) }
+    }
+}
+
+object Schema {
+    private val migrations = listOf(
+        """
+        CREATE TABLE ticks (
+            id INTEGER PRIMARY KEY,
+            start_ts INTEGER NOT NULL,
+            end_ts INTEGER NOT NULL,
+            n INTEGER NOT NULL,
+            seconds INTEGER NOT NULL,
+            app TEXT, bundle TEXT, title TEXT, url TEXT, domain TEXT,
+            category TEXT NOT NULL,
+            level TEXT NOT NULL,
+            source TEXT NOT NULL,
+            rule_id INTEGER,
+            work_time INTEGER NOT NULL,
+            skipped_idle INTEGER NOT NULL DEFAULT 0,
+            skipped_unchanged INTEGER NOT NULL DEFAULT 0,
+            proc_ms INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX ticks_start ON ticks(start_ts);
+        CREATE TABLE hourly (
+            hour_ts INTEGER NOT NULL,
+            level TEXT NOT NULL,
+            category TEXT NOT NULL,
+            source TEXT NOT NULL,
+            work_time INTEGER NOT NULL,
+            subject TEXT NOT NULL,
+            seconds INTEGER NOT NULL,
+            ticks INTEGER NOT NULL,
+            skipped_idle INTEGER NOT NULL DEFAULT 0,
+            skipped_unchanged INTEGER NOT NULL DEFAULT 0,
+            proc_ms INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (hour_ts, level, category, source, work_time, subject)
+        );
+        CREATE TABLE rules (
+            id INTEGER PRIMARY KEY,
+            kind TEXT NOT NULL,
+            pattern TEXT NOT NULL,
+            category TEXT NOT NULL,
+            created_ts INTEGER NOT NULL,
+            UNIQUE(kind, pattern)
+        );
+        CREATE TABLE labels (
+            id INTEGER PRIMARY KEY,
+            ts INTEGER NOT NULL,
+            kind TEXT NOT NULL,
+            pattern TEXT NOT NULL,
+            previous_category TEXT NOT NULL,
+            category TEXT NOT NULL
+        );
+        CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+        """,
+    )
+
+    fun migrate(db: Db) = db.use { c ->
+        var version = c.createStatement().use { s -> s.executeQuery("PRAGMA user_version").use { rs -> rs.next(); rs.getInt(1) } }
+        while (version < migrations.size) {
+            c.autoCommit = false
+            try {
+                migrations[version].split(";").map { it.trim() }.filter { it.isNotEmpty() }.forEach { stmt ->
+                    c.createStatement().use { it.execute(stmt) }
+                }
+                version++
+                c.createStatement().use { it.execute("PRAGMA user_version = $version") }
+                c.commit()
+            } catch (e: Throwable) {
+                c.rollback(); throw e
+            } finally {
+                c.autoCommit = true
+            }
+        }
+    }
+}
