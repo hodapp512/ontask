@@ -18,12 +18,12 @@ public class MakeIcons {
     static Path2D shield(double x, double y, double u) {
         Path2D p = new Path2D.Double();
         p.moveTo(x + 50 * u, y + 4 * u);
-        p.quadTo(x + 68 * u, y + 14 * u, x + 88 * u, y + 15 * u);
-        p.lineTo(x + 88 * u, y + 46 * u);
-        p.curveTo(x + 88 * u, y + 72 * u, x + 70 * u, y + 88 * u, x + 50 * u, y + 96 * u);
-        p.curveTo(x + 30 * u, y + 88 * u, x + 12 * u, y + 72 * u, x + 12 * u, y + 46 * u);
-        p.lineTo(x + 12 * u, y + 15 * u);
-        p.quadTo(x + 32 * u, y + 14 * u, x + 50 * u, y + 4 * u);
+        p.quadTo(x + 72 * u, y + 15 * u, x + 95 * u, y + 15 * u);
+        p.lineTo(x + 95 * u, y + 44 * u);
+        p.curveTo(x + 95 * u, y + 72 * u, x + 74 * u, y + 89 * u, x + 50 * u, y + 97 * u);
+        p.curveTo(x + 26 * u, y + 89 * u, x + 5 * u, y + 72 * u, x + 5 * u, y + 44 * u);
+        p.lineTo(x + 5 * u, y + 15 * u);
+        p.quadTo(x + 28 * u, y + 15 * u, x + 50 * u, y + 4 * u);
         p.closePath();
         return p;
     }
@@ -31,16 +31,16 @@ public class MakeIcons {
     /** The mark in a 100×100 box. */
     static void mark(Graphics2D g, double x, double y, double size) {
         double u = size / 100;
-        g.setPaint(new GradientPaint((float) (x + 12 * u), (float) (y + 4 * u), BLUE, (float) (x + 88 * u), (float) (y + 96 * u), TEAL));
+        g.setPaint(new GradientPaint((float) (x + 5 * u), (float) (y + 4 * u), BLUE, (float) (x + 95 * u), (float) (y + 97 * u), TEAL));
         g.fill(shield(x, y, u));
         // Clock hands from the centre: the long one to 12, the short one to 3.
-        double cx = x + 50 * u, cy = y + 50 * u;
+        double cx = x + 50 * u, cy = y + 55 * u;
         g.setColor(Color.WHITE);
-        g.setStroke(new BasicStroke((float) (9 * u), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g.setStroke(new BasicStroke((float) (7 * u), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         Path2D hands = new Path2D.Double();
-        hands.moveTo(cx, y + 24 * u); hands.lineTo(cx, cy); hands.lineTo(x + 70 * u, cy);
+        hands.moveTo(cx, y + 31 * u); hands.lineTo(cx, cy); hands.lineTo(x + 70 * u, cy);
         g.draw(hands);
-        double r = 5.5 * u;
+        double r = 4.5 * u;
         g.setColor(ORANGE);
         g.fill(new java.awt.geom.Ellipse2D.Double(cx - r, cy - r, 2 * r, 2 * r));
     }

@@ -69,16 +69,16 @@ class TrayGlyph(private val color: Color = Color.Black) : Painter() {
         val u = size.minDimension / 100f
         val shield = androidx.compose.ui.graphics.Path().apply {
             moveTo(50 * u, 4 * u)
-            quadraticTo(68 * u, 14 * u, 88 * u, 15 * u)
-            lineTo(88 * u, 46 * u)
-            cubicTo(88 * u, 72 * u, 70 * u, 88 * u, 50 * u, 96 * u)
-            cubicTo(30 * u, 88 * u, 12 * u, 72 * u, 12 * u, 46 * u)
-            lineTo(12 * u, 15 * u)
-            quadraticTo(32 * u, 14 * u, 50 * u, 4 * u)
+            quadraticTo(72 * u, 15 * u, 95 * u, 15 * u)
+            lineTo(95 * u, 44 * u)
+            cubicTo(95 * u, 72 * u, 74 * u, 89 * u, 50 * u, 97 * u)
+            cubicTo(26 * u, 89 * u, 5 * u, 72 * u, 5 * u, 44 * u)
+            lineTo(5 * u, 15 * u)
+            quadraticTo(28 * u, 15 * u, 50 * u, 4 * u)
             close()
         }
-        val hands = androidx.compose.ui.graphics.Path().apply { moveTo(50 * u, 24 * u); lineTo(50 * u, 50 * u); lineTo(70 * u, 50 * u) }
-        val stroke = Stroke(width = 11 * u, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round)
+        val hands = androidx.compose.ui.graphics.Path().apply { moveTo(50 * u, 31 * u); lineTo(50 * u, 55 * u); lineTo(70 * u, 55 * u) }
+        val stroke = Stroke(width = 9 * u, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round)
         drawContext.canvas.saveLayer(androidx.compose.ui.geometry.Rect(0f, 0f, size.width, size.height), androidx.compose.ui.graphics.Paint())
         drawPath(shield, color)
         drawPath(hands, color, style = stroke, blendMode = androidx.compose.ui.graphics.BlendMode.Clear)
