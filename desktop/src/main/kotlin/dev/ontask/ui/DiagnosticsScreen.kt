@@ -93,8 +93,12 @@ fun DiagnosticsScreen(app: App) {
         stats?.let { s -> StatsSection(s, tick) }
         SectionCard("AI use (last 24 hours)", "Only when nothing else could label what you were doing. Local models are free; cloud costs are rough estimates.") {
             if (aiStats.isEmpty()) Text("No AI calls yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            aiStats.forEach { a -> KV("${a.provider} · ${a.model} (${if (a.tier.equals("vision", true)) "images" else "text"})", "${a.calls} calls, ${"%.1f".format(a.avgMs / 1000)} s each, ${a.failed} failed, ~$${"%.4f".format(a.costUsd)}") }
-            app.aiError?.let { KV("Last error", it) }
+            aiStats.forEach { a ->
+                KV("${a.provider.lowercase().replaceFirstChar { it.uppercase() }} · ${a.model} (${if (a.tier.equals("vision", true)) "images" else "text"})",
+                    "${a.calls} calls" + (if (a.calls > a.failed) ", %.1f s each".format(a.avgMs / 1000) else "") + (if (a.failed > 0) ", ${a.failed} failed" else "") + (if (a.costUsd > 0) ", ~$${"%.4f".format(a.costUsd)}" else ""))
+                if (a.failed > 0) Hint("Latest failure: " + (a.lastError ?: "reason not recorded (before this update) — most likely the model wasn't downloaded yet"))
+            }
+            (app.ai.lastProblem ?: app.aiError)?.let { Notice("AI isn't running right now: $it", error = true) }
         }
         RulesSection(app, rules) { rules = app.ruleStore.userRules() }
         SectionCard("Activity log", "Every check, newest first: what was in front of you, how it was labeled, and what decided the label. Stays on this Mac.") {

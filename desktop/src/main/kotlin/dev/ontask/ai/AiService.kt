@@ -90,23 +90,43 @@ class AiService(
         return res
     }
 
+    /** The latest reason AI couldn't run (model not downloaded, Ollama stopped, request failed); null once it works. */
+    @Volatile var lastProblem: String? = null; private set
+    /** After a failure, a model isn't tried again for a few minutes, so a missing model doesn't fail every 30 seconds. */
+    private val backoff = HashMap<String, Long>()
+    private val backoffMs = 5 * 60_000L
+
+    private fun waiting(cfg: ProviderConfig): Boolean = (backoff["${cfg.kind}/${cfg.model}"] ?: 0) > System.currentTimeMillis()
+
+    private fun failed(cfg: ProviderConfig, e: Exception) {
+        backoff["${cfg.kind}/${cfg.model}"] = System.currentTimeMillis() + backoffMs
+        val m = e.message.orEmpty()
+        lastProblem = when {
+            cfg.kind == ProviderKind.OLLAMA && ("not found" in m || "404" in m) -> "${cfg.model} isn't downloaded in Ollama yet. Settings → AI labeling → Download."
+            cfg.kind == ProviderKind.OLLAMA && ("Connection refused" in m || "ConnectException" in m || "Network" in m) -> "Ollama isn't running. Open the Ollama app, or pick another provider in Settings → AI labeling."
+            else -> m.ifBlank { "The ${cfg.kind.label} request failed." }
+        }
+    }
+
     private fun call(tier: Tier, cfg: ProviderConfig, s: Sample, ocr: String?, priorities: List<String>, shots: List<FewShot>, images: List<String>?): AiResult? {
-        if (cfg.kind == ProviderKind.LLAMACPP && !llama.ensure(cfg.model)) { record(cfg, tier, 0, null, null, false); return null }
+        if (waiting(cfg)) return null
+        if (cfg.kind == ProviderKind.LLAMACPP && !llama.ensure(cfg.model)) { record(cfg, tier, 0, null, null, false, "Couldn't start the built-in model"); lastProblem = "Couldn't start the built-in model ${cfg.model}."; return null }
         if (cfg.kind == ProviderKind.LLAMACPP) llama.touch()
         val ok: LlmResult? = try {
             llm.chat(cfg, SYSTEM, userPrompt(s, ocr, priorities, shots), images ?: emptyList(), maxTokens = 80)
-        } catch (e: LlmException) { record(cfg, tier, 0, null, null, false); null }
+        } catch (e: LlmException) { record(cfg, tier, 0, null, null, false, e.message); failed(cfg, e); null }
+        if (ok != null) lastProblem = null
         if (ok == null) return null
         record(cfg, tier, ok.ms, ok.inTokens, ok.outTokens, true)
         return parse(ok.text, if (images != null) Source.VISION else Source.OCR)
     }
 
-    private fun record(cfg: ProviderConfig, tier: Tier, ms: Long, inTok: Int?, outTok: Int?, ok: Boolean) = db.use { c ->
-        c.prepareStatement("INSERT INTO ai_calls(ts,provider,model,tier,ms,in_tokens,out_tokens,cost_usd,ok) VALUES (?,?,?,?,?,?,?,?,?)").use {
+    private fun record(cfg: ProviderConfig, tier: Tier, ms: Long, inTok: Int?, outTok: Int?, ok: Boolean, error: String? = null) = db.use { c ->
+        c.prepareStatement("INSERT INTO ai_calls(ts,provider,model,tier,ms,in_tokens,out_tokens,cost_usd,ok,error) VALUES (?,?,?,?,?,?,?,?,?,?)").use {
             it.setLong(1, System.currentTimeMillis() / 1000); it.setString(2, cfg.kind.name); it.setString(3, cfg.model); it.setString(4, tier.name)
             it.setLong(5, ms); if (inTok == null) it.setNull(6, java.sql.Types.INTEGER) else it.setInt(6, inTok)
             if (outTok == null) it.setNull(7, java.sql.Types.INTEGER) else it.setInt(7, outTok)
-            it.setDouble(8, Pricing.estimate(cfg.kind, inTok, outTok)); it.setInt(9, if (ok) 1 else 0); it.executeUpdate()
+            it.setDouble(8, Pricing.estimate(cfg.kind, inTok, outTok)); it.setInt(9, if (ok) 1 else 0); it.setString(10, error?.take(300)); it.executeUpdate()
         }
     }
 
@@ -155,7 +175,9 @@ class AiService(
             s.url?.let { appendLine("Address: ${it.take(200)}") }
             if (plan.isNotEmpty()) appendLine("Today's plan: " + plan.joinToString("; ").take(500))
         }
-        val text = llm.chat(config(Tier.TEXT), sys, user, emptyList(), maxTokens = 40).text
+        val cfg = config(Tier.TEXT)
+        if (waiting(cfg)) return null
+        val text = try { llm.chat(cfg, sys, user, emptyList(), maxTokens = 40).text } catch (e: LlmException) { failed(cfg, e); return null }
         val o = Json.parseToJsonElement(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1)) as JsonObject
         val conf = o["confidence"]?.jsonPrimitive?.doubleOrNull ?: 0.5
         o["work"]?.jsonPrimitive?.booleanOrNull?.takeIf { conf >= 0.7 }
@@ -169,12 +191,17 @@ class AiService(
 
     // ---- diagnostics ------------------------------------------------------------------------------------
 
-    data class CallStats(val provider: String, val model: String, val tier: String, val calls: Int, val avgMs: Double, val failed: Int, val costUsd: Double)
+    /** [avgMs] covers successful calls only; [lastError] is the most recent failure's reason, if recorded. */
+    data class CallStats(val provider: String, val model: String, val tier: String, val calls: Int, val avgMs: Double, val failed: Int, val costUsd: Double, val lastError: String? = null)
 
     fun stats(sinceTs: Long): List<CallStats> = db.use { c ->
-        c.prepareStatement("SELECT provider,model,tier,COUNT(*),AVG(ms),SUM(1-ok),SUM(cost_usd) FROM ai_calls WHERE ts >= ? GROUP BY provider,model,tier").use { ps ->
-            ps.setLong(1, sinceTs)
-            ps.executeQuery().use { rs -> buildList { while (rs.next()) add(CallStats(rs.getString(1), rs.getString(2), rs.getString(3), rs.getInt(4), rs.getDouble(5), rs.getInt(6), rs.getDouble(7))) } }
+        c.prepareStatement(
+            """SELECT provider, model, tier, COUNT(*), COALESCE(AVG(CASE WHEN ok=1 THEN ms END), 0), SUM(1-ok), SUM(cost_usd),
+                      (SELECT error FROM ai_calls e WHERE e.provider=a.provider AND e.model=a.model AND e.tier=a.tier AND e.ok=0 AND e.ts >= ? ORDER BY e.ts DESC LIMIT 1)
+               FROM ai_calls a WHERE ts >= ? GROUP BY provider, model, tier""",
+        ).use { ps ->
+            ps.setLong(1, sinceTs); ps.setLong(2, sinceTs)
+            ps.executeQuery().use { rs -> buildList { while (rs.next()) add(CallStats(rs.getString(1), rs.getString(2), rs.getString(3), rs.getInt(4), rs.getDouble(5), rs.getInt(6), rs.getDouble(7), rs.getString(8))) } }
         }
     }
 

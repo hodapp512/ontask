@@ -141,6 +141,10 @@ object Schema {
         );
         CREATE TABLE verdicts (item TEXT PRIMARY KEY, title TEXT, level TEXT NOT NULL, source TEXT NOT NULL, ts INTEGER NOT NULL);
         """,
+        // Why an AI call failed, shown in Diagnostics.
+        """
+        ALTER TABLE ai_calls ADD COLUMN error TEXT;
+        """,
     )
 
     fun migrate(db: Db) = db.use { c ->

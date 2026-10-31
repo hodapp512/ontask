@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import dev.ontask.ui.AppOverlays
@@ -48,6 +49,16 @@ fun main() {
     }
     application {
         var visible by remember { mutableStateOf(showWindow) }
+        // Sized from the screen (about 80% × 85% of the usable area) and centered; kept while OnTask runs so a resize sticks.
+        val windowState = remember {
+            val screen = runCatching { java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().maximumWindowBounds }.getOrNull()
+            val w = ((screen?.width ?: 1440) * 0.8).coerceIn(960.0, 1600.0)
+            val h = ((screen?.height ?: 900) * 0.85).coerceIn(680.0, 1100.0)
+            androidx.compose.ui.window.WindowState(
+                size = androidx.compose.ui.unit.DpSize(w.dp, h.dp),
+                position = androidx.compose.ui.window.WindowPosition.Aligned(androidx.compose.ui.Alignment.Center),
+            )
+        }
         OnTaskTray(app) { dest -> Nav.open(dest); visible = true }
         // Opening OnTask again (Finder, Dock, Spotlight) while it runs in the menu bar shows the window.
         LaunchedEffect(Unit) {
@@ -56,7 +67,7 @@ fun main() {
         AppOverlays(app)
         // The window is only composed while visible, so a hidden app holds no UI resources.
         if (visible) {
-            Window(onCloseRequest = { visible = false }, title = "OnTask", icon = androidx.compose.ui.res.painterResource("icon.png")) {
+            Window(onCloseRequest = { visible = false }, state = windowState, title = "OnTask", icon = androidx.compose.ui.res.painterResource("icon.png")) {
                 val raises by Nav.raises.collectAsState()
                 LaunchedEffect(raises) { if (raises > 0) { window.toFront(); window.requestFocus() } }
                 MainScreen(app)
