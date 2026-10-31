@@ -125,6 +125,18 @@ class Verdicts(private val db: Db) {
         }
     }
 
+    /** Pages and videos in Variable categories seen since [sinceTs] with no verdict yet, newest first, as samples to judge. */
+    fun unjudged(sinceTs: Long, limit: Int): List<Pair<String, dev.ontask.Sample>> {
+        val variable = Category.registry.values.filter { it.variable }.map { it.name }.ifEmpty { listOf("VARIABLE") }
+        val rows = db.use { c ->
+            c.prepareStatement("SELECT app, title, url FROM ticks WHERE start_ts >= ? AND category IN (${variable.joinToString(",") { "?" }}) ORDER BY start_ts DESC").use { ps ->
+                ps.setLong(1, sinceTs); variable.forEachIndexed { i, n -> ps.setString(i + 2, n) }
+                ps.executeQuery().use { rs -> buildList { while (rs.next()) add(dev.ontask.Sample(app = rs.getString(1), title = rs.getString(2), url = rs.getString(3))) } }
+            }
+        }
+        return rows.map { itemKey(it.app, it.title, it.url) to it }.distinctBy { it.first }.filter { get(it.first) == null }.take(limit)
+    }
+
     @Synchronized
     fun clear(item: String) { cache.remove(item); db.use { c -> c.prepareStatement("DELETE FROM verdicts WHERE item=?").use { it.setString(1, item); it.executeUpdate() } } }
 }

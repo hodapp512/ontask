@@ -51,7 +51,7 @@ class AiService(
         prefs.get("${prefix(t)}.provider")?.let { runCatching { ProviderKind.valueOf(it) }.getOrNull() }
             ?: if (ollama.detect()) ProviderKind.OLLAMA else ProviderKind.LLAMACPP
 
-    fun modelOf(t: Tier): String = prefs.get("${prefix(t)}.model") ?: defaultModel(providerOf(t))
+    fun modelOf(t: Tier): String = prefs.get("${prefix(t)}.model")?.let { if (it == THINKING_QWEN) ModelCatalog.all.first { m -> m.default }.ollamaTag else it } ?: defaultModel(providerOf(t))
 
     fun choose(t: Tier, kind: ProviderKind, model: String) { prefs.set("${prefix(t)}.provider", kind.name); prefs.set("${prefix(t)}.model", model) }
 
@@ -103,6 +103,7 @@ class AiService(
         val m = e.message.orEmpty()
         lastProblem = when {
             cfg.kind == ProviderKind.OLLAMA && ("not found" in m || "404" in m) -> "${cfg.model} isn't downloaded in Ollama yet. Settings → AI labeling → Download."
+            "only thinks" in m -> m
             cfg.kind == ProviderKind.OLLAMA && ("Connection refused" in m || "ConnectException" in m || "Network" in m) -> "Ollama isn't running. Open the Ollama app, or pick another provider in Settings → AI labeling."
             else -> m.ifBlank { "The ${cfg.kind.label} request failed." }
         }
@@ -131,6 +132,9 @@ class AiService(
     }
 
     companion object {
+        /** Was the recommended model until it turned out to be the thinking variant; chosen it means the instruct one. */
+        private const val THINKING_QWEN = "qwen3-vl:4b"
+
         /** Built from the current categories, which the user can edit. */
         val SYSTEM: String get() = """
             You classify what a person is doing on their computer right now. Reply with ONLY a JSON object:
@@ -177,7 +181,9 @@ class AiService(
         }
         val cfg = config(Tier.TEXT)
         if (waiting(cfg)) return null
-        val text = try { llm.chat(cfg, sys, user, emptyList(), maxTokens = 40).text } catch (e: LlmException) { failed(cfg, e); return null }
+        val r = try { llm.chat(cfg, sys, user, emptyList(), maxTokens = 60) } catch (e: LlmException) { record(cfg, Tier.TEXT, 0, null, null, false, e.message); failed(cfg, e); return null }
+        record(cfg, Tier.TEXT, r.ms, r.inTokens, r.outTokens, true); lastProblem = null
+        val text = r.text
         val o = Json.parseToJsonElement(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1)) as JsonObject
         val conf = o["confidence"]?.jsonPrimitive?.doubleOrNull ?: 0.5
         o["work"]?.jsonPrimitive?.booleanOrNull?.takeIf { conf >= 0.7 }

@@ -46,6 +46,23 @@ class AiTest {
         } finally { srv.stop(0) }
     }
 
+    @Test fun thinkingModelThatNeverAnswersIsAFailureNotUnsure() {
+        val (srv, url) = server { """{"choices":[{"message":{"content":"","reasoning":"Okay, let's see..."},"finish_reason":"length"}],"usage":{"prompt_tokens":100,"completion_tokens":60}}""" }
+        try {
+            val s = svc()
+            val cfg = ProviderConfig(ProviderKind.OPENAI, "qwen3-vl:4b", "k", url)
+            assertNull(s.classify(Sample(app = "Safari", title = "x"), null, emptyList(), emptyList(), cfgOverride = mapOf(Tier.TEXT to cfg)))
+            val st = s.stats(0).single(); assertEquals(1, st.failed)
+            assertTrue("only thinks" in (st.lastError ?: ""), st.lastError)
+            assertTrue("only thinks" in (s.lastProblem ?: ""))
+        } finally { srv.stop(0) }
+    }
+
+    @Test fun oldThinkingQwenChoiceMeansTheInstructModel() {
+        val s = svc(); s.choose(Tier.TEXT, ProviderKind.OLLAMA, "qwen3-vl:4b")
+        assertEquals("qwen3-vl:4b-instruct", s.modelOf(Tier.TEXT))
+    }
+
     @Test fun lowConfidenceFallsBackToVisionTierWithImage() {
         var visionBody = ""
         val (text, tUrl) = server { reply("""{"category":"NEWS","confidence":0.3}""") }

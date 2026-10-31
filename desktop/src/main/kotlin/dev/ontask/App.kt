@@ -254,6 +254,7 @@ class App(val dir: Path = dataDir()) {
 
         if (ai.enabled && !ai.metadataOnly && !live.away && now - lastAi >= prefs.int("ai.interval_sec", 30) && tracker.needsAi() && !aiBusy) { lastAi = now; scope.launch(IO) { aiCycle(live.sample) } }
         variableCheck(now, live)
+        if (ai.enabled && !ai.metadataOnly && now - lastBackfill >= 120 && !backfillBusy) { lastBackfill = now; backfillBusy = true; scope.launch(IO) { try { judgeEarlier(now) } finally { backfillBusy = false } } }
         checkRegularEnded(now)
         if (ai.llama.running) ai.llama.stopIfIdle()
         if (cloud.configured && now - lastCloud >= 60) { lastCloud = now; scope.launch(IO) { cloud.syncOnce(now) } }
@@ -280,6 +281,22 @@ class App(val dir: Path = dataDir()) {
             if (work != null) { verdicts.set(item, seg.title, work, Source.AI_PAGE, nowSec()); tracker.applyVerdict(if (work) Level.DEEP else Level.WASTED) }
             else askVariable(ask, now)
         } else askVariable(ask, now)
+    }
+
+    private var lastBackfill = 0L
+    @Volatile private var backfillBusy = false
+    /** Items the catch-up already asked about this run (AI unsure or failed), so it moves on to others. */
+    private val backfillTried = HashSet<String>()
+
+    /** Catches up on videos and pages from the last week that were never judged (AI was off or failing), a few at a time. */
+    private fun judgeEarlier(now: Long) {
+        val todo = verdicts.unjudged(now - 7 * 86400, 200).filter { it.first !in backfillTried }.take(5)
+        for ((item, sample) in todo) {
+            if (synchronized(variableJudging) { item in variableJudging }) continue
+            backfillTried += item
+            val work = ai.judgeWork(sample, priorities.today(now)) ?: continue
+            verdicts.set(item, sample.title, work, Source.AI_PAGE, nowSec())
+        }
     }
 
     private fun askVariable(ask: VariableAsk, now: Long) {

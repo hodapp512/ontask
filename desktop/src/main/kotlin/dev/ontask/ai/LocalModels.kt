@@ -22,7 +22,8 @@ data class CatalogModel(val label: String, val ollamaTag: String, val gguf: Stri
 object ModelCatalog {
     // 4-bit builds. The GGUF repo ids are what `llama-server -hf` downloads; verify them if a download 404s.
     val all = listOf(
-        CatalogModel("Qwen3-VL 4B (recommended)", "qwen3-vl:4b", "Qwen/Qwen3-VL-4B-Instruct-GGUF", 3.3, default = true),
+        // The instruct build: Ollama's plain qwen3-vl:4b tag is the "thinking" one, which spends its whole answer reasoning.
+        CatalogModel("Qwen3-VL 4B (recommended)", "qwen3-vl:4b-instruct", "Qwen/Qwen3-VL-4B-Instruct-GGUF", 3.3, default = true),
         CatalogModel("Gemma 3 4B", "gemma3:4b", "ggml-org/gemma-3-4b-it-GGUF", 3.3),
         CatalogModel("Qwen2.5-VL 7B", "qwen2.5vl:7b", "ggml-org/Qwen2.5-VL-7B-Instruct-GGUF", 6.0),
     )

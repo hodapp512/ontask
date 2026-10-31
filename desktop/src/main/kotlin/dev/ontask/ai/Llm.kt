@@ -66,8 +66,12 @@ class LlmClient(private val http: HttpClient = HttpClient.newBuilder().connectTi
         val ms = (System.nanoTime() - t0) / 1_000_000
         if (resp.statusCode() !in 200..299) throw LlmException("${cfg.kind.label} returned ${resp.statusCode()}: ${resp.body().take(200)}", resp.statusCode())
         val o = Json.parseToJsonElement(resp.body()).jsonObject
-        val text = o["choices"]?.jsonArray?.firstOrNull()?.jsonObject?.get("message")?.jsonObject?.get("content")?.jsonPrimitive?.contentOrNull
+        val choice = o["choices"]?.jsonArray?.firstOrNull()?.jsonObject
+        val text = choice?.get("message")?.jsonObject?.get("content")?.jsonPrimitive?.contentOrNull
             ?: throw LlmException("Unexpected response from ${cfg.kind.label}")
+        // "Thinking" models can spend the whole budget reasoning and return no answer at all.
+        if (text.isBlank() && choice["finish_reason"]?.jsonPrimitive?.contentOrNull == "length")
+            throw LlmException("${cfg.model} only thinks and never answers in time. Pick a non-thinking (instruct) model in Settings → AI labeling.")
         val usage = o["usage"] as? JsonObject
         return LlmResult(text, usage?.get("prompt_tokens")?.jsonPrimitive?.intOrNull, usage?.get("completion_tokens")?.jsonPrimitive?.intOrNull, ms)
     }
