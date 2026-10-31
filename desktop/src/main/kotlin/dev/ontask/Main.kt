@@ -18,8 +18,8 @@ fun main() {
     // Black-and-alpha tray icon is drawn as a template image, so it adapts to light and dark menu bars.
     System.setProperty("apple.awt.enableTemplateImages", "true")
     System.setProperty("apple.awt.application.name", "OnTask")
-    // Compose otherwise puts its own default icon in the Dock.
-    runCatching { java.awt.Taskbar.getTaskbar().iconImage = javax.imageio.ImageIO.read(object {}.javaClass.getResource("/icon.png")) }
+    // Menu bar only, like the packaged app's LSUIElement: no Dock icon, also under `./gradlew run`.
+    System.setProperty("apple.awt.UIElement", "true")
     val app = App()
     val login = dev.ontask.block.LoginItem()
     val packaged = login.appExecutable() != null
@@ -69,7 +69,11 @@ fun main() {
         if (visible) {
             Window(onCloseRequest = { visible = false }, state = windowState, title = "OnTask", icon = androidx.compose.ui.res.painterResource("icon.png")) {
                 val raises by Nav.raises.collectAsState()
-                LaunchedEffect(raises) { if (raises > 0) { window.toFront(); window.requestFocus() } }
+                // Without a Dock icon macOS doesn't activate OnTask by itself, so bring it forward explicitly.
+                LaunchedEffect(raises) {
+                    runCatching { java.awt.Desktop.getDesktop().requestForeground(true) }
+                    window.toFront(); window.requestFocus()
+                }
                 MainScreen(app)
             }
         }

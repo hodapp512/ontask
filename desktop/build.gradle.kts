@@ -104,11 +104,14 @@ compose.desktop {
             appResourcesRootDir.set(layout.buildDirectory.dir("appres"))
             macOS {
                 bundleID = "dev.ontask.app"
+                // LSUIElement (below): menu bar only — no Dock icon and no app menu.
                 iconFile.set(project.file("icons/OnTask.icns")) // regenerate with icons/MakeIcons.java
                 entitlementsFile.set(project.file("entitlements.plist"))
                 runtimeEntitlementsFile.set(project.file("entitlements.plist"))
                 infoPlist {
                     extraKeysRawXml = """
+                        <key>LSUIElement</key>
+                        <true/>
                         <key>NSAppleEventsUsageDescription</key>
                         <string>OnTask reads the current page URL and title of your browser to classify what you're doing.</string>
                         <key>NSScreenCaptureUsageDescription</key>
