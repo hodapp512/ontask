@@ -72,11 +72,14 @@ class Reports(private val db: Db, private val zone: ZoneId = ZoneId.systemDefaul
             val subjects = ArrayList<Subject>()
             c.prepareStatement(
                 """SELECT subject, category, SUM(seconds) s FROM ($unionSql) WHERE ts >= ? AND ts < ? AND level != 'AWAY' AND subject != ''
-                   GROUP BY subject, category ORDER BY s DESC LIMIT 10""",
+                   GROUP BY subject, category ORDER BY s DESC LIMIT 20""",
             ).use { ps ->
                 ps.setLong(1, start); ps.setLong(2, end)
                 ps.executeQuery().use { rs -> while (rs.next()) subjects.add(Subject(dev.ontask.track.displayAppName(rs.getString(1)), Category.valueOf(rs.getString(2)), rs.getLong(3))) }
             }
+            // Names that display the same (e.g. "MainKt" and "OnTask") become one row.
+            val merged = subjects.groupBy { it.name to it.category }.map { (k, v) -> Subject(k.first, k.second, v.sumOf { it.seconds }) }.sortedByDescending { it.seconds }.take(10)
+            subjects.clear(); subjects.addAll(merged)
 
             DailyReport(date, start, all, work, timeline, Sessions.deepSessions(timeline), Sessions.distractionEvents(timeline), worst, subjects)
         }

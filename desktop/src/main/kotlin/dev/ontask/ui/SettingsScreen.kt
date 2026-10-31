@@ -35,6 +35,7 @@ fun SettingsScreen(app: App, theme: ThemeMode, onTheme: (ThemeMode) -> Unit, ope
                 androidx.compose.material3.Button({ open(Dest.BLOCK_LIST) }) { Text("Edit block list") }
             }
         }
+        CategoriesSettings(app)
         StartupSettings(app)
         SectionCard("Appearance") {
             SettingRow("Theme", "Light, dark, or follow your Mac's appearance setting.") {

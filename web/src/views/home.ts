@@ -70,7 +70,7 @@ function yourDay(u: User, schedule: DocumentData | undefined, eveningDone: boole
         h("div", {},
           h("h3", {}, "Today so far"),
           h("p", { class: "muted small" }, `💻 ${mac.name ?? "Mac"} · ${mac.lastSyncMs ? "updated " + ago(mac.lastSyncMs) : "not synced yet"}`)),
-        report ? reportBody(report) : h("p", { class: "muted" }, "Nothing tracked yet today. Your Mac sends an update every few minutes while you work."),
+        report ? reportBody(report, { uid: u.uid, categories: (schedule?.categories ?? []) as Cat[] }) : h("p", { class: "muted" }, "Nothing tracked yet today. Your Mac sends an update every few minutes while you work."),
       ));
     }
     kids.push(scheduleCard(schedule, eveningDone));
@@ -110,7 +110,14 @@ function macLinkCard(onCodeShown: () => void): HTMLElement {
   );
 }
 
-function reportBody(r: DocumentData): HTMLElement {
+type Cat = { id: string; label: string; level: string; variable?: boolean };
+
+/** Sends a category correction to the Mac, which applies it on its next sync (about a minute). */
+async function sendCorrection(uid: string, subject: string, category: string) {
+  await addDoc(collection(db, "users", uid, "labelRequests"), { subject, category, ts: Date.now() });
+}
+
+function reportBody(r: DocumentData, edit?: { uid: string; categories: Cat[] }): HTMLElement {
   const totals = (r.totals ?? {}) as Partial<Record<LevelKey, number>>;
   const sum = LEVELS.reduce((a, l) => a + (totals[l.key] ?? 0), 0) || 1;
   const share = deepShare(totals);
@@ -123,8 +130,25 @@ function reportBody(r: DocumentData): HTMLElement {
     h("div", { class: "legend" }, LEVELS.map((l) => h("span", {}, h("span", { class: "dot", style: `background:${l.color}` }), `${l.label} ${fmtDuration(totals[l.key] ?? 0)}`))),
     tl,
     h("p", { class: "muted small" }, `${sessions} deep-work session${sessions === 1 ? "" : "s"} · ${r.distractionEvents ?? 0} distraction${r.distractionEvents === 1 ? "" : "s"}`),
-    (r.topSites ?? []).length > 0 && h("details", {}, h("summary", {}, "Where the time went"), (r.topSites as any[]).slice(0, 8).map((s) => h("p", { class: "row between" }, h("span", {}, s.name), h("span", { class: "muted" }, fmtDuration(s.seconds))))),
+    (r.topSites ?? []).length > 0 && h("details", {}, h("summary", {}, "Where the time went"),
+      edit?.categories.length ? h("p", { class: "muted small" }, "Labeled wrong? Pick the right category — your Mac updates within a minute.") : null,
+      (r.topSites as any[]).slice(0, 8).map((s) => siteRow(s, edit))),
   );
+}
+
+function siteRow(s: { name: string; category?: string; categoryId?: string; seconds: number }, edit?: { uid: string; categories: Cat[] }): HTMLElement {
+  if (!edit?.categories.length) return h("p", { class: "row between" }, h("span", {}, s.name), h("span", { class: "muted" }, fmtDuration(s.seconds)));
+  const note = h("span", { class: "muted small" });
+  const sel = h("select", {
+    class: "cat",
+    onchange: async () => {
+      sel.disabled = true;
+      try { await sendCorrection(edit.uid, s.name, sel.value); note.textContent = "Updating on your Mac…"; }
+      catch (e: any) { note.textContent = e.message; sel.disabled = false; }
+    },
+  }, edit.categories.map((c) => h("option", { value: c.id, selected: c.id === s.categoryId }, c.label)),
+    !edit.categories.some((c) => c.id === s.categoryId) && h("option", { value: "", selected: true, disabled: true }, s.category ?? "Unclassified")) as HTMLSelectElement;
+  return h("div", { class: "site" }, h("div", { class: "row between" }, h("span", {}, s.name), h("span", { class: "muted" }, fmtDuration(s.seconds))), h("div", { class: "row" }, sel, note));
 }
 
 function scheduleCard(s: DocumentData | undefined, eveningDone: boolean): HTMLElement | null {

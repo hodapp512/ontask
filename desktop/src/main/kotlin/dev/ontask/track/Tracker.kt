@@ -88,7 +88,7 @@ class Tracker(
         val day = Instant.ofEpochSecond(nowSec).atZone(zone).toLocalDate()
         if (day != totalsDay) { totalsDay = day; totals.clear() }
         totals.merge(seg.level, st.tickSec.toLong(), Long::plus)
-        _live.value = Live(HashMap(totals), if (away) null else s, Classification(seg.category, seg.source, seg.ruleId), away)
+        _live.value = Live(HashMap(totals), if (away) null else s, Classification(seg.category, seg.source, seg.ruleId, seg.level), away)
         return seg
     }
 
@@ -113,6 +113,17 @@ class Tracker(
             _live.value = _live.value.copy(totals = HashMap(totals), classification = Classification(seg.category, seg.source, seg.ruleId))
         }
         return true
+    }
+
+    /** Sets whether the open page or video in a Variable category is work, keeping today's totals consistent. */
+    @Synchronized
+    fun applyVerdict(level: Level) {
+        val seg = open ?: return
+        if (!seg.category.variable || seg.levelOverride == level) return
+        val old = seg.level
+        seg.levelOverride = level; seg.dirty = true
+        totals.merge(old, -seg.seconds.toLong(), Long::plus); totals.merge(level, seg.seconds.toLong(), Long::plus)
+        _live.value = _live.value.copy(totals = HashMap(totals), classification = Classification(seg.category, seg.source, seg.ruleId, level))
     }
 
     /** True if the open segment is unclassified and could use AI. */

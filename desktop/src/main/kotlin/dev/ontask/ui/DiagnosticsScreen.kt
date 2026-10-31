@@ -108,7 +108,7 @@ fun DiagnosticsScreen(app: App) {
                     Text(fmtTime(r.ts), Modifier.weight(0.09f), style = MaterialTheme.typography.bodySmall)
                     Text(fmtDuration(r.seconds.toLong()), Modifier.weight(0.06f), style = MaterialTheme.typography.bodySmall)
                     Text(listOfNotNull(r.app, r.domain).joinToString(" · ").ifEmpty { "—" } + (r.title?.let { " — ${it.take(60)}" } ?: ""), Modifier.weight(0.45f), style = MaterialTheme.typography.bodySmall, maxLines = 1)
-                    Box(Modifier.weight(0.14f)) { (r.domain ?: r.app)?.let { n -> CategoryPicker(app, dev.ontask.track.displayAppName(n), r.category) { relabeled++ } } ?: Text(r.category.label, style = MaterialTheme.typography.bodySmall) }
+                    Box(Modifier.weight(0.14f)) { (r.domain ?: r.app)?.let { n -> CategoryPicker(app, dev.ontask.track.displayAppName(n), r.category, { relabeled++ }, item = Triple(dev.ontask.classify.itemKey(r.app, r.title, r.url), r.title, r.level)) } ?: Text(r.category.label, style = MaterialTheme.typography.bodySmall) }
                     Text(r.source.label + if (r.workTime) "" else " (off-hours)", Modifier.weight(0.2f), style = MaterialTheme.typography.bodySmall)
                 }
             }
@@ -126,6 +126,7 @@ private fun sourceHelp(s: Source) = when (s) {
     Source.METADATA -> "Guessed from the app name and window title"
     Source.OCR -> "AI read the text on screen"
     Source.VISION -> "AI looked at a screenshot"
+    Source.AI_PAGE -> "AI decided whether a page or video on a Varies site was work"
     Source.AWAY -> "You weren't at the computer"
 }
 

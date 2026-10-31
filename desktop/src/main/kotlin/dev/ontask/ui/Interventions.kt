@@ -44,7 +44,9 @@ fun AppOverlays(app: App) {
     val battery by app.batteryPrompt.collectAsState()
     val mode = remember { runCatching { ThemeMode.valueOf(app.prefs.str("theme", "SYSTEM")) }.getOrDefault(ThemeMode.SYSTEM) }
 
+    val variable by app.variableAsk.collectAsState()
     iv?.let { InterventionWindow(app, it, mode) }
+    variable?.let { VariableAskWindow(app, it, mode) }
     prompt?.let { PromptWindow(app, it, mode) }
     if (battery) OnTaskTheme(mode) {
         AlertDialog(

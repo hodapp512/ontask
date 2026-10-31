@@ -166,9 +166,12 @@ private fun RightNowCard(app: App, now: Long, changed: () -> Unit) {
                 val domain = domainOf(s.url)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Dot(levelColor(c.level))
-                    Text(listOfNotNull(s.app, domain).joinToString(" · "), Modifier.weight(1f), maxLines = 1)
+                    Column(Modifier.weight(1f)) {
+                        Text(listOfNotNull(s.app, domain).joinToString(" · "), maxLines = 1)
+                        if (c.category.variable) s.title?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1) }
+                    }
                     val pattern = domain ?: s.app
-                    if (pattern != null) CategoryPicker(app, pattern, c.category, changed)
+                    if (pattern != null) CategoryPicker(app, pattern, c.category, changed, item = Triple(dev.ontask.classify.itemKey(s.app, s.title, s.url), s.title, c.level))
                 }
             }
         }

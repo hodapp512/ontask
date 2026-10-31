@@ -41,6 +41,9 @@ import java.time.LocalDate
 class App(val dir: Path = dataDir()) {
     val db: Db = Db.open(dir.resolve("ontask.db"))
     val prefs = Prefs(db)
+    /** Loaded first: rules and stored activity are read through the current list of categories. */
+    val categories = dev.ontask.classify.CategoryStore(db).also { it.load() }
+    val verdicts = dev.ontask.classify.Verdicts(db)
     val ruleStore = RuleStore(db)
     val settingsStore = SettingsStore(db)
     val reports = Reports(db)
@@ -72,7 +75,7 @@ class App(val dir: Path = dataDir()) {
         return if (alts.isEmpty()) own else alts.random()
     }
 
-    val cloud by lazy { dev.ontask.cloud.CloudSync(prefs, events, reports, { settings }, habits, checkins) }
+    val cloud by lazy { dev.ontask.cloud.CloudSync(prefs, events, reports, { settings }, habits, checkins, relabel = { name, cat -> reclassify(name, Category.valueOf(cat)) }) }
     val updates = dev.ontask.cloud.UpdateCheck()
     @Volatile var updateAvailable: dev.ontask.cloud.UpdateInfo? = null; private set
     private var lastCloud = 0L; private var lastUpdateCheck = 0L
@@ -91,6 +94,13 @@ class App(val dir: Path = dataDir()) {
     private val _intervention = MutableStateFlow<Intervention?>(null)
     /** Current intervention step to show (null = none). Cleared by the user's action. */
     val intervention: StateFlow<Intervention?> = _intervention
+    /** "Is this work?" for a page or video in a Variable category that AI couldn't decide. */
+    data class VariableAsk(val item: String, val title: String?, val site: String?)
+    private val _variableAsk = MutableStateFlow<VariableAsk?>(null)
+    val variableAsk: StateFlow<VariableAsk?> = _variableAsk
+    private val variableAsked = HashSet<String>()
+    private val variableJudging = HashSet<String>()
+
     private val _duePrompt = MutableStateFlow<Prompt?>(null)
     val duePrompt: StateFlow<Prompt?> = _duePrompt
     private val _batteryPrompt = MutableStateFlow(false)
@@ -141,12 +151,46 @@ class App(val dir: Path = dataDir()) {
         if (_intervention.value != null && ladder.step == Step.NONE) _intervention.value = null
 
         if (ai.enabled && !ai.metadataOnly && !live.away && now - lastAi >= prefs.int("ai.interval_sec", 30) && tracker.needsAi() && !aiBusy) { lastAi = now; scope.launch(IO) { aiCycle(live.sample) } }
+        variableCheck(now, live)
         if (ai.llama.running) ai.llama.stopIfIdle()
         if (cloud.configured && now - lastCloud >= 60) { lastCloud = now; scope.launch(IO) { cloud.syncOnce(now) } }
         if (prefs.get("update.repo") != null && now - lastUpdateCheck >= 7 * 86400) { lastUpdateCheck = now; scope.launch(IO) { checkForUpdates() } }
         if (ai.enabled && now - lastBattery >= 60) { lastBattery = now; scope.launch(IO) { batteryCheck() } }
         if (adBlock.refreshDue(now) && !adBlockBusy) { adBlockBusy = true; scope.launch(IO) { try { adBlock.refresh(now) } finally { adBlockBusy = false } } }
         if (now - lastRhythm >= 30) { lastRhythm = now; runCatching { rhythmCheck(now, live.away) } }
+    }
+
+    /**
+     * A page or video in a Variable category (e.g. YouTube) counts as Mixed until it's decided: a remembered verdict,
+     * else AI on its title against today's plan, else — in work hours or a Focus session — a pop-up asking you.
+     */
+    private fun variableCheck(now: Long, live: dev.ontask.track.Live) {
+        val seg = tracker.currentSegment() ?: return
+        if (live.away || !seg.category.variable || seg.levelOverride != null) return
+        val item = dev.ontask.classify.itemKey(seg.app, seg.title, seg.url)
+        verdicts.get(item)?.let { tracker.applyVerdict(it); return }
+        val ask = VariableAsk(item, seg.title, seg.domain ?: seg.app)
+        synchronized(variableJudging) { if (!variableJudging.add(item)) return }
+        if (ai.enabled && !ai.metadataOnly && live.sample != null) scope.launch(IO) {
+            val work = ai.judgeWork(live.sample, priorities.today(now))
+            if (work != null) { verdicts.set(item, seg.title, work, Source.AI_PAGE, nowSec()); tracker.applyVerdict(if (work) Level.DEEP else Level.WASTED) }
+            else askVariable(ask, now)
+        } else askVariable(ask, now)
+    }
+
+    private fun askVariable(ask: VariableAsk, now: Long) {
+        synchronized(variableJudging) { variableJudging.remove(ask.item) }
+        if (!blocking.strictNow(now) || _variableAsk.value != null || !variableAsked.add(ask.item)) return
+        _variableAsk.value = ask
+    }
+
+    /** Answer from the pop-up or a dropdown: [work] true/false saves a verdict; null just closes the pop-up. */
+    fun answerVariable(item: String, title: String?, work: Boolean?) {
+        if (_variableAsk.value?.item == item) _variableAsk.value = null
+        if (work == null) return
+        verdicts.set(item, title, work, Source.USER_LABEL, nowSec())
+        val seg = tracker.currentSegment()
+        if (seg != null && dev.ontask.classify.itemKey(seg.app, seg.title, seg.url) == item) tracker.applyVerdict(if (work) Level.DEEP else Level.WASTED)
     }
 
     private suspend fun aiCycle(sample: dev.ontask.Sample?) {
@@ -226,6 +270,26 @@ class App(val dir: Path = dataDir()) {
     }
 
     fun reloadRules() { classifier = Classifier(ruleStore.userRules()) }
+
+    /**
+     * Files [name] (an app, or a website if it has a dot and no spaces) under [to]: saves a rule for the future and
+     * relabels its past activity. Used by the dropdowns here and by corrections sent from the phone.
+     */
+    fun reclassify(name: String, to: Category, from: Category = Category.UNKNOWN) {
+        val kind = if ('.' in name && ' ' !in name) dev.ontask.classify.RuleKind.DOMAIN else dev.ontask.classify.RuleKind.APP
+        ruleStore.label(kind, name, to, from, nowSec())
+        ruleStore.relabelHistory(kind, name, to)
+        reloadRules(); tracker.invalidate()
+    }
+
+    /** Deletes a category and re-sorts what was in it with the remaining rules (anything unmatched → Unclassified). */
+    fun deleteCategory(c: Category) {
+        categories.delete(c) { app, bundle, title, url ->
+            val cls = Classifier(ruleStore.userRules().filter { it.category != c })
+            cls.classify(Sample(app = app, bundleId = bundle, title = title, url = url)).category
+        }
+        reloadRules(); tracker.invalidate()
+    }
 
     fun updateSettings(s: Settings) { settingsStore.save(s); settings = s }
 

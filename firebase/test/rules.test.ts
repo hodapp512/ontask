@@ -101,4 +101,10 @@ describe("model recommendation", () => {
     await assertFails(setDoc(doc(as(TRACKED), "modelRecommendation", "latest"), { candidates: [1] }));
     await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "modelRecommendation", "latest")));
   });
+  it("only you can send category corrections for your own day", async () => {
+    const req = { subject: "youtube.com", category: "LEARNING", ts: 1 };
+    await assertSucceeds(setDoc(doc(as(TRACKED), "users", TRACKED, "labelRequests", "r1"), req));
+    await assertFails(setDoc(doc(as(PARTNER), "users", TRACKED, "labelRequests", "r2"), req));
+    await assertFails(setDoc(doc(as(TRACKED), "users", TRACKED, "labelRequests", "r3"), { ...req, extra: true }));
+  });
 });

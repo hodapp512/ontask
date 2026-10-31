@@ -1,7 +1,15 @@
 package dev.ontask.classify
 
 import dev.ontask.Category
-import dev.ontask.Category.*
+import dev.ontask.Category.Companion.CORE_WORK
+import dev.ontask.Category.Companion.WORK_SUPPORT
+import dev.ontask.Category.Companion.LEARNING
+import dev.ontask.Category.Companion.COMMUNICATION
+import dev.ontask.Category.Companion.ENTERTAINMENT
+import dev.ontask.Category.Companion.SOCIAL
+import dev.ontask.Category.Companion.NEWS
+import dev.ontask.Category.Companion.SHOPPING
+import dev.ontask.Category.Companion.VARIABLE
 
 /** Simple built-in rules. Users override them with their own (see RuleStore). Ids are negative. */
 object DefaultRules {
@@ -19,7 +27,9 @@ object DefaultRules {
         WORK_SUPPORT to listOf("mail.google.com", "calendar.google.com", "docs.google.com", "drive.google.com", "notion.so", "atlassian.net"),
         LEARNING to listOf("wikipedia.org", "coursera.org", "udemy.com", "khanacademy.org", "edx.org"),
         COMMUNICATION to listOf("slack.com", "web.whatsapp.com", "teams.microsoft.com", "meet.google.com", "zoom.us"),
-        ENTERTAINMENT to listOf("youtube.com", "netflix.com", "twitch.tv", "hulu.com", "disneyplus.com", "spotify.com"),
+        // Could be a tutorial or a time sink: judged video by video.
+        VARIABLE to listOf("youtube.com", "vimeo.com", "medium.com", "substack.com"),
+        ENTERTAINMENT to listOf("netflix.com", "twitch.tv", "hulu.com", "disneyplus.com", "spotify.com"),
         SOCIAL to listOf("facebook.com", "instagram.com", "x.com", "twitter.com", "reddit.com", "tiktok.com", "linkedin.com", "threads.net"),
         NEWS to listOf("news.ycombinator.com", "cnn.com", "nytimes.com", "bbc.com", "foxnews.com", "theguardian.com", "washingtonpost.com"),
         SHOPPING to listOf("amazon.com", "ebay.com", "etsy.com", "walmart.com", "target.com"),

@@ -32,8 +32,10 @@ data class Segment(
     var alignment: Int? = null,
     var confidence: Double? = null,
     var dirty: Boolean = true,
+    /** For Variable categories: the verdict for this page or video, once known. */
+    var levelOverride: dev.ontask.Level? = null,
 ) {
-    val level get() = category.level
+    val level get() = levelOverride ?: category.level
 }
 
 class TickStore(private val db: Db) {

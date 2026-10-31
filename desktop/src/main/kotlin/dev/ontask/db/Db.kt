@@ -133,6 +133,14 @@ object Schema {
         ALTER TABLE ticks ADD COLUMN alignment INTEGER;
         ALTER TABLE ticks ADD COLUMN confidence REAL;
         """,
+        // Editable categories (built-ins are stored only once changed) and verdicts for Variable pages/videos.
+        """
+        CREATE TABLE categories (
+            name TEXT PRIMARY KEY, label TEXT NOT NULL, level TEXT NOT NULL, variable INTEGER NOT NULL DEFAULT 0,
+            deleted INTEGER NOT NULL DEFAULT 0, pos INTEGER NOT NULL DEFAULT 100
+        );
+        CREATE TABLE verdicts (item TEXT PRIMARY KEY, title TEXT, level TEXT NOT NULL, source TEXT NOT NULL, ts INTEGER NOT NULL);
+        """,
     )
 
     fun migrate(db: Db) = db.use { c ->

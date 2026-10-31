@@ -216,14 +216,27 @@ fun pickTextFile(title: String): java.nio.file.Path? {
  * past activity, so the change shows everywhere at once.
  */
 @Composable
-fun CategoryPicker(app: dev.ontask.App, name: String, current: dev.ontask.Category, onChanged: () -> Unit) {
+fun CategoryPicker(
+    app: dev.ontask.App, name: String, current: dev.ontask.Category, onChanged: () -> Unit,
+    /** For a page or video on a Varies site: its item key, title and current verdict (focused / wasted), to correct just this one. */
+    item: Triple<String, String?, dev.ontask.Level>? = null,
+) {
     var open by remember { mutableStateOf(false) }
+    val verdict = item?.third?.takeIf { current.variable && it != dev.ontask.Level.MIXED }
     Box {
         TextButton({ open = true }) {
-            Box(Modifier.size(8.dp).background(levelColor(current.level), androidx.compose.foundation.shape.CircleShape))
-            Text("  ${current.label} ▾", style = MaterialTheme.typography.bodySmall)
+            Box(Modifier.size(8.dp).background(levelColor(verdict ?: current.level), androidx.compose.foundation.shape.CircleShape))
+            Text("  ${current.label}" + when (verdict) { dev.ontask.Level.DEEP -> " · work"; dev.ontask.Level.WASTED -> " · not work"; else -> "" } + " ▾", style = MaterialTheme.typography.bodySmall)
         }
         DropdownMenu(open, { open = false }) {
+            if (item != null && current.variable) {
+                Text("This page or video…", Modifier.padding(horizontal = 12.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                DropdownMenuItem({ Text("Is work" + if (verdict == dev.ontask.Level.DEEP) "  ✓" else "") }, { open = false; app.answerVariable(item.first, item.second, true); onChanged() },
+                    leadingIcon = { Box(Modifier.size(8.dp).background(levelColor(dev.ontask.Level.DEEP), androidx.compose.foundation.shape.CircleShape)) })
+                DropdownMenuItem({ Text("Isn't work" + if (verdict == dev.ontask.Level.WASTED) "  ✓" else "") }, { open = false; app.answerVariable(item.first, item.second, false); onChanged() },
+                    leadingIcon = { Box(Modifier.size(8.dp).background(levelColor(dev.ontask.Level.WASTED), androidx.compose.foundation.shape.CircleShape)) })
+                HorizontalDivider()
+            }
             Text("$name is…", Modifier.padding(horizontal = 12.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             dev.ontask.Category.assignable.forEach { cat ->
                 DropdownMenuItem(
@@ -236,10 +249,5 @@ fun CategoryPicker(app: dev.ontask.App, name: String, current: dev.ontask.Catego
     }
 }
 
-/** Saves the rule and relabels history. Names with a dot and no spaces are websites; anything else is an app. */
-fun reclassify(app: dev.ontask.App, name: String, from: dev.ontask.Category, to: dev.ontask.Category) {
-    val kind = if ('.' in name && ' ' !in name) dev.ontask.classify.RuleKind.DOMAIN else dev.ontask.classify.RuleKind.APP
-    app.ruleStore.label(kind, name, to, from, App.nowSec())
-    app.ruleStore.relabelHistory(kind, name, to)
-    app.reloadRules()
-}
+/** Saves the rule and relabels history (see [App.reclassify]). */
+fun reclassify(app: dev.ontask.App, name: String, from: dev.ontask.Category, to: dev.ontask.Category) = app.reclassify(name, to, from)

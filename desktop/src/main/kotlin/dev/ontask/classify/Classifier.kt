@@ -16,9 +16,8 @@ data class Rule(
     val user: Boolean,
 )
 
-data class Classification(val category: Category, val source: Source, val ruleId: Long? = null) {
-    val level: Level get() = category.level
-}
+/** [level] differs from the category's only for a Variable category with a verdict for this page or video. */
+data class Classification(val category: Category, val source: Source, val ruleId: Long? = null, val level: Level = category.level)
 
 fun domainOf(url: String?): String? {
     if (url.isNullOrBlank()) return null
@@ -50,7 +49,8 @@ class Classifier(userRules: List<Rule>, builtIn: List<Rule> = DefaultRules.all) 
                 RuleKind.DOMAIN -> domain != null && (domain == r.pattern || domain.endsWith("." + r.pattern))
                 RuleKind.APP -> r.pattern.equals(s.app, ignoreCase = true) || r.pattern.equals(s.bundleId, ignoreCase = true)
             }
-            if (hit) return Classification(r.category, if (r.user) Source.USER_LABEL else Source.RULE, if (r.user) r.id else null)
+            // Rules follow the current categories: renamed or re-levelled ones apply as edited, deleted ones are skipped.
+            if (hit) return Classification(Category.registry[r.category.name] ?: continue, if (r.user) Source.USER_LABEL else Source.RULE, if (r.user) r.id else null)
         }
         return Classification(Category.UNKNOWN, Source.METADATA)
     }

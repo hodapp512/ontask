@@ -7,7 +7,7 @@ import dev.ontask.db.Db
 
 data class LogRow(
     val ts: Long, val seconds: Int, val app: String?, val domain: String?, val title: String?,
-    val category: Category, val level: Level, val source: Source, val workTime: Boolean,
+    val category: Category, val level: Level, val source: Source, val workTime: Boolean, val url: String? = null,
 )
 
 data class LogFilter(val text: String = "", val level: Level? = null, val source: Source? = null, val limit: Int = 200)
@@ -61,13 +61,13 @@ class Diagnostics(private val db: Db) {
         }
         f.level?.let { where.append(" AND level = ?"); args.add(it.name) }
         f.source?.let { where.append(" AND source = ?"); args.add(it.name) }
-        c.prepareStatement("SELECT start_ts,seconds,app,domain,title,category,level,source,work_time FROM ticks WHERE $where ORDER BY start_ts DESC LIMIT ${f.limit}").use { ps ->
+        c.prepareStatement("SELECT start_ts,seconds,app,domain,title,category,level,source,work_time,url FROM ticks WHERE $where ORDER BY start_ts DESC LIMIT ${f.limit}").use { ps ->
             args.forEachIndexed { i, a -> ps.setString(i + 1, a as String) }
             ps.executeQuery().use { rs ->
                 buildList {
                     while (rs.next()) add(
                         LogRow(rs.getLong(1), rs.getInt(2), rs.getString(3), rs.getString(4), rs.getString(5),
-                            Category.valueOf(rs.getString(6)), Level.valueOf(rs.getString(7)), Source.valueOf(rs.getString(8)), rs.getInt(9) == 1),
+                            Category.valueOf(rs.getString(6)), Level.valueOf(rs.getString(7)), Source.valueOf(rs.getString(8)), rs.getInt(9) == 1, rs.getString(10)),
                     )
                 }
             }

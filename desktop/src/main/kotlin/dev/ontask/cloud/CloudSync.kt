@@ -1,5 +1,6 @@
 package dev.ontask.cloud
 
+import dev.ontask.Category
 import dev.ontask.Level
 import dev.ontask.block.Events
 import dev.ontask.db.Prefs
@@ -42,6 +43,8 @@ class CloudSync(
     private val habits: Habits,
     private val checkins: Checkins,
     private val clientFactory: (CloudConfig) -> CloudClient = { CloudClient(it, dev.ontask.ai.Keychain()) },
+    /** Applies a correction sent from the phone: file this app or site under that category. */
+    private val relabel: (name: String, category: String) -> Unit = { _, _ -> },
     private val zone: ZoneId = ZoneId.systemDefault(),
 ) {
     @Volatile var lastError: String? = null; private set
@@ -91,7 +94,8 @@ class CloudSync(
         return try {
             val uid = c.ensureUid()
             drainEvents(c, uid)
-            if (force || nowSec - lastReportTs >= 600) { uploadReport(c, uid, LocalDate.now(zone)); lastReportTs = nowSec }
+            val corrected = applyPhoneCorrections(c, uid)
+            if (force || corrected || nowSec - lastReportTs >= 600) { uploadReport(c, uid, LocalDate.now(zone)); lastReportTs = nowSec }
             uploadScheduleIfChanged(c, uid)
             uploadCheckinFlag(c, uid)
             pullReactions(c, uid)
@@ -147,6 +151,17 @@ class CloudSync(
         if (done.isNotEmpty()) events.markSynced(done)
     }
 
+    /** Corrections made on the phone ("Where the time went" → pick a category), applied here and then removed. */
+    private fun applyPhoneCorrections(c: CloudClient, uid: String): Boolean {
+        val reqs = c.list("users/$uid/labelRequests")
+        reqs.forEach { (id, o) ->
+            val name = o["subject"]?.jsonPrimitive?.contentOrNull; val cat = o["category"]?.jsonPrimitive?.contentOrNull
+            if (name != null && cat != null && cat in Category.registry) relabel(name, cat)
+            c.delete("users/$uid/labelRequests/$id")
+        }
+        return reqs.isNotEmpty()
+    }
+
     private fun uploadReport(c: CloudClient, uid: String, date: LocalDate) {
         c.write("users/$uid/reports", date.toString(), reportPayload(reports.daily(date), System.currentTimeMillis()))
     }
@@ -197,7 +212,7 @@ class CloudSync(
         put("deepSessions", buildJsonArray { r.deepSessions.forEach { add(buildJsonObject { put("a", it.start - r.dayStart); put("b", it.end - r.dayStart) }) } })
         put("distractionEvents", r.distractionEvents)
         r.worstHour?.let { put("worstHour", buildJsonObject { put("hour", java.time.Instant.ofEpochSecond(r.dayStart + it.first * 3600L).atZone(zone).hour); put("wastedSec", it.second) }) }
-        put("topSites", buildJsonArray { r.topSubjects.take(8).forEach { add(buildJsonObject { put("name", it.name); put("category", it.category.label); put("seconds", it.seconds) }) } })
+        put("topSites", buildJsonArray { r.topSubjects.take(8).forEach { add(buildJsonObject { put("name", it.name); put("category", it.category.label); put("categoryId", it.category.name); put("seconds", it.seconds) }) } })
         put("updatedAt", nowMs)
     }
 
@@ -210,6 +225,10 @@ class CloudSync(
             })
             put("exceptions", buildJsonObject {
                 s.schedule.exceptions.forEach { (d, ranges) -> put(d.toString(), buildJsonArray { ranges.forEach { add(buildJsonObject { put("startMin", it.startMin); put("endMin", it.endMin) }) } }) }
+            })
+            // So the phone can offer the same categories when you correct a label there.
+            put("categories", buildJsonArray {
+                Category.assignable.forEach { k -> add(buildJsonObject { put("id", k.name); put("label", k.label); put("level", k.level.name); put("variable", k.variable) }) }
             })
             put("habits", buildJsonArray {
                 habits.all().forEach { h -> add(buildJsonObject { put("id", h.id); put("name", h.name); put("time", h.time); put("enabled", h.enabled); put("days", buildJsonArray { h.days.forEach { add(JsonPrimitive(it)) } }) }) }

@@ -8,6 +8,7 @@ import dev.ontask.db.Db
 import dev.ontask.db.Prefs
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
@@ -110,10 +111,10 @@ class AiService(
     }
 
     companion object {
-        private val categories = Category.assignable.joinToString(", ") { it.name }
-        val SYSTEM = """
+        /** Built from the current categories, which the user can edit. */
+        val SYSTEM: String get() = """
             You classify what a person is doing on their computer right now. Reply with ONLY a JSON object:
-            {"category": one of [$categories], "alignment": 1-3, "confidence": 0.0-1.0}
+            {"category": one of [${Category.assignable.filter { !it.variable }.joinToString(", ") { "${it.name} (${it.label})" }}], "alignment": 1-3, "confidence": 0.0-1.0}
             alignment: 1 = unrelated to their stated priorities, 2 = neutral/supporting, 3 = directly advances a priority.
             Use the examples the person has labelled before as guidance.
         """.trimIndent()
@@ -139,6 +140,26 @@ class AiService(
             return AiResult(cat, align, conf, source)
         }
     }
+
+    /**
+     * For Variable categories: is this particular page or video work, given today's plan? WORK / NOT_WORK, or null
+     * when the model is unsure or unavailable (then the person is asked).
+     */
+    fun judgeWork(s: Sample, plan: List<String>): Boolean? = runCatching {
+        val sys = "Decide whether the person is working or not, from one page or video they have open. Reply with ONLY a JSON object: " +
+            "{\"work\": true|false, \"confidence\": 0.0-1.0}. Tutorials, documentation, talks and research related to their plan or job count as work; " +
+            "entertainment, music, gaming, vlogs, news and unrelated videos do not."
+        val user = buildString {
+            domainOf(s.url)?.let { appendLine("Site: $it") }
+            s.title?.let { appendLine("Title: ${it.take(200)}") }
+            s.url?.let { appendLine("Address: ${it.take(200)}") }
+            if (plan.isNotEmpty()) appendLine("Today's plan: " + plan.joinToString("; ").take(500))
+        }
+        val text = llm.chat(config(Tier.TEXT), sys, user, emptyList(), maxTokens = 40).text
+        val o = Json.parseToJsonElement(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1)) as JsonObject
+        val conf = o["confidence"]?.jsonPrimitive?.doubleOrNull ?: 0.5
+        o["work"]?.jsonPrimitive?.booleanOrNull?.takeIf { conf >= 0.7 }
+    }.getOrNull()
 
     /** One short, honest sentence of context for a partner message. Best effort: null if the model is unavailable. */
     fun contextLine(what: String, driftMin: Long, priorities: List<String>): String? = runCatching {
