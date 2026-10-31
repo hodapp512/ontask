@@ -2,8 +2,11 @@ package dev.ontask.report
 
 import dev.ontask.Level
 
-/** A stretch of time at one level (adjacent same-level segments merged), with seconds per app or site in it. */
-data class Run(val start: Long, val end: Long, val level: Level, val activity: Map<String, Long> = emptyMap()) {
+/**
+ * A stretch of time in one category (adjacent segments of the same category merged), with seconds per app, site or
+ * video in it ("youtube.com – Learning Java"). Its color comes from [level]; [category] is shown when you hover.
+ */
+data class Run(val start: Long, val end: Long, val level: Level, val activity: Map<String, Long> = emptyMap(), val category: dev.ontask.Category? = null) {
     val seconds get() = end - start
     /** The [n] apps or sites that took the most time in this stretch. */
     fun top(n: Int = 3): List<Pair<String, Long>> = activity.entries.sortedByDescending { it.value }.take(n).map { it.key to it.value }
@@ -23,7 +26,7 @@ object Sessions {
         val out = ArrayList<Run>()
         for (r in raw) {
             val last = out.lastOrNull()
-            if (last != null && last.level == r.level && r.start - last.end <= maxGap) {
+            if (last != null && last.level == r.level && last.category == r.category && r.start - last.end <= maxGap) {
                 val act = HashMap(last.activity); r.activity.forEach { (k, v) -> act.merge(k, v, Long::plus) }
                 out[out.lastIndex] = last.copy(end = maxOf(last.end, r.end), activity = act)
             }
@@ -57,4 +60,12 @@ object Sessions {
 
     /** Distraction event: a WASTED run of at least 30 seconds. */
     fun distractionEvents(runs: List<Run>): Int = runs.count { it.level == Level.WASTED && it.seconds >= MIN_DISTRACTION_SEC }
+}
+
+/** What a stretch was: its category ("Entertainment / News / Social"), "Unsure" for undecided pages, or the level. */
+fun runLabel(run: Run): String = when {
+    run.level == Level.AWAY -> Level.AWAY.label
+    run.category == null || run.category == dev.ontask.Category.UNKNOWN -> run.level.label
+    run.category.variable -> "Unsure"
+    else -> run.category.label
 }

@@ -226,11 +226,11 @@ private fun Timeline(r: DailyReport) {
                         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp).widthIn(max = 320.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Dot(levelColor(run.level), 8)
-                                Text("${run.level.label} · ${clockRange(run.start, run.end)} · ${fmtDuration(run.seconds)}", style = MaterialTheme.typography.labelLarge)
+                                Text("${dev.ontask.report.runLabel(run)} · ${clockRange(run.start, run.end)} · ${fmtDuration(run.seconds)}", style = MaterialTheme.typography.labelLarge)
                             }
                             val top = run.top(3)
                             if (top.isEmpty()) Text(if (run.level == Level.AWAY) "Away from the computer" else "No app recorded", style = MaterialTheme.typography.bodySmall)
-                            top.forEach { (n, sec) -> Text("$n — ${fmtDuration(sec)}", style = MaterialTheme.typography.bodySmall, maxLines = 1) }
+                            top.forEach { (n, sec) -> Text("$n — ${fmtDuration(sec)}", style = MaterialTheme.typography.bodySmall, maxLines = 2) }
                         }
                     }
                 }

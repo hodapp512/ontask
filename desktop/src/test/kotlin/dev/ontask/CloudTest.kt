@@ -96,6 +96,24 @@ class CloudTest {
         assertFalse("Sample window title" in p) // titles never leave the Mac
     }
 
+    @Test fun videoTitlesShowInYourTimelineButNotYourPartners() {
+        val app = UiShots.newApp()
+        val start = java.time.LocalDate.now().atStartOfDay(java.time.ZoneId.systemDefault()).toEpochSecond() + 10 * 3600
+        app.db.use { c ->
+            c.createStatement().executeUpdate("""INSERT INTO ticks(start_ts,end_ts,n,seconds,app,title,url,domain,category,level,source,work_time,item,item_cat)
+                VALUES ($start,${start + 600},10,600,'Safari','Funny Cat Video - YouTube','https://www.youtube.com/watch?v=c','youtube.com','VARIABLE','WASTED','AI_PAGE',1,'YouTube: Funny Cat Video','ENTERTAINMENT')""")
+        }
+        val r = app.reports.daily(java.time.LocalDate.now())
+        val run = r.timeline.first { "youtube.com – Funny Cat Video" in it.activity }
+        assertEquals("Entertainment / News / Social", dev.ontask.report.runLabel(run))
+        val db = Db.memory(); val prefs = Prefs(db)
+        val sync = CloudSync(prefs, Events(db), Reports(app.db), { Settings() }, Habits(prefs), Checkins(db))
+        val partner = sync.reportPayload(r, 1L, titles = false).toString()
+        assertTrue("Entertainment / News / Social" in partner && "youtube.com" in partner)
+        assertFalse("Funny Cat Video" in partner)
+        assertTrue("Funny Cat Video" in sync.reportPayload(r, 1L, titles = true).toString())
+    }
+
     @Test fun updateCheckComparesVersions() {
         assertTrue(UpdateCheck.isNewer("v1.2.0", "1.1.9")); assertTrue(UpdateCheck.isNewer("2.0", "1.9.9")); assertFalse(UpdateCheck.isNewer("v1.0.0", "1.0.0")); assertFalse(UpdateCheck.isNewer("0.9", "1.0.0"))
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)

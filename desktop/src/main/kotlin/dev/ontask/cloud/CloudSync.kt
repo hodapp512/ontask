@@ -240,8 +240,11 @@ class CloudSync(
             r.timeline.filter { it.seconds >= 60 }.take(500).forEach { run ->
                 add(buildJsonObject {
                     put("a", run.start - r.dayStart); put("b", run.end - r.dayStart); put("k", run.level.name.first().toString())
+                    put("c", dev.ontask.report.runLabel(run))
                     // What the stretch was made of, for the phone's timeline details.
-                    run.top(3).takeIf { it.isNotEmpty() }?.let { top -> put("t", buildJsonArray { top.forEach { (n, sec) -> add(buildJsonObject { put("n", n); put("s", sec) }) } }) }
+                    // Without titles allowed, "youtube.com – Learning Java" is just "youtube.com".
+                    run.top(3).map { (n, sec) -> (if (titles) n else n.substringBefore(" – ")) to sec }.groupBy({ it.first }, { it.second }).map { (n, s) -> n to s.sum() }
+                        .takeIf { it.isNotEmpty() }?.let { top -> put("t", buildJsonArray { top.forEach { (n, sec) -> add(buildJsonObject { put("n", n); put("s", sec) }) } }) }
                 })
             }
         })
