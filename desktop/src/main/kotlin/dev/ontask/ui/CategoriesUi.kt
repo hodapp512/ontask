@@ -45,7 +45,7 @@ fun VariableAskWindow(app: App, ask: App.VariableAsk, mode: ThemeMode) {
     val cats = remember { Category.assignable.filter { !it.variable } }
     Window(
         onCloseRequest = { app.answerVariable(ask.item, ask.title, null) }, title = "OnTask", alwaysOnTop = true, resizable = false, focusable = false,
-        state = rememberWindowState(size = DpSize(480.dp, 250.dp), position = WindowPosition.Aligned(Alignment.BottomEnd)),
+        state = rememberWindowState(size = DpSize(480.dp, 250.dp), position = centeredOnActiveScreen(DpSize(480.dp, 250.dp))),
     ) {
         OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {

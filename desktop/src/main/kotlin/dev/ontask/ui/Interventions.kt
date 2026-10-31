@@ -78,13 +78,13 @@ fun InterventionWindow(app: App, iv: Intervention, mode: ThemeMode) {
             Window(
                 // Normal-sized window (not full screen). Closing is ignored until the lock runs out.
                 onCloseRequest = { if (left <= 0) app.interventionDismiss() }, title = "OnTask — are you on task?", alwaysOnTop = true, resizable = true,
-                state = rememberWindowState(size = DpSize(560.dp, 520.dp), position = WindowPosition.Aligned(Alignment.Center)),
+                state = rememberWindowState(size = DpSize(560.dp, 520.dp), position = centeredOnActiveScreen(DpSize(560.dp, 520.dp))),
             ) { OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) { StepTwo(app, iv, left) } } }
         }
 
         Step.PARTNER -> Window(
             onCloseRequest = { app.interventionDismiss() }, title = "OnTask — reach out?", alwaysOnTop = true,
-            state = rememberWindowState(size = DpSize(520.dp, 460.dp), position = WindowPosition.Aligned(Alignment.Center)),
+            state = rememberWindowState(size = DpSize(520.dp, 460.dp), position = centeredOnActiveScreen(DpSize(520.dp, 460.dp))),
         ) { OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) { StepThree(app, iv) } } }
 
         Step.NONE -> {}
@@ -151,7 +151,7 @@ fun PromptWindow(app: App, prompt: Prompt, mode: ThemeMode) {
     val title = when (prompt) { Prompt.PLANNING, Prompt.PLANNING_SHORT -> "Plan your day"; Prompt.MIDDAY -> "Midday check-in"; else -> "Evening check-in" }
     Window(
         onCloseRequest = { app.finishPrompt(prompt, snoozeMin = 10) }, title = "OnTask — $title",
-        state = rememberWindowState(size = DpSize(640.dp, 760.dp), position = WindowPosition.Aligned(Alignment.Center)),
+        state = rememberWindowState(size = DpSize(640.dp, 760.dp), position = centeredOnActiveScreen(DpSize(640.dp, 760.dp))),
     ) {
         OnTaskTheme(mode) {
             Surface(Modifier.fillMaxSize()) {

@@ -246,3 +246,16 @@ fun CategoryPicker(
 
 /** Saves the rule and relabels history (see [App.reclassify]). */
 fun reclassify(app: dev.ontask.App, name: String, from: dev.ontask.Category, to: dev.ontask.Category) = app.reclassify(name, to, from)
+
+/**
+ * Centered on the screen you're working on (the one with the mouse pointer), not always the main display. For
+ * pop-ups that need an answer, such as "I can't tell whether this is work".
+ */
+fun centeredOnActiveScreen(size: androidx.compose.ui.unit.DpSize): androidx.compose.ui.window.WindowPosition {
+    val bounds = runCatching { java.awt.MouseInfo.getPointerInfo().device.defaultConfiguration.bounds }.getOrNull()
+        ?: return androidx.compose.ui.window.WindowPosition.Aligned(androidx.compose.ui.Alignment.Center)
+    return androidx.compose.ui.window.WindowPosition.Absolute(
+        (bounds.x + (bounds.width - size.width.value) / 2).dp,
+        (bounds.y + (bounds.height - size.height.value) / 2).dp,
+    )
+}

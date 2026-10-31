@@ -173,3 +173,15 @@ Format: **Decision** — why. *Rejected:* alternatives, and why not.
 - **Work, Work adjacent, Entertainment / News / Social, Personal admin** (plus Varies). Simple is better, and the app
   is about staying on work. Learning, Communication, Social, News and Shopping were retired; existing history in them
   is sorted again once on upgrade. Work adjacent counts as Mixed by default.
+
+## 2026-10-31 · Pop-ups, API key, day planning
+
+- **"I can't tell whether this is work" opens in the center of the screen you're working on** (the one with the
+  pointer), as do the other pop-ups that need an answer. Disruptive is fine: a corner window was easy to miss.
+  Small nudges (unblock start/end, the first drift prompt) stay in the corner.
+- **The Firebase web API key is restricted to the five APIs OnTask uses** (Identity Toolkit, Token Service, Cloud
+  Firestore, Firebase Installations, FCM Registration). The key is public by design, so the risk was billing: an
+  unrestricted key works with every API enabled in the project (it had 25, including Firebase AI Logic, which can
+  call Gemini). No application restriction: the Mac app calls the APIs directly, without a website referrer.
+- **No day-off planning prompts.** Asking "any work today?" on days without work hours, and offering a work block when
+  work is detected on a day off, were considered and dropped.

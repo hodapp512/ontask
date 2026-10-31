@@ -97,7 +97,7 @@ fun BlockingHelperPromptWindow(app: App, mode: ThemeMode) {
     val health by app.helperHealth.collectAsState()
     Window(
         onCloseRequest = { app.helperPromptLater() }, title = "OnTask", alwaysOnTop = true, resizable = false,
-        state = rememberWindowState(size = DpSize(480.dp, 230.dp), position = WindowPosition.Aligned(Alignment.Center)),
+        state = rememberWindowState(size = DpSize(480.dp, 230.dp), position = centeredOnActiveScreen(DpSize(480.dp, 230.dp))),
     ) {
         OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
