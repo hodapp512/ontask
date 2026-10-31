@@ -80,6 +80,7 @@ fun HomeScreen(app: App) {
         }
         BlockingHelperBanner(app, now)
         HelperBanner(app)
+        TodayCard(app, today) { reflecting = true }
         val summary: @Composable () -> Unit = {
             report?.let { r ->
                 SummaryCard(r, if (date == today) "Today so far" else "Your day", app, onRelabel = { tick++ }, header = { DateBar(date, { date = it }) { tick++ } }) {
@@ -87,18 +88,7 @@ fun HomeScreen(app: App) {
                 }
             } ?: Text("Loading…")
         }
-        val side: @Composable () -> Unit = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                RightNowCard(app, now) { tick++ }
-                TodayCard(app, today) { reflecting = true }
-            }
-        }
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            if (maxWidth >= 980.dp) Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Box(Modifier.weight(1.5f)) { summary() }
-                Box(Modifier.weight(1f)) { side() }
-            } else Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { summary(); side() }
-        }
+        summary()
     }
     if (unblocking) UnblockPickerWindow(app, app.blocking.currentlyBlocked(App.nowSec())) { unblocking = false; tick++ }
     if (reflecting) ReflectionWindow(app) { reflecting = false; tick++ }
@@ -124,53 +114,6 @@ private fun FocusButton(app: App, now: Long, changed: () -> Unit) {
             if (active != null) DropdownMenuItem({ Text("End focus session now") }, { open = false; app.focus.stop(App.nowSec()); app.blocking.tick(App.nowSec()); changed() })
             else listOf(20, 30, 45, 60, 90).forEach { m ->
                 DropdownMenuItem({ Text("Block distractions for $m minutes") }, { open = false; app.focus.start(m, App.nowSec()); app.blocking.tick(App.nowSec()); changed() })
-            }
-        }
-    }
-}
-
-/** Blocking status, open unblocks, and what you're doing this second (with a quick way to correct its label). */
-@Composable
-private fun RightNowCard(app: App, now: Long, changed: () -> Unit) {
-    val svc = app.blocking
-    val strict = svc.strictNow(now)
-    val focus = app.focus.active(now)
-    val blocked = remember(now / 30, strict) { svc.currentlyBlocked(now) }
-    val active = remember(now) { svc.unblocks.active(now) }
-    val live by app.tracker.live.collectAsState()
-    PlainCard {
-        Text("Right now", style = MaterialTheme.typography.titleMedium)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Dot(if (strict) levelColor(Level.DEEP) else levelColor(Level.AWAY))
-            Text(when {
-                focus != null -> "Focus session until ${fmtHm(focus.plannedEndTs)} · ${blocked.size} sites blocked"
-                strict -> "Work hours · ${blocked.size} sites blocked"
-                else -> "Outside work hours · ${blocked.size} sites blocked · unblocking is instant"
-            })
-        }
-        if (svc.mode == BlockMode.DRY_RUN) Text("Test mode (for developing OnTask): nothing is really blocked.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-        active.forEach { u ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("${u.domain} open" + (if (u.kind == UnblockKind.WORK) " for work" else "") + " · ${fmtDuration(u.expiresTs - now)} left", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                TextButton({ svc.unblocks.end(u.id, now); svc.tick(now); changed() }) { Text("Block again") }
-            }
-        }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        val s = live.sample; val c = live.classification
-        when {
-            live.away -> Text("You're away — not counted against you.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            s == null || c == null -> Text("Waiting for the first reading…", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            else -> {
-                val domain = domainOf(s.url)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Dot(levelColor(c.level))
-                    Column(Modifier.weight(1f)) {
-                        Text(listOfNotNull(s.app, domain).joinToString(" · "), maxLines = 1)
-                        if (c.category.variable) s.title?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1) }
-                    }
-                    val pattern = domain ?: s.app
-                    if (pattern != null) CategoryPicker(app, pattern, c.category, changed, item = Triple(dev.ontask.classify.itemKey(s.app, s.title, s.url), s.title, c.level))
-                }
             }
         }
     }

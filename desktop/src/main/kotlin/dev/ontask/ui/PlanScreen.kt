@@ -49,9 +49,9 @@ private fun PlanBody(app: App, prompt: Prompt, date: LocalDate, onDone: () -> Un
 
 @Composable
 internal fun PrioritiesCard(app: App, date: LocalDate, short: Boolean, onDone: () -> Unit) {
-    var text by remember { mutableStateOf(app.priorities.forDate(date).ifEmpty { app.priorities.previous(date) }.joinToString("\n")) }
+    var text by remember { mutableStateOf(app.priorities.forDate(date).joinToString("\n")) }
     val change = remember { app.checkins.get(date.minusDays(1), "evening")?.change.orEmpty() }
-    SectionCard("Today's plan", "What matters today, in your own words. Pre-filled from your last plan — change what's different.") {
+    SectionCard("Today's plan", "What matters today, in your own words.") {
         if (change.isNotBlank()) Notice("Yesterday you wanted to change: $change")
         OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth(), minLines = 4, placeholder = { Text("e.g. Finish the Acme proposal, then review PRs. No news before lunch.") })
         Button({
