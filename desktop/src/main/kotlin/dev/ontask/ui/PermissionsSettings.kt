@@ -30,7 +30,7 @@ val App.permissions: Permissions get() = Permissions(helper)
 
 @Composable
 fun PermissionsSettings(app: App) {
-    SectionCard("Permissions", "OnTask works with app names alone. These macOS permissions let it see more; grant what you're comfortable with.") {
+    SectionCard("Permissions", "Optional. Each one lets OnTask see more.") {
         PermissionsBody(app)
     }
 }

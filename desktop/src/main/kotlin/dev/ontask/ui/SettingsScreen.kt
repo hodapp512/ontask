@@ -20,16 +20,16 @@ fun SettingsScreen(app: App, theme: ThemeMode, onTheme: (ThemeMode) -> Unit, ope
     var s by remember { mutableStateOf(app.settings) }
     fun update(n: dev.ontask.db.Settings) { s = n; app.updateSettings(n) }
 
-    Page("Settings", "Changes are saved as you make them.") {
+    Page("Settings") {
         UninstallButton(app)
-        SectionCard("Work hours", "Inside your work hours, distracting sites are blocked and OnTask watches more closely. Outside them, anything goes.") {
+        SectionCard("Work hours", "When unblocking takes more effort.") {
             val hours = remember { s.schedule.week.days.values.sumOf { r -> r.sumOf { it.endMin - it.startMin } } / 60.0 }
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Text("%.1f hours a week".format(hours), Modifier.weight(1f))
                 androidx.compose.material3.Button({ open(Dest.WORK_HOURS) }) { Text("Edit work hours") }
             }
         }
-        SectionCard("Block list", "The sites blocked during work hours and Focus sessions.") {
+        SectionCard("Block list", "Blocked around the clock.") {
             val n = remember { app.blocking.blocklist.all().size }
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Text("$n site${if (n == 1) "" else "s"}" + if (app.adBlock.enabled) ", plus ads and malware" else "", Modifier.weight(1f))
@@ -45,7 +45,7 @@ fun SettingsScreen(app: App, theme: ThemeMode, onTheme: (ThemeMode) -> Unit, ope
                 }
             }
         }
-        SectionCard("Tracking", "How closely OnTask watches what's on your screen.") {
+        SectionCard("Tracking") {
             SliderSetting(
                 "Check interval", "How often OnTask checks what you're doing. Shorter is more precise, longer uses less battery.",
                 s.tickSec, 2..30, "seconds", step = 1,
@@ -74,7 +74,7 @@ private fun StartupSettings(app: App) {
     var reopen by remember { mutableStateOf(app.prefs.bool("startup.reopen", false)) }
     val packaged = login.appExecutable() != null
     fun apply() { app.prefs.set("startup.at_login", atLogin); app.prefs.set("startup.reopen", reopen); if (packaged) login.set(atLogin, keepAlive = reopen) }
-    SectionCard("Keep OnTask running", if (packaged) "So blocking and tracking don't stop when OnTask is closed." else "Available in the installed app (not when running from Gradle).") {
+    SectionCard("Startup", if (packaged) null else "Available in the installed app (not when running from Gradle).") {
         SwitchSetting("Start when you log in", "OnTask opens in the menu bar when you log in to your Mac.", atLogin) { atLogin = it; apply() }
         SwitchSetting("Reopen if it's quit or crashes", "OnTask comes back a few seconds after it closes. Turn this off to be able to quit it for good.", reopen) { reopen = it; apply() }
         if (packaged && !login.managed && (atLogin || reopen)) Text("Takes effect the next time OnTask opens.", style = androidx.compose.material3.MaterialTheme.typography.bodySmall)

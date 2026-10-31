@@ -40,7 +40,7 @@ internal fun BlocklistCard(app: App, changed: () -> Unit) {
     var msg by remember { mutableStateOf("") }
     val list = remember { mutableStateOf(app.blocking.blocklist.all()) }
     fun reload() { list.value = app.blocking.blocklist.all(); changed() }
-    SectionCard("Block list", "Sites blocked during work hours and Focus sessions. www. is covered automatically.") {
+    SectionCard("Block list", "Blocked around the clock. Covers www. too.") {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(text, { text = it }, label = { Text("Add a site, e.g. news.ycombinator.com") }, singleLine = true, modifier = Modifier.weight(1f))
             Button({ val n = app.blocking.blocklist.add(text.split(',', ' ', '\n'), App.nowSec()); msg = if (n == 0) "Nothing new added (invalid or already listed)." else "Added $n."; text = ""; reload() }, enabled = text.isNotBlank()) { Text("Add") }

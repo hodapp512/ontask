@@ -107,8 +107,6 @@ fun ApplicationScope.OnTaskTray(app: App, open: (Dest?) -> Unit) {
             Item("Today: focused ${fmtDuration(deep)}, wasted ${fmtDuration(wasted)}", enabled = false, onClick = {})
             if (openCount > 0) Item("$openCount site${if (openCount == 1) "" else "s"} unblocked right now", enabled = false, onClick = {})
             Separator()
-            Item("Unblock a site…", enabled = blocked.isNotEmpty(), onClick = { changed(); picking = true })
-            Separator()
             if (focus != null) {
                 Item("Focus session ends at ${fmtHm(focus.plannedEndTs)} (${fmtDuration(focus.plannedEndTs - now)} left)", enabled = false, onClick = {})
                 Item("End Focus session now", onClick = { app.focus.stop(App.nowSec()); retick(); changed() })
@@ -119,6 +117,7 @@ fun ApplicationScope.OnTaskTray(app: App, open: (Dest?) -> Unit) {
                 }
             }
             Separator()
+            Item("Unblock a site…", enabled = blocked.isNotEmpty(), onClick = { changed(); picking = true })
             Item("Add site to block…", onClick = { adding = true })
             CheckboxItem("Ad blocking", checked = adOn, onCheckedChange = { app.adBlock.enabled = it; retick(); changed() })
             Separator()

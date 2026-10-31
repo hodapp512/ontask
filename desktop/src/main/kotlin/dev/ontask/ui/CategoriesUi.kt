@@ -81,8 +81,7 @@ fun CategoriesSettings(app: App) {
 
     SectionCard(
         "Categories",
-        "How OnTask sorts what you do. Each category counts as Focused, Mixed or Wasted — or Varies, for sites like YouTube " +
-            "that can be either, where each video or page is judged on its own.",
+        "Each counts as Focused, Mixed or Wasted, or Varies (judged per video or page).",
     ) {
         cats.forEach { c ->
             var label by remember(c, version) { mutableStateOf(c.label) }

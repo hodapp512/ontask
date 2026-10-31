@@ -22,7 +22,7 @@ fun BlockingSettings(app: App) {
     var delays by remember { mutableStateOf(app.blocking.unblocks.delays.let { d -> (0..3).map { d.getOrElse(it) { d.last() } } }) }
     var reset by remember { mutableStateOf(app.prefs.int("unblock.reset_hour", 4)) }
 
-    SectionCard("Blocking & unblocking", "The friction you face when you want to open a blocked site.") {
+    SectionCard("Unblocking") {
         SettingRow("Message on the delay screen", "What you see while you wait. Write something that will actually stop you.") {
             OutlinedTextField(message, { message = it; app.prefs.set("unblock.message", it) }, singleLine = true, modifier = Modifier.fillMaxWidth(0.5f))
         }

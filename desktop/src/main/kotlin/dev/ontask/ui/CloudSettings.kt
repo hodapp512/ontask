@@ -46,7 +46,7 @@ fun QrCode(text: String, sizeDp: Int = 180) {
 
 @Composable
 fun CloudSettings(app: App) {
-    SectionCard("Phone & partner", "Link your phone to see your day and get reminders there, and invite someone you trust to receive your evening review. Only daily summaries leave this Mac, never the detailed activity log.") { CloudSettingsBody(app) }
+    SectionCard("Phone & partner", "Only daily summaries leave this Mac.") { CloudSettingsBody(app) }
 }
 
 @Composable
@@ -140,7 +140,7 @@ fun UpdateSettings(app: App) {
     var repo by remember { mutableStateOf(app.prefs.str("update.repo", "")) }
     var msg by remember { mutableStateOf(app.updateAvailable?.let { "Version ${it.version} is available." } ?: "") }
     val scope = rememberCoroutineScope()
-    SectionCard("Updates", "OnTask checks GitHub Releases weekly and tells you when a new version is out. It never installs anything by itself.") {
+    SectionCard("Updates", "Checked weekly. Nothing installs by itself.") {
         KV("Installed version", UpdateCheck.currentVersion())
         OutlinedTextField(repo, { repo = it; app.prefs.set("update.repo", it.trim().ifEmpty { null }) }, label = { Text("GitHub repository (owner/name)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {

@@ -180,7 +180,7 @@ private fun ReflectionWindow(app: App, onClose: () -> Unit) {
 @Composable
 fun BlockListScreen(app: App) {
     var tick by remember { mutableStateOf(0) }
-    Page("Block list", "Sites blocked around the clock. In work hours and Focus sessions, unblocking takes more effort.") {
+    Page("Block list", "Blocked around the clock.") {
         BlocklistCard(app) { tick++ }
         BlockingSettings(app)
     }
