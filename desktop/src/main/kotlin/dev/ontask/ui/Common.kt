@@ -50,6 +50,18 @@ fun fmtDuration(sec: Long): String {
 
 private val timeFmt = DateTimeFormatter.ofPattern("HH:mm:ss")
 fun fmtTime(epochSec: Long): String = timeFmt.format(Instant.ofEpochSecond(epochSec).atZone(ZoneId.systemDefault()))
+
+/** "just now", "5 min ago", "2 h ago", "3 days ago". */
+fun fmtAgo(epochSec: Long, nowSec: Long = System.currentTimeMillis() / 1000): String {
+    val s = (nowSec - epochSec).coerceAtLeast(0)
+    return when {
+        s < 60 -> "just now"
+        s < 3600 -> "${s / 60} min ago"
+        s < 86400 -> "${s / 3600} h ago"
+        s < 2 * 86400 -> "yesterday"
+        else -> "${s / 86400} days ago"
+    }
+}
 fun fmtHm(epochSec: Long): String = fmtTime(epochSec).take(5)
 
 /** A scrolling, centered page with a title and a one-line description. */

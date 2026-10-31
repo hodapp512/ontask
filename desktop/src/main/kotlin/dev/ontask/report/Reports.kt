@@ -70,7 +70,7 @@ class Reports(private val db: Db, private val zone: ZoneId = ZoneId.systemDefaul
                    GROUP BY subject, category ORDER BY s DESC LIMIT 10""",
             ).use { ps ->
                 ps.setLong(1, start); ps.setLong(2, end)
-                ps.executeQuery().use { rs -> while (rs.next()) subjects.add(Subject(rs.getString(1), Category.valueOf(rs.getString(2)), rs.getLong(3))) }
+                ps.executeQuery().use { rs -> while (rs.next()) subjects.add(Subject(dev.ontask.track.displayAppName(rs.getString(1)), Category.valueOf(rs.getString(2)), rs.getLong(3))) }
             }
 
             DailyReport(date, start, all, work, timeline, Sessions.deepSessions(timeline), Sessions.distractionEvents(timeline), worst, subjects)

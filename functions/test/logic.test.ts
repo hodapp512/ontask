@@ -10,6 +10,7 @@ const at = (iso: string) => new Date(iso);
 describe("messages", () => {
   it("maps events to partner messages and ignores private ones", () => {
     expect(partnerMessage({ type: "work_unblock", ts: 1, payload: { domain: "youtube.com", minutes: 60, purpose: "Acme onboarding" } }, "Sam")!.text).toContain("Acme onboarding");
+    expect(partnerMessage({ type: "checkin", ts: 1, payload: { message: "Today: 3h deep." } }, "Sam Rivera")!.text).toBe("Here is Sam's evening review.\n\nToday: 3h deep.");
     expect(partnerMessage({ type: "work_hours_change", ts: 1, payload: { reason: "Doctor", meaning: "Blocking off." } }, "Sam")!.text).toContain("Doctor");
     expect(partnerMessage({ type: "unblock", ts: 1, payload: {} }, "Sam")).toBeNull();
     expect(partnerMessage({ type: "focus_start", ts: 1 }, "Sam")).toBeNull();

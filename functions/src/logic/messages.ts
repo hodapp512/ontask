@@ -5,12 +5,13 @@ export interface EventDoc { type: string; ts: number; payload?: Record<string, u
 /** Which Mac events become partner messages, and the text partners read. Returns null for events partners never see. */
 export function partnerMessage(ev: EventDoc, name: string): { type: MessageType; text: string } | null {
   const p = ev.payload ?? {};
+  const first = firstName(name);
   const s = (k: string) => (p[k] === undefined || p[k] === null ? "" : String(p[k]));
   switch (ev.type) {
     case "binge_alert":
       return { type: "binge_alert", text: s("message") || `${name} has been drifting off task and wanted you to know.` };
     case "checkin":
-      return { type: "checkin", text: s("message") || `${name} checked in.` };
+      return { type: "checkin", text: s("message") ? `Here is ${first}'s evening review.\n\n${s("message")}` : `${first} checked in.` };
     case "work_hours_change":
       return { type: "work_hours_change", text: `${name} reduced their work hours. Reason: "${s("reason")}". ${s("meaning")}` };
     case "work_unblock":
@@ -18,6 +19,11 @@ export function partnerMessage(ev: EventDoc, name: string): { type: MessageType;
     default:
       return null;
   }
+}
+
+/** "Dennis Hodapp" -> "Dennis"; used wherever a message talks about the person. */
+export function firstName(name: string): string {
+  return name.trim().split(/\s+/)[0] || name;
 }
 
 export const GENTLE_CLOSE = "No need to reply — but a 👍 helps.";

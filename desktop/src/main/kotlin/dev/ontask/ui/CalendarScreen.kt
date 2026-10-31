@@ -1,5 +1,9 @@
 package dev.ontask.ui
 
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.layout.widthIn
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -101,11 +105,14 @@ fun CalendarScreen(app: App, initialWeekStart: LocalDate = LocalDate.now().with(
                 else "Changes only the dates below, e.g. a day off or a short day. The template stays as is.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (!templateMode) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton({ weekStart = weekStart.minusWeeks(1) }) { Text("◀") }
-                Text("Week of ${weekStart}", Modifier.weight(1f))
-                OutlinedButton({ weekStart = weekStart.plusWeeks(1) }) { Text("▶") }
-                TextButton({ weekStart = LocalDate.now().with(DayOfWeek.MONDAY) }) { Text("This week") }
+            if (!templateMode) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                IconTextButton("◀", "Previous week") { weekStart = weekStart.minusWeeks(1) }
+                Text(
+                    "Week of " + weekStart.format(java.time.format.DateTimeFormatter.ofPattern("MMM d, yyyy")),
+                    Modifier.widthIn(min = 190.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center, style = MaterialTheme.typography.titleSmall,
+                )
+                IconTextButton("▶", "Next week") { weekStart = weekStart.plusWeeks(1) }
+                if (weekStart != LocalDate.now().with(DayOfWeek.MONDAY)) TextButton({ weekStart = LocalDate.now().with(DayOfWeek.MONDAY) }) { Text("Back to this week") }
             }
         }
         SectionCard("%.1f hours %s".format(total, if (templateMode) "per week" else "this week"), "Click or drag to paint. Starting on a filled cell erases instead.") {
@@ -184,4 +191,10 @@ private fun WeekGrid(draft: List<BooleanArray>, dates: List<LocalDate>, template
             }
         }
     }
+}
+
+/** Small round arrow button. */
+@Composable
+private fun IconTextButton(symbol: String, description: String, onClick: () -> Unit) {
+    androidx.compose.material3.FilledTonalIconButton(onClick, Modifier.semantics { contentDescription = description }) { Text(symbol) }
 }

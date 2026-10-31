@@ -98,9 +98,9 @@ Done once per Firebase project. In the console (<https://console.firebase.google
 
 1. On your phone, open `https://<project-id>.web.app` (the Mac app shows a QR code for it) and sign in. On iPhone:
    Share → **Add to Home Screen**, open it from there, then Settings → **Turn on notifications**.
-2. Phone → Me → Link my Mac → **Show code**. Type the 5-character code into OnTask on the Mac (Settings → Phone &
+2. Phone home screen → **Link my Mac**. Type the 5-character code into OnTask on the Mac (Settings → Phone &
    partner). Codes expire after 5 minutes and work once.
-3. Phone → Me → **Invite a partner**: send the link/QR code. Your partner opens it, signs in, and chooses how they want
+3. Phone home screen → **Invite a partner**: send the link/QR code. Your partner opens it, signs in, and chooses how they want
    to be notified (push, text, email). Use **Send test message** to check delivery.
 
 The Mac app has the project built in (`desktop/src/main/resources/cloud.properties`); if you run your own Firebase

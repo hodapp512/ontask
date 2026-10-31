@@ -4,12 +4,16 @@ import { httpsCallable } from "firebase/functions";
 import { signOut } from "firebase/auth";
 import { auth, db, fns } from "../firebase";
 import { h } from "../dom";
-import { MESSAGE_TYPES } from "../format";
-import { enablePush } from "../session";
+import { MESSAGE_TYPES, ago } from "../format";
+import { enablePush, pushState } from "../session";
 
 /** My settings as a partner: how I'm notified for each message type, quiet hours, contact details, push. */
 export async function settingsView(u: User): Promise<HTMLElement> {
-  const links = await getDocs(query(collection(db, "links"), where("partnerUid", "==", u.uid)));
+  const [links, devices, push] = await Promise.all([
+    getDocs(query(collection(db, "links"), where("partnerUid", "==", u.uid))),
+    getDocs(collection(db, "users", u.uid, "devices")),
+    pushState(u),
+  ]);
   const contactRef = doc(db, "users", u.uid, "contact", "main");
   const contact = (await getDoc(contactRef)).data() ?? {};
   const note = h("p", { class: "muted" });
@@ -29,7 +33,8 @@ export async function settingsView(u: User): Promise<HTMLElement> {
     const qs = h("input", { type: "time", value: prefs.quietHours?.start ?? "" }) as HTMLInputElement;
     const qe = h("input", { type: "time", value: prefs.quietHours?.end ?? "" }) as HTMLInputElement;
     return h("div", { class: "card" },
-      h("h2", {}, `Notifications about ${d.get("trackedName") ?? "your friend"}`), rows,
+      h("h2", {}, `How you hear about ${d.get("trackedName") ?? "your friend"}`),
+      h("p", { class: "muted" }, "Pick how each kind of message reaches you. Text and email use the backup contact above."), rows,
       h("div", { class: "row" }, h("label", { class: "grow" }, "Quiet from", qs), h("label", { class: "grow" }, "until", qe)),
       h("div", { class: "row" },
         h("button", { class: "primary", onclick: async () => {
@@ -41,15 +46,21 @@ export async function settingsView(u: User): Promise<HTMLElement> {
       ));
   });
 
+  const deviceRows = devices.docs.map((d) => d.data()).sort((a, b) => (b.lastSyncMs ?? b.lastSeenMs ?? 0) - (a.lastSyncMs ?? a.lastSeenMs ?? 0)).map((x) =>
+    h("p", { class: "row between" }, h("span", {}, `${x.kind === "mac" ? "💻" : "📱"} ${x.name ?? x.kind}`), h("span", { class: "muted small" }, ago(x.lastSyncMs ?? x.lastSeenMs ?? 0))));
+
   return h("main", {},
-    h("h1", {}, "Settings"),
-    h("div", { class: "card" }, h("h2", {}, "This device"), h("p", { class: "muted" }, "Get push notifications here. On iPhone, add OnTask to your Home Screen first (Share → Add to Home Screen)."),
-      h("button", { class: "primary", onclick: async () => say(await enablePush(u).catch((e) => String(e))) }, "Turn on notifications")),
+    h("header", { class: "top" }, h("a", { href: "#/", class: "icon-btn", "aria-label": "Back" }, "←"), h("h1", { class: "grow" }, "Settings")),
+    h("div", { class: "card" }, h("h2", {}, "Account"), h("p", {}, u.displayName ?? ""), h("p", { class: "muted" }, u.email ?? ""),
+      h("button", { onclick: () => signOut(auth) }, "Sign out")),
+    h("div", { class: "card" }, h("h2", {}, "Notifications on this device"),
+      h("p", { class: "muted" }, push === "on" ? "On ✓" : push === "needs-home-screen" ? "On iPhone, add OnTask to your Home Screen first (Share → Add to Home Screen), then open it from there." : push === "unsupported-desktop" ? "This browser can't receive notifications." : "Off"),
+      push === "off" && h("button", { class: "primary", onclick: async () => { const r = await enablePush(u).catch((e) => ({ ok: false, message: String(e?.message ?? e) })); say(r.message, !r.ok); } }, "Turn on notifications")),
+    h("div", { class: "card" }, h("h2", {}, "Linked devices"), deviceRows.length ? deviceRows : h("p", { class: "muted" }, "None yet. Link your Mac from the home screen.")),
     h("div", { class: "card" }, h("h2", {}, "Backup contact (optional)"), h("p", { class: "muted" }, "Used only if push can't reach you (for example, you haven't opened the app in a few days). Stored privately in your account, never in the code."),
       h("label", {}, "Phone (for texts)", phone), h("label", {}, "Email", email),
       h("button", { onclick: async () => { await setDoc(contactRef, { phone: phone.value.trim() || null, email: email.value.trim() || null }, { merge: true }); say("Saved."); } }, "Save contact details")),
-    linkCards.length ? linkCards : h("div", { class: "card" }, h("p", { class: "muted" }, "Once you're paired with someone, you can choose how each kind of message reaches you.")),
+    linkCards.length ? linkCards : h("div", { class: "card" }, h("p", { class: "muted" }, "When you support someone, you'll choose here how their messages reach you.")),
     note,
-    h("button", { onclick: () => signOut(auth) }, "Sign out"),
   );
 }

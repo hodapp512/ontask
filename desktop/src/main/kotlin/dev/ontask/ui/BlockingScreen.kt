@@ -31,63 +31,11 @@ import dev.ontask.block.UnblockKind
 import dev.ontask.block.UnblockRejected
 import kotlinx.coroutines.delay
 
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-fun BlockingScreen(app: App) {
-    var tick by remember { mutableStateOf(0) }
-    var now by remember { mutableStateOf(App.nowSec()) }
-    LaunchedEffect(tick) { while (true) { now = App.nowSec(); delay(1000) } } // only while this screen is open
-    val svc = app.blocking
-    val strict = svc.strictNow(now)
-    var unblockFor by remember { mutableStateOf<List<String>?>(null) }
-    var mode by remember(tick) { mutableStateOf(svc.mode) }
-
-    Page("Blocking", "Distracting sites are blocked during work hours and Focus sessions. Outside them, anything goes.") {
-        val blocked = remember(tick, strict) { svc.currentlyBlocked(now) }
-        SectionCard("Status") {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Dot(if (strict) levelColor(dev.ontask.Level.WASTED) else levelColor(dev.ontask.Level.DEEP))
-                Text(if (strict) "Strict mode is on — ${blocked.size} sites blocked right now." else "Outside work hours — nothing is blocked.", style = MaterialTheme.typography.titleSmall)
-            }
-            svc.focus.active(now)?.let { Text("Focus session: ${fmtDuration(it.plannedEndTs - now)} left", color = MaterialTheme.colorScheme.primary) }
-            svc.lastError?.let { Notice(it, error = true) }
-            if (mode != BlockMode.LIVE) Notice("Mode: ${mode.label}. ${mode.explain}")
-        }
-        FocusCard(app, now) { tick++ }
-        SectionCard("Unblock a site", "Unblocking always has a delay that grows through the day (${app.blocking.unblocks.delays.joinToString(", ") { fmtDelay(it) }}) and resets at ${app.blocking.unblocks.resetHour}am. Today so far: ${app.blocking.unblocks.todayCount(now)}.") {
-            var pick by remember { mutableStateOf<String?>(null) }
-            val all = remember(tick) { svc.blocklist.all() }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Picker(pick ?: "Choose a site", all, { it }) { pick = it }
-                Button({ pick?.let { unblockFor = listOf(it) } }, enabled = pick != null) { Text("Unblock…") }
-            }
-            if (all.isEmpty()) Text("Your block list is empty. Add sites below.", style = MaterialTheme.typography.bodySmall)
-        }
-        PurposeCard(app, now) { tick++ }
-        val active = remember(tick, now / 5) { svc.unblocks.active(now) }
-        SectionCard("Active unblocks") {
-            if (active.isEmpty()) Text("Nothing is unblocked.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            active.forEach { u ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(u.domain + if (u.kind == UnblockKind.WORK) "  (work: ${u.purpose})" else "", style = MaterialTheme.typography.bodyLarge)
-                        Text("${fmtDuration(u.expiresTs - now)} left", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    TextButton({ app.unblocks.end(u.id, now); app.blocking.tick(now); tick++ }) { Text("Block again") }
-                }
-            }
-        }
-        BlocklistCard(app) { tick++ }
-        BlockingSetup(app, mode) { mode = it; tick++ }
-    }
-    unblockFor?.let { UnblockDialog(app, it, onClose = { unblockFor = null; tick++ }) }
-}
-
-private fun fmtDelay(s: Int) = if (s >= 60 && s % 60 == 0) "${s / 60}m" else "${s}s"
+internal fun fmtDelay(s: Int) = if (s >= 60 && s % 60 == 0) "${s / 60}m" else "${s}s"
 private val App.unblocks get() = blocking.unblocks
 
 @Composable
-private fun FocusCard(app: App, now: Long, changed: () -> Unit) {
+internal fun FocusCard(app: App, now: Long, changed: () -> Unit) {
     val active = app.focus.active(now)
     SectionCard("Focus session", "Apply work-hours blocking for a set time, even outside work hours. It's logged as a deep-work attempt.") {
         if (active != null) {
@@ -104,7 +52,7 @@ private fun FocusCard(app: App, now: Long, changed: () -> Unit) {
 }
 
 @Composable
-private fun PurposeCard(app: App, now: Long, changed: () -> Unit) {
+internal fun PurposeCard(app: App, now: Long, changed: () -> Unit) {
     var site by remember { mutableStateOf<String?>(null) }
     var purpose by remember { mutableStateOf("") }
     var minutes by remember { mutableStateOf(60) }
@@ -125,7 +73,7 @@ private fun PurposeCard(app: App, now: Long, changed: () -> Unit) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun BlocklistCard(app: App, changed: () -> Unit) {
+internal fun BlocklistCard(app: App, changed: () -> Unit) {
     var text by remember { mutableStateOf("") }
     var msg by remember { mutableStateOf("") }
     val list = remember { mutableStateOf(app.blocking.blocklist.all()) }
@@ -147,7 +95,7 @@ private fun BlocklistCard(app: App, changed: () -> Unit) {
 }
 
 @Composable
-private fun BlockingSetup(app: App, mode: BlockMode, onMode: (BlockMode) -> Unit) {
+internal fun BlockingSetup(app: App, mode: BlockMode, onMode: (BlockMode) -> Unit) {
     val helper = remember { dev.ontask.block.RootHelper() }
     var msg by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf(false) }

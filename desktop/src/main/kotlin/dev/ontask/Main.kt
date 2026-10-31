@@ -16,6 +16,7 @@ import dev.ontask.ui.OnTaskTray
 fun main() {
     // Black-and-alpha tray icon is drawn as a template image, so it adapts to light and dark menu bars.
     System.setProperty("apple.awt.enableTemplateImages", "true")
+    System.setProperty("apple.awt.application.name", "OnTask")
     val app = App().also { it.start() }
     application {
         var visible by remember { mutableStateOf(true) }

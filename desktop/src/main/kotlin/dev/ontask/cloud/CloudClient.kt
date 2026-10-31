@@ -113,6 +113,36 @@ class CloudClient(private val cfg: CloudConfig, private val keychain: Keychain? 
         if (r.statusCode() !in 200..299) throw CloudException("Firestore ${r.statusCode()}: ${r.body().take(300)}", r.statusCode())
     }
 
+    fun delete(docPath: String) {
+        val r = send(HttpRequest.newBuilder(URI.create("${cfg.firestoreBase}/$docPath")).header("Authorization", "Bearer ${token()}").DELETE().build())
+        if (r.statusCode() !in 200..299 && r.statusCode() != 404) throw CloudException("Firestore ${r.statusCode()}", r.statusCode())
+    }
+
+    /** Reads one document; null if it doesn't exist. */
+    fun get(docPath: String): JsonObject? {
+        val r = send(HttpRequest.newBuilder(URI.create("${cfg.firestoreBase}/$docPath")).header("Authorization", "Bearer ${token()}").GET().build())
+        if (r.statusCode() == 404) return null
+        if (r.statusCode() !in 200..299) throw CloudException("Firestore ${r.statusCode()}: ${r.body().take(300)}", r.statusCode())
+        return (json.parseToJsonElement(r.body()).jsonObject["fields"] as? JsonObject)?.let { FsValue.decodeFields(it) } ?: JsonObject(emptyMap())
+    }
+
+    /** Lists a (small) collection: document id to fields. */
+    fun list(collectionPath: String): List<Pair<String, JsonObject>> {
+        val r = send(HttpRequest.newBuilder(URI.create("${cfg.firestoreBase}/$collectionPath?pageSize=50")).header("Authorization", "Bearer ${token()}").GET().build())
+        if (r.statusCode() !in 200..299) throw CloudException("Firestore ${r.statusCode()}: ${r.body().take(300)}", r.statusCode())
+        val docs = json.parseToJsonElement(r.body()).jsonObject["documents"] as? JsonArray ?: return emptyList()
+        return docs.map { d -> val o = d.jsonObject; o["name"]!!.jsonPrimitive.content.substringAfterLast('/') to ((o["fields"] as? JsonObject)?.let { FsValue.decodeFields(it) } ?: JsonObject(emptyMap())) }
+    }
+
+    /** Documents in [collectionId] (top level) where [field] == [equals]. */
+    fun queryEq(collectionId: String, field: String, equals: String): List<JsonObject> {
+        val q = """{"structuredQuery":{"from":[{"collectionId":"$collectionId"}],"where":{"fieldFilter":{"field":{"fieldPath":"$field"},"op":"EQUAL","value":{"stringValue":${JsonPrimitive(equals)}}}},"limit":20}}"""
+        val url = cfg.firestoreBase.substringBefore("/documents") + "/documents:runQuery"
+        val r = send(HttpRequest.newBuilder(URI.create(url)).header("Content-Type", "application/json").header("Authorization", "Bearer ${token()}").POST(HttpRequest.BodyPublishers.ofString(q)).build())
+        if (r.statusCode() !in 200..299) throw CloudException("Query ${r.statusCode()}: ${r.body().take(300)}", r.statusCode())
+        return (json.parseToJsonElement(r.body()) as JsonArray).mapNotNull { (it.jsonObject["document"] as? JsonObject)?.get("fields") as? JsonObject }.map { FsValue.decodeFields(it) }
+    }
+
     /** Collection-group query: documents named [group] where [field] == [equals] and ts > [after]. */
     fun queryGroup(group: String, field: String, equals: String, after: Long): List<JsonObject> {
         val q = """{"structuredQuery":{"from":[{"collectionId":"$group","allDescendants":true}],"where":{"compositeFilter":{"op":"AND","filters":[

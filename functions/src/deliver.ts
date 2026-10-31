@@ -1,6 +1,6 @@
 import type { Firestore } from "firebase-admin/firestore";
 import { FieldValue } from "firebase-admin/firestore";
-import { partnerMessage, withClose, type EventDoc } from "./logic/messages";
+import { firstName, partnerMessage, withClose, type EventDoc } from "./logic/messages";
 import { bingeAllowed, decide, inQuietHours } from "./logic/routing";
 import { DEFAULT_PARTNER_PREFS, type MessageType, type PartnerPrefs } from "./logic/types";
 import type { Senders } from "./senders";
@@ -8,7 +8,7 @@ import type { Senders } from "./senders";
 export interface Link { trackedUid: string; partnerUid: string; partnerPrefs?: PartnerPrefs; status: string }
 
 const TITLES: Record<MessageType, string> = {
-  binge_alert: "Check-in from {name}", checkin: "{name}'s daily check-in", work_hours_change: "{name} changed their work hours",
+  binge_alert: "Check-in from {name}", checkin: "{name}'s evening review", work_hours_change: "{name} changed their work hours",
   missed_checkin: "{name} hasn't checked in", work_unblock: "{name} unblocked a site for work",
 };
 
@@ -44,7 +44,7 @@ export async function deliverToPartner(
     return { delivered: false, reason: "quiet_hours", channel: d.channel };
   }
 
-  const title = TITLES[type].replace("{name}", trackedName);
+  const title = TITLES[type].replace("{name}", firstName(trackedName));
   let res: { ok: boolean; detail: string };
   try {
     if (d.channel === "push") {

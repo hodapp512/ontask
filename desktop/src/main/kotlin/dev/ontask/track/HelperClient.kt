@@ -32,6 +32,8 @@ class HelperClient(private val binary: File) : SampleSource, AutoCloseable {
     private var consecutiveTimeouts = 0
 
     @Volatile var status: String = "not started"; private set
+    /** Last command the helper refused, e.g. "screen_recording_denied". Not a failure of the helper itself. */
+    @Volatile var lastCommandError: String? = null; private set
     @Volatile var restarts: Int = 0; private set
     @Volatile var failures: Int = 0; private set
     val pid: Long? get() = process?.takeIf { it.isAlive }?.pid()
@@ -79,8 +81,10 @@ class HelperClient(private val binary: File) : SampleSource, AutoCloseable {
                 found
             }
             consecutiveTimeouts = 0
+            // A refused command (e.g. screen capture without Screen Recording permission) still means the helper is fine.
+            status = "running"
             if (resp["ok"]?.jsonPrimitive?.boolean == true) resp["result"]?.jsonObject
-            else { status = "error: ${resp["error"]}"; null }
+            else { lastCommandError = resp["error"]?.jsonPrimitive?.content; null }
         } catch (e: TimeoutCancellationException) {
             // A first-time Automation prompt can block the helper for a while; only restart if it keeps happening.
             status = "timeout"; if (++consecutiveTimeouts >= 3) { kill(); consecutiveTimeouts = 0 }
@@ -95,7 +99,7 @@ class HelperClient(private val binary: File) : SampleSource, AutoCloseable {
     override suspend fun sample(): Sample? {
         val r = request("sample")
         if (r == null) { failures++; return null }
-        return runCatching { json.decodeFromJsonElement(Sample.serializer(), r) }.getOrNull()
+        return runCatching { json.decodeFromJsonElement(Sample.serializer(), r) }.getOrNull()?.let { s -> s.copy(app = s.app?.let(::displayAppName)) }
     }
 
     /** Stops the helper; the next request starts a fresh one (macOS only reports a new Screen Recording grant to a new process). */
@@ -103,3 +107,6 @@ class HelperClient(private val binary: File) : SampleSource, AutoCloseable {
 
     override fun close() = kill()
 }
+
+/** OnTask's own JVM process shows up as "MainKt" (or "java") when run outside the app bundle. */
+fun displayAppName(app: String): String = if (app == "MainKt" || app == "java" || app == "OnTask") "OnTask" else app

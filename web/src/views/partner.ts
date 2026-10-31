@@ -5,24 +5,13 @@ import { db, fns } from "../firebase";
 import { h } from "../dom";
 import { LEVELS, REACTIONS, deepShare, fmtDuration, timelineSvg, todayKey, type LevelKey, type Seg } from "../format";
 
-/** "People I support": links where I am the partner. */
-export async function partnerHome(u: User): Promise<HTMLElement> {
-  const links = await getDocs(query(collection(db, "links"), where("partnerUid", "==", u.uid)));
-  const cards = links.docs.map((d) => {
-    const l = d.data();
-    return h("div", { class: "card" }, h("h2", {}, l.trackedName ?? "Friend"), h("div", { class: "row" }, h("a", { href: `#/person/${encodeURIComponent(d.id)}` }, h("button", { class: "primary" }, "Open"))));
-  });
-  return h("main", {}, h("h1", {}, "People"),
-    cards.length ? cards : h("div", { class: "card" }, h("h2", {}, "Nobody yet"), h("p", { class: "muted" }, "When someone invites you, open their invite link or enter the code under Me → Join with a code.")));
-}
-
 export async function joinView(u: User, code: string): Promise<HTMLElement> {
   const out = h("div", { class: "card" }, h("p", {}, "Joining…"));
   try {
     const r = await httpsCallable<{ code: string }, { linkId: string }>(fns, "acceptInvite")({ code });
-    location.hash = `#/person/${encodeURIComponent(r.data.linkId)}`;
-  } catch (e: any) { out.replaceChildren(h("p", { class: "error" }, e.message ?? "That invite didn't work."), h("a", { href: "#/" }, "Back")); }
-  return h("main", {}, h("h1", {}, "Pairing"), out);
+    location.hash = "#/";
+  } catch (e: any) { out.replaceChildren(h("p", { class: "error" }, e.message ?? "That invite didn't work."), h("a", { href: "#/" }, "Home")); }
+  return h("main", {}, h("header", { class: "top" }, h("a", { href: "#/", class: "icon-btn", "aria-label": "Back" }, "←"), h("h1", { class: "grow" }, "Pairing")), out);
 }
 
 /** One tracked person: messages, today's report (if they share it) and one-tap reactions. */
@@ -54,7 +43,7 @@ export async function personView(u: User, linkId: string): Promise<HTMLElement> 
   };
 
   return h("main", {},
-    h("h1", {}, link.trackedName ?? "Friend"),
+    h("header", { class: "top" }, h("a", { href: "#/", class: "icon-btn", "aria-label": "Back" }, "←"), h("h1", { class: "grow" }, link.trackedName ?? "Friend")),
     reportCard,
     h("div", { class: "card" }, h("h2", {}, "Send encouragement"), h("div", { class: "row" }, REACTIONS.map((r) => h("button", { onclick: send(r.kind) }, r.label))), reply, status),
     h("div", { class: "card" }, h("h2", {}, "Messages"), feed),

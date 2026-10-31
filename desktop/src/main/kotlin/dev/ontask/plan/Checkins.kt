@@ -39,13 +39,20 @@ class Checkins(private val db: Db) {
 }
 
 object CheckinDraft {
+    /** How the day felt, stored as 1–5. */
+    val FEELINGS = listOf(1 to "😣 Rough", 2 to "😕 Meh", 3 to "🙂 Okay", 4 to "😊 Good", 5 to "🤩 Great")
+    fun feeling(rating: Int): String = FEELINGS.firstOrNull { it.first == rating }?.second ?: "$rating/5"
+
+    /** First line the partner reads before the message; the server adds it when delivering. */
+    fun intro(fullName: String?): String? = fullName?.trim()?.split(Regex("\\s+"))?.firstOrNull()?.takeIf { it.isNotBlank() }?.let { "Here is $it's evening review." }
+
     fun deepShare(r: DailyReport?): Int? {
         r ?: return null
         val denom = Level.entries.filter { it != Level.AWAY }.sumOf { r.totalsAll[it] ?: 0 }
         return if (denom < 600) null else ((r.totalsAll[Level.DEEP] ?: 0) * 100 / denom).toInt()
     }
 
-    private fun dur(sec: Long) = "${sec / 3600}h ${sec % 3600 / 60}m"
+    private fun dur(sec: Long) = if (sec >= 3600) "${sec / 3600}h ${sec % 3600 / 60}m" else "${sec / 60}m"
 
     /** The drafted check-in the user reviews before it is sent to their partner. */
     fun message(today: DailyReport, yesterday: DailyReport?, rating: Int?, helped: String?, hurt: String?, change: String?, struggles: List<String> = emptyList()): String = buildString {
@@ -56,7 +63,7 @@ object CheckinDraft {
         today.deepSessions.maxOfOrNull { it.seconds }?.let { append(", longest ${dur(it)}") }
         append(".")
         if (share != null && prev != null) append(" " + when { share > prev + 2 -> "Better than yesterday."; share < prev - 2 -> "Not as good as yesterday."; else -> "About the same as yesterday." })
-        if (rating != null) append("\nSelf-rating: $rating/5.")
+        if (rating != null) append("\nHow the day felt: ${feeling(rating).substringAfter(' ')}.")
         if (!helped.isNullOrBlank()) append("\nWhat helped: ${helped.trim()}")
         if (!hurt.isNullOrBlank()) append("\nWhat hurt: ${hurt.trim()}")
         if (!change.isNullOrBlank()) append("\nTomorrow I'll: ${change.trim()}")

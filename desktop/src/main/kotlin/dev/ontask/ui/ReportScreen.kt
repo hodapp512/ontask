@@ -47,25 +47,6 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
-@Composable
-fun ReportScreen(app: App, initialDate: LocalDate = LocalDate.now()) {
-    var date by remember { mutableStateOf(initialDate) }
-    var refresh by remember { mutableStateOf(0) }
-    var report by remember { mutableStateOf<DailyReport?>(null) }
-    // Computed on demand: when the screen opens, the date changes, or the user hits refresh.
-    LaunchedEffect(date, refresh) {
-        withContext(Dispatchers.IO) { app.tracker.flush() }
-        report = withContext(Dispatchers.IO) { app.reports.daily(date) }
-    }
-    Page("Daily report", "Where your time went. Computed when you open it — nothing runs in the background for it.") {
-        HelperBanner(app)
-        NowCard(app) { refresh++ }
-        DateBar(date, { date = it }) { refresh++ }
-        val r = report
-        if (r == null) Text("Loading…") else ReportBody(r)
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DateBar(date: LocalDate, onDate: (LocalDate) -> Unit, onRefresh: () -> Unit) {
@@ -99,18 +80,22 @@ fun DateBar(date: LocalDate, onDate: (LocalDate) -> Unit, onRefresh: () -> Unit)
 }
 
 @Composable
-private fun HelperBanner(app: App) {
+internal fun HelperBanner(app: App) {
     val live by app.tracker.live.collectAsState()
     val status = app.helper.status
-    if (status != "running" && status != "not started") Notice("The tracking helper isn't running: $status", error = true)
+    if (status != "running" && status != "not started") Notice(
+        if (status == "timeout") "OnTask's activity reader is slow to respond. If this stays, quit and reopen OnTask."
+        else "OnTask can't see what you're working on right now, so nothing is being tracked. Quit and reopen OnTask; if it keeps happening, check Diagnostics.",
+        error = true,
+    )
     else if (live.sample?.accessibilityTrusted == false)
         Notice("Window titles of non-browser apps are hidden until you grant Accessibility access (System Settings → Privacy & Security). Diagnostics has a shortcut.")
 }
 
 @Composable
-private fun NowCard(app: App, onLabeled: () -> Unit) {
+internal fun NowCard(app: App, onLabeled: () -> Unit) {
     val live by app.tracker.live.collectAsState()
-    SectionCard("Right now") {
+    SectionCard("Right now", "What OnTask sees at this moment and how it labeled it. If it's wrong, correct it here and OnTask will remember.") {
         val s = live.sample; val c = live.classification
         if (live.away) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) { Dot(levelColor(Level.AWAY)); Text("You're away — not counted against you.") }
         else if (s == null || c == null) Text("Waiting for the first reading…", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -153,15 +138,15 @@ fun ReportBody(r: DailyReport) {
             }
         }
     }
-    SectionCard("Timeline", "The whole day, midnight to midnight. Gaps mean OnTask wasn't running.") { Timeline(r) }
-    SectionCard("Focus") {
+    SectionCard("Timeline", "From your first to your last activity today. Gaps mean the Mac was off or asleep.") { Timeline(r) }
+    SectionCard("Deep-work sessions", "Stretches of 25 minutes or more without a distraction.") {
         val longest = r.deepSessions.maxOfOrNull { it.seconds }
         KV("Deep-work sessions (25+ min)", "${r.deepSessions.size}" + (longest?.let { " · longest ${fmtDuration(it)}" } ?: ""))
         r.deepSessions.forEach { Text("${fmtHm(it.start)}–${fmtHm(it.end)}  (${fmtDuration(it.seconds)})", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 12.dp)) }
         KV("Distraction events (30 s+ wasted)", r.distractionEvents.toString())
         KV("Worst hour", r.worstHour?.let { "%02d:00 — %s wasted".format(Instant.ofEpochSecond(r.dayStart + it.first * 3600L).atZone(ZoneId.systemDefault()).hour, fmtDuration(it.second)) } ?: "None 🎉")
     }
-    SectionCard("Where the time went") {
+    SectionCard("Where the time went", "Your top apps and websites today.") {
         if (r.topSubjects.isEmpty()) Text("No apps or sites recorded.")
         r.topSubjects.forEachIndexed { i, s ->
             if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -184,18 +169,37 @@ fun ReportBody(r: DailyReport) {
 @Composable
 private fun Timeline(r: DailyReport) {
     val track = MaterialTheme.colorScheme.surfaceVariant
+    val (from, to) = timelineWindow(r.timeline.map { (it.start - r.dayStart) to (it.end - r.dayStart) })
+    val span = (to - from).toFloat()
     Canvas(Modifier.fillMaxWidth().height(32.dp)) {
         drawRoundRect(track, size = size, cornerRadius = CornerRadius(6f))
         r.timeline.forEach { run ->
-            val x0 = ((run.start - r.dayStart) / 86400f * size.width).coerceIn(0f, size.width)
-            val x1 = ((run.end - r.dayStart) / 86400f * size.width).coerceIn(0f, size.width)
+            val x0 = ((run.start - r.dayStart - from) / span * size.width).coerceIn(0f, size.width)
+            val x1 = ((run.end - r.dayStart - from) / span * size.width).coerceIn(0f, size.width)
             drawRect(levelColor(run.level), Offset(x0, 0f), Size(maxOf(x1 - x0, 1.5f), size.height))
         }
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        listOf("00", "06", "12", "18", "24").forEach { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        timelineLabels(from, to).forEach { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
         Level.entries.forEach { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) { Dot(levelColor(it), 8); Text(it.label, style = MaterialTheme.typography.labelSmall) } }
     }
+}
+
+/** Seconds-after-midnight window to draw: whole hours around the data, at least 2 hours; the full day if empty. */
+fun timelineWindow(runs: List<Pair<Long, Long>>): Pair<Long, Long> {
+    if (runs.isEmpty()) return 0L to 86_400L
+    var from = runs.minOf { it.first } / 3600 * 3600
+    var to = ((runs.maxOf { it.second } + 3599) / 3600 * 3600).coerceAtMost(86_400)
+    if (to - from < 7200) { to = (from + 7200).coerceAtMost(86_400); from = (to - 7200).coerceAtLeast(0) }
+    return from to to
+}
+
+/** About five evenly spaced clock labels across the window, e.g. "8 AM", "10 AM". */
+fun timelineLabels(from: Long, to: Long): List<String> {
+    val hours = ((to - from) / 3600).toInt().coerceAtLeast(1)
+    val step = listOf(1, 2, 3, 4, 6).firstOrNull { hours / it <= 6 } ?: 6
+    val fmt = java.time.format.DateTimeFormatter.ofPattern("h a")
+    return (0..hours step step).map { java.time.LocalTime.of(((from / 3600 + it) % 24).toInt(), 0).format(fmt) }
 }

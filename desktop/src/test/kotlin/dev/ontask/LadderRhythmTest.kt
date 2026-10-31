@@ -94,6 +94,8 @@ class LadderRhythmTest {
     @Test fun draftMessageIncludesStatsTrendAndGentleClose() {
         fun rep(deep: Long, wasted: Long) = DailyReport(date, 0, mapOf(Level.DEEP to deep, Level.WASTED to wasted), emptyMap(), emptyList(), emptyList(), 0, null, emptyList())
         val m = CheckinDraft.message(rep(14400, 1800), rep(7200, 7200), 4, "Early start", "Reddit", "Phone in other room")
-        assertTrue("4h 0m deep" in m && "Better than yesterday" in m && "4/5" in m && "Early start" in m && m.endsWith("a 👍 helps."))
+        assertTrue("4h 0m deep" in m && "Better than yesterday" in m && "How the day felt: Good" in m && "Early start" in m && m.endsWith("a 👍 helps."))
+        assertEquals("Here is Sam's evening review.", CheckinDraft.intro("Sam Rivera"))
+        assertEquals(null, CheckinDraft.intro(null))
     }
 }

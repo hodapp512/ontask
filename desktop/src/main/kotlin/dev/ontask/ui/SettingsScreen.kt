@@ -11,15 +11,30 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Modifier
 import dev.ontask.App
 
 /** Settings that apply immediately: each change is saved as it is made. */
 @Composable
-fun SettingsScreen(app: App, theme: ThemeMode, onTheme: (ThemeMode) -> Unit) {
+fun SettingsScreen(app: App, theme: ThemeMode, onTheme: (ThemeMode) -> Unit, open: (Dest) -> Unit) {
     var s by remember { mutableStateOf(app.settings) }
     fun update(n: dev.ontask.db.Settings) { s = n; app.updateSettings(n) }
 
     Page("Settings", "Changes are saved as you make them.") {
+        SectionCard("Work hours", "Inside your work hours, distracting sites are blocked and OnTask watches more closely. Outside them, anything goes.") {
+            val hours = remember { s.schedule.week.days.values.sumOf { r -> r.sumOf { it.endMin - it.startMin } } / 60.0 }
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Text("%.1f hours a week".format(hours), Modifier.weight(1f))
+                androidx.compose.material3.Button({ open(Dest.WORK_HOURS) }) { Text("Edit work hours") }
+            }
+        }
+        SectionCard("Block list", "The sites blocked during work hours and Focus sessions.") {
+            val n = remember { app.blocking.blocklist.all().size }
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Text("$n site${if (n == 1) "" else "s"}" + if (app.adBlock.enabled) ", plus ads and malware" else "", Modifier.weight(1f))
+                androidx.compose.material3.Button({ open(Dest.BLOCK_LIST) }) { Text("Edit block list") }
+            }
+        }
         SectionCard("Appearance") {
             SettingRow("Theme", "Light, dark, or follow your Mac's appearance setting.") {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -38,7 +53,7 @@ fun SettingsScreen(app: App, theme: ThemeMode, onTheme: (ThemeMode) -> Unit) {
             ) { update(s.copy(awayAfterSec = it * 60)) }
         }
         PermissionsSettings(app)
-        SectionCard("Your data") {
+        SectionCard("Your data", "Everything OnTask records stays in a database on this Mac.") {
             SliderSetting(
                 "Keep detailed history", "Keep detailed history for this many days. Older data is kept forever as hourly summaries.",
                 s.retentionDays, 7..365, "days", step = 1,
@@ -48,7 +63,7 @@ fun SettingsScreen(app: App, theme: ThemeMode, onTheme: (ThemeMode) -> Unit) {
         Expander("Advanced") {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 KV("Data folder", app.dir.toString())
-                KV("Helper", app.helper.status)
+                KV("Activity reader (ontask-helper)", if (app.helper.status == "running") "Running ✓" else app.helper.status)
             }
         }
     }

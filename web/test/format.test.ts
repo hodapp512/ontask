@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deepShare, fmtDuration, timelineSvg, todayKey } from "../src/format";
+import { deepShare, fmtDuration, timelineSvg, todayKey, ago, firstName, greeting, timelineWindow } from "../src/format";
 
 describe("format", () => {
   it("formats durations", () => { expect(fmtDuration(45)).toBe("45s"); expect(fmtDuration(300)).toBe("5m"); expect(fmtDuration(5400)).toBe("1h 30m"); });
@@ -12,4 +12,28 @@ describe("format", () => {
     expect(svg).toContain('width="50"'); expect(svg).toContain("#d64545");
   });
   it("keys days as yyyy-MM-dd", () => expect(todayKey(new Date(2026, 9, 5))).toBe("2026-10-05"));
+});
+
+describe("home screen helpers", () => {
+  it("uses first names", () => { expect(firstName("Sam Rivera")).toBe("Sam"); expect(firstName("Sam")).toBe("Sam"); });
+  it("says how long ago", () => {
+    const now = 1_000_000_000_000;
+    expect(ago(now - 10_000, now)).toBe("just now");
+    expect(ago(now - 5 * 60_000, now)).toBe("5 min ago");
+    expect(ago(now - 3 * 3_600_000, now)).toBe("3 h ago");
+    expect(ago(now - 86_400_000, now)).toBe("yesterday");
+  });
+  it("greets by time of day", () => {
+    expect(greeting(new Date(2026, 0, 1, 9))).toBe("Good morning");
+    expect(greeting(new Date(2026, 0, 1, 14))).toBe("Good afternoon");
+    expect(greeting(new Date(2026, 0, 1, 20))).toBe("Good evening");
+  });
+});
+
+describe("timeline zoom", () => {
+  it("fits whole hours around the data", () => {
+    expect(timelineWindow([])).toEqual([0, 86400]);
+    expect(timelineWindow([{ a: 8 * 3600 + 600, b: 12 * 3600, k: "D" }, { a: 13 * 3600, b: 16 * 3600 + 60, k: "W" }])).toEqual([8 * 3600, 17 * 3600]);
+    expect(timelineWindow([{ a: 9 * 3600 + 60, b: 9 * 3600 + 600, k: "D" }])).toEqual([9 * 3600, 11 * 3600]);
+  });
 });

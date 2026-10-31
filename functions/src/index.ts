@@ -117,7 +117,13 @@ export const redeemLinkCode = onCall(PUBLIC, async (req) => {
     tx.delete(ref);
     return snap.get("uid") as string;
   });
-  return { token: await admin.auth().createCustomToken(uid, { device: "mac" }) };
+  // Who the Mac is now signed in as, so it can show it right away.
+  const [user, profile] = await Promise.all([admin.auth().getUser(uid), db.doc(`users/${uid}`).get()]);
+  return {
+    token: await admin.auth().createCustomToken(uid, { device: "mac" }),
+    name: (profile.get("displayName") as string | undefined) ?? user.displayName ?? null,
+    email: user.email ?? null,
+  };
 });
 
 export const sendTestMessage = onCall({ ...PUBLIC, secrets: MSG_SECRETS }, async (req) => {

@@ -46,7 +46,7 @@ fun QrCode(text: String, sizeDp: Int = 180) {
 
 @Composable
 fun CloudSettings(app: App) {
-    SectionCard("Accountability partner & phone", "Pair with a partner and your phone. Only what you choose to share leaves your Mac — never the raw activity log.") { CloudSettingsBody(app) }
+    SectionCard("Phone & partner", "Link your phone to see your day and get reminders there, and invite someone you trust to receive your evening review. Only daily summaries leave this Mac, never the detailed activity log.") { CloudSettingsBody(app) }
 }
 
 @Composable
@@ -64,7 +64,7 @@ fun CloudSettingsBody(app: App) {
         if (busy) return
         busy = true; msg = "Linking…"
         scope.launch(Dispatchers.IO) {
-            msg = try { app.cloud.linkWithCode(code); app.cloud.syncOnce(App.nowSec(), force = true); code = ""; "Linked! Your phone and partner will now hear from this Mac." } catch (e: Exception) { e.message ?: "Couldn't link" }
+            msg = try { app.cloud.linkWithCode(code); app.cloud.syncOnce(App.nowSec(), force = true); code = ""; "Linked! Your phone will show today's progress in a moment." } catch (e: Exception) { e.message ?: "Couldn't link" }
             busy = false; tick++
         }
     }
@@ -75,7 +75,7 @@ fun CloudSettingsBody(app: App) {
             web?.let { QrCode(it, 140) }
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("1. Scan the code with your phone's camera${web?.let { " (or open $it)" } ?: ""} and sign in.", style = MaterialTheme.typography.bodyMedium)
-                Text("2. Tap Me → Link my Mac → Show code.", style = MaterialTheme.typography.bodyMedium)
+                Text("2. Tap Link my Mac.", style = MaterialTheme.typography.bodyMedium)
                 Text("3. Type the 5-character code here:", style = MaterialTheme.typography.bodyMedium)
                 OutlinedTextField(
                     code,
@@ -86,7 +86,13 @@ fun CloudSettingsBody(app: App) {
             }
         }
     } else {
-        KV("Status", "This Mac is linked" + (app.cloud.lastSyncTs.takeIf { it > 0 }?.let { " · last sync ${fmtTime(it)}" } ?: ""))
+        val info = remember(tick, app.cloud.lastSyncTs) { app.cloud.linkInfo() }
+        Text("Linked ✓", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+        KV("Account", listOfNotNull(info?.name, info?.email?.let { "($it)" }).joinToString(" ").ifBlank { "Signed in (details appear after the next sync)" })
+        KV("This Mac", "Sending updates" + (app.cloud.lastSyncTs.takeIf { it > 0 }?.let { " · last sent ${fmtTime(it)}" } ?: ""))
+        KV("Phones", info?.phones?.takeIf { it.isNotEmpty() }?.joinToString(", ") { (n, seen) -> if (seen > 0) "$n (opened ${fmtAgo(seen / 1000)})" else n } ?: "None yet. Open ${web ?: "the OnTask website"} on your phone and sign in.")
+        KV("Accountability partner", info?.partners?.takeIf { it.isNotEmpty() }?.joinToString(", ") ?: "None yet. Invite one below.")
+        info?.supporting?.takeIf { it.isNotEmpty() }?.let { KV("You support", it.joinToString(", ")) }
         app.cloud.lastError?.let { KV("Last sync problem", it) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button({
@@ -96,9 +102,9 @@ fun CloudSettingsBody(app: App) {
                         invite = c to "${app.cloud.config!!.webBase}/#/join/$c"; ""
                     } catch (e: Exception) { e.message ?: "Failed" }
                 }
-            }) { Text("Invite a partner") }
+            }) { Text(if (info?.partners.isNullOrEmpty()) "Invite a partner" else "Invite another partner") }
             OutlinedButton({ scope.launch(Dispatchers.IO) { app.cloud.syncOnce(App.nowSec(), force = true); tick++; msg = app.cloud.lastError ?: "Synced." } }) { Text("Sync now") }
-            TextButton({ app.cloud.signOut(); tick++ }) { Text("Unlink") }
+            TextButton({ app.cloud.signOut(); tick++ }) { Text("Unlink this Mac") }
         }
         invite?.let { (c, link) ->
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {

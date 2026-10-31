@@ -91,6 +91,7 @@ fun ApplicationScope.OnTaskTray(app: App, open: (Dest?) -> Unit) {
 
     var picking by remember { mutableStateOf(false) }
     var adding by remember { mutableStateOf(false) }
+    var forWork by remember { mutableStateOf(false) }
 
     Tray(
         icon = remember { TrayGlyph() },
@@ -102,10 +103,10 @@ fun ApplicationScope.OnTaskTray(app: App, open: (Dest?) -> Unit) {
             if (openCount > 0) Item("$openCount site${if (openCount == 1) "" else "s"} unblocked right now", enabled = false, onClick = {})
             Separator()
             Item(if (blocked.isEmpty()) "Unblock a site… (nothing blocked)" else "Unblock a site…", enabled = blocked.isNotEmpty(), onClick = { changed(); picking = true })
-            Item("Unblock for work…", onClick = { open(Dest.BLOCKING) })
+            Item("Unblock for work…", onClick = { forWork = true })
             if (focus != null) Menu("Focus session") {
                 Item("Ends at ${fmtHm(focus.plannedEndTs)} (${fmtDuration(focus.plannedEndTs - now)} left)", enabled = false, onClick = {})
-                Item("End early…", onClick = { open(Dest.BLOCKING) })
+                Item("End now", onClick = { app.focus.stop(App.nowSec()); retick(); changed() })
             } else Menu("Start Focus session") {
                 listOf(25, 45, 60, 90).forEach { m ->
                     Item("$m minutes", onClick = { app.focus.start(m, App.nowSec()); retick(); changed() })
@@ -117,7 +118,7 @@ fun ApplicationScope.OnTaskTray(app: App, open: (Dest?) -> Unit) {
             val last = app.adBlock.lastRefresh
             Item("Refresh ad-block list now" + if (last > 0) " (updated ${fmtDuration(now - last)} ago)" else "", enabled = adOn, onClick = { app.refreshAdBlock() })
             Separator()
-            Item("Today's report", onClick = { open(Dest.REPORT) })
+            Item("Today's report", onClick = { open(Dest.HOME) })
             Item("Settings…", onClick = { open(Dest.SETTINGS) })
             Item("Open OnTask", onClick = { open(null) })
             Separator()
@@ -126,13 +127,14 @@ fun ApplicationScope.OnTaskTray(app: App, open: (Dest?) -> Unit) {
     )
     if (picking) UnblockPickerWindow(app, blocked) { picking = false; changed() }
     if (adding) AddSitesWindow(app) { adding = false; changed() }
+    if (forWork) WorkUnblockWindow(app) { forWork = false; changed() }
 }
 
-private fun themeOf(app: App) = runCatching { ThemeMode.valueOf(app.prefs.str("theme", "SYSTEM")) }.getOrDefault(ThemeMode.SYSTEM)
+internal fun themeOf(app: App) = runCatching { ThemeMode.valueOf(app.prefs.str("theme", "SYSTEM")) }.getOrDefault(ThemeMode.SYSTEM)
 
 /** Choose a blocked site, then hand over to the regular [UnblockDialog] (delay and friction included). */
 @Composable
-private fun UnblockPickerWindow(app: App, blocked: List<String>, onClose: () -> Unit) {
+internal fun UnblockPickerWindow(app: App, blocked: List<String>, onClose: () -> Unit) {
     var filter by remember { mutableStateOf("") }
     var chosen by remember { mutableStateOf<String?>(null) }
     Window(
@@ -156,7 +158,7 @@ private fun UnblockPickerWindow(app: App, blocked: List<String>, onClose: () -> 
 }
 
 @Composable
-private fun AddSitesWindow(app: App, onClose: () -> Unit) {
+internal fun AddSitesWindow(app: App, onClose: () -> Unit) {
     var text by remember { mutableStateOf("") }
     var msg by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
@@ -181,6 +183,19 @@ private fun AddSitesWindow(app: App, onClose: () -> Unit) {
                     }, enabled = text.isNotBlank()) { Text("Add") }
                 }
             }
+        } }
+    }
+}
+
+/** "Unblock for work" in its own small window (from the menu bar or the Home screen). */
+@Composable
+internal fun WorkUnblockWindow(app: App, onClose: () -> Unit) {
+    Window(
+        onCloseRequest = onClose, title = "Unblock for work", alwaysOnTop = true, resizable = false,
+        state = rememberWindowState(size = DpSize(560.dp, 420.dp), position = WindowPosition.Aligned(Alignment.Center)),
+    ) {
+        OnTaskTheme(remember { themeOf(app) }) { Surface(Modifier.fillMaxSize()) {
+            Column(Modifier.padding(12.dp)) { PurposeCard(app, App.nowSec()) { onClose() } }
         } }
     }
 }

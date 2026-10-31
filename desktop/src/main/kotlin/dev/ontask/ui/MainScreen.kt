@@ -15,19 +15,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import dev.ontask.App
 
-enum class Dest(val label: String, val glyph: String) {
-    REPORT("Report", "▤"),
-    PLAN("Today", "✓"),
-    BLOCKING("Blocking", "⛔"),
-    CALENDAR("Work hours", "🗓"),
-    DIAGNOSTICS("Diagnostics", "⚙"),
+/** Screens. Work hours and the block list are pages inside Settings ([parent]), not rail items. */
+enum class Dest(val label: String, val glyph: String, val parent: Dest? = null) {
+    HOME("Home", "⌂"),
     SETTINGS("Settings", "☰"),
+    DIAGNOSTICS("Diagnostics", "⚙"),
+    WORK_HOURS("Work hours", "", SETTINGS),
+    BLOCK_LIST("Block list", "", SETTINGS),
 }
 
 @Composable
-fun MainScreen(app: App, startAt: Dest = Dest.REPORT) {
+fun MainScreen(app: App, startAt: Dest = Dest.HOME) {
     var dest by remember { mutableStateOf(Nav.requested.value ?: startAt) }
     val requested by Nav.requested.collectAsState()
     LaunchedEffect(requested) { requested?.let { dest = it; Nav.requested.value = null } }
@@ -37,18 +39,20 @@ fun MainScreen(app: App, startAt: Dest = Dest.REPORT) {
         if (!setupDone) { SetupWizard(app) { setupDone = true }; return@OnTaskTheme }
         androidx.compose.material3.Surface(Modifier.fillMaxSize(), color = androidx.compose.material3.MaterialTheme.colorScheme.background) { Row(Modifier.fillMaxSize()) {
             NavigationRail {
-                Dest.entries.forEach { d ->
-                    NavigationRailItem(selected = dest == d, onClick = { dest = d }, icon = { Text(d.glyph) }, label = { Text(d.label) })
+                Dest.entries.filter { it.parent == null }.forEach { d ->
+                    NavigationRailItem(selected = dest == d || dest.parent == d, onClick = { dest = d }, icon = { Text(d.glyph) }, label = { Text(d.label) })
                 }
             }
-            Box(Modifier.fillMaxSize()) {
-                when (dest) {
-                    Dest.REPORT -> ReportScreen(app)
-                    Dest.PLAN -> PlanScreen(app)
-                    Dest.BLOCKING -> BlockingScreen(app)
-                    Dest.CALENDAR -> CalendarScreen(app)
-                    Dest.DIAGNOSTICS -> DiagnosticsScreen(app)
-                    Dest.SETTINGS -> SettingsScreen(app, mode) { mode = it; app.prefs.set("theme", it.name) }
+            androidx.compose.foundation.layout.Column(Modifier.fillMaxSize()) {
+                dest.parent?.let { p -> androidx.compose.material3.TextButton({ dest = p }, Modifier.padding(start = 12.dp, top = 8.dp)) { Text("← ${p.label}") } }
+                Box(Modifier.weight(1f).fillMaxSize()) {
+                    when (dest) {
+                        Dest.HOME -> HomeScreen(app)
+                        Dest.WORK_HOURS -> CalendarScreen(app)
+                        Dest.BLOCK_LIST -> BlockListScreen(app)
+                        Dest.DIAGNOSTICS -> DiagnosticsScreen(app)
+                        Dest.SETTINGS -> SettingsScreen(app, mode, { mode = it; app.prefs.set("theme", it.name) }) { dest = it }
+                    }
                 }
             }
         } }
@@ -58,7 +62,6 @@ fun MainScreen(app: App, startAt: Dest = Dest.REPORT) {
 /** Hook for settings sections added by later phases (blocking, AI, partner, ...). */
 @Composable
 fun ExtraSettings(app: App) {
-    BlockingSettings(app)
     InterventionSettings(app)
     AiSettings(app)
     CloudSettings(app)

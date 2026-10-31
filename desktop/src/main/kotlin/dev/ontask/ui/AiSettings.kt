@@ -37,7 +37,7 @@ import java.util.WeakHashMap
 
 @Composable
 fun AiSettings(app: App) {
-    SectionCard("Smarter classification (AI)", "Rules decide first. AI only looks at activity no rule covers, using on-screen text and, if unsure, a screenshot. Screenshots and text are deleted right after.") {
+    SectionCard("AI labeling (optional)", "When the app or website alone doesn't tell OnTask whether you're working, AI can read the text on screen — and look at a screenshot if still unsure. Both are deleted right after.") {
         AiSettingsBody(app)
     }
 }

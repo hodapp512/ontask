@@ -25,7 +25,7 @@ enum class Category(val label: String, val level: Level) {
 
 /** Where a classification came from (design: rule / metadata / OCR / vision / user label). */
 enum class Source(val label: String) {
-    RULE("Built-in rule"), USER_LABEL("User rule"), METADATA("Metadata only"), OCR("AI on screen text"), VISION("AI vision"), AWAY("Away")
+    RULE("Built-in list"), USER_LABEL("Your rule"), METADATA("App & window title"), OCR("AI read the screen"), VISION("AI looked at the screen"), AWAY("Away")
 }
 
 /** One reading from the Swift helper. */

@@ -6,6 +6,7 @@ rules_version = '2';
 //   users/{uid}/events/{id}         outbox written by the Mac     (owner creates; functions process)
 //   users/{uid}/reports/{date}      daily aggregates              (owner writes; partner reads if share == "report")
 //   users/{uid}/schedule/current    work hours, habits, times     (owner)
+//   users/{uid}/devices/{id}        linked Macs and phones        (owner; shown in both apps)
 //   links/{trackedUid}_{partnerUid} one tracked<->partner link    (created by functions only)
 //     messages/{id}                 messages delivered to partner (functions only)
 //     reactions/{id}                partner reactions             (partner creates)
@@ -39,6 +40,7 @@ service cloud.firestore {
         allow read: if isOwner(uid) || partnerSeesReport(uid);
       }
       match /schedule/{doc} { allow read, write: if isOwner(uid); }
+      match /devices/{id} { allow read, write: if isOwner(uid); }
       match /checkins/{date} {
         allow write: if isOwner(uid);
         allow read: if isOwner(uid) || isPartnerOf(uid);
