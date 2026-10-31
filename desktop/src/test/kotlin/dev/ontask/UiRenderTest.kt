@@ -1,5 +1,8 @@
 package dev.ontask
 
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.unit.dp
+
 import dev.ontask.ui.DiagnosticsScreen
 import dev.ontask.ui.MainScreen
 import dev.ontask.ui.Dest
@@ -18,6 +21,12 @@ class UiRenderTest {
     @Test fun renderSettingsWithAi() {
         val app = UiShots.newApp(); app.prefs.set("setup.done", true); app.ai.enabled = true
         UiShots.shot("settings-ai", false, 1100, 2400) { MainScreen(app, Dest.SETTINGS) }
+    }
+
+    @Test fun renderTrayGlyph() {
+        UiShots.shot("tray-glyph", false, 88, 88) {
+            androidx.compose.foundation.Image(dev.ontask.ui.TrayGlyph(), null, androidx.compose.ui.Modifier.size(88.dp))
+        }
     }
 
     @Test fun renderEveningPrompt() {

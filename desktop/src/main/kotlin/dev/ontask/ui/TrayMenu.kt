@@ -59,15 +59,30 @@ object Nav {
     fun open(dest: Dest?) { if (dest != null) requested.value = dest; raises.value++ }
 }
 
-/** The logo's check + chevron, drawn black: macOS renders it as a template image (see `apple.awt.enableTemplateImages`). */
+/**
+ * The logo's shield with the clock hands cut out, drawn black: macOS renders it as a template image (see
+ * `apple.awt.enableTemplateImages`). Same shapes as desktop/icons/MakeIcons.java.
+ */
 class TrayGlyph(private val color: Color = Color.Black) : Painter() {
     override val intrinsicSize = Size(44f, 44f)
     override fun DrawScope.onDraw() {
         val u = size.minDimension / 100f
-        val stroke = Stroke(width = 13 * u, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round)
-        val check = androidx.compose.ui.graphics.Path().apply { moveTo(8 * u, 51 * u); lineTo(30 * u, 73 * u); lineTo(59 * u, 29 * u) }
-        val chevron = androidx.compose.ui.graphics.Path().apply { moveTo(75 * u, 33 * u); lineTo(93 * u, 51 * u); lineTo(75 * u, 69 * u) }
-        drawPath(check, color, style = stroke); drawPath(chevron, color, style = stroke)
+        val shield = androidx.compose.ui.graphics.Path().apply {
+            moveTo(50 * u, 4 * u)
+            quadraticTo(68 * u, 14 * u, 88 * u, 15 * u)
+            lineTo(88 * u, 46 * u)
+            cubicTo(88 * u, 72 * u, 70 * u, 88 * u, 50 * u, 96 * u)
+            cubicTo(30 * u, 88 * u, 12 * u, 72 * u, 12 * u, 46 * u)
+            lineTo(12 * u, 15 * u)
+            quadraticTo(32 * u, 14 * u, 50 * u, 4 * u)
+            close()
+        }
+        val hands = androidx.compose.ui.graphics.Path().apply { moveTo(50 * u, 24 * u); lineTo(50 * u, 50 * u); lineTo(70 * u, 50 * u) }
+        val stroke = Stroke(width = 11 * u, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round)
+        drawContext.canvas.saveLayer(androidx.compose.ui.geometry.Rect(0f, 0f, size.width, size.height), androidx.compose.ui.graphics.Paint())
+        drawPath(shield, color)
+        drawPath(hands, color, style = stroke, blendMode = androidx.compose.ui.graphics.BlendMode.Clear)
+        drawContext.canvas.restore()
     }
 }
 
