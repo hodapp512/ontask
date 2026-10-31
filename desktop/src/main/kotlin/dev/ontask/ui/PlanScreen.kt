@@ -48,9 +48,22 @@ private fun PlanBody(app: App, prompt: Prompt, date: LocalDate, onDone: () -> Un
 }
 
 @Composable
-internal fun PrioritiesCard(app: App, date: LocalDate, short: Boolean, onDone: () -> Unit) {
+internal fun PrioritiesCard(app: App, date: LocalDate, short: Boolean, compact: Boolean = false, onDone: () -> Unit) {
     var text by remember { mutableStateOf(app.priorities.forDate(date).joinToString("\n")) }
     val change = remember { app.checkins.get(date.minusDays(1), "evening")?.change.orEmpty() }
+    fun save() { app.priorities.set(date, listOf(text)); app.checkins.save(Checkin(date, "planning", App.nowSec(), null, null, null, null, null, false)); onDone() }
+    // Home: one line to start, growing as you type; the title and button share a row.
+    if (compact) {
+        PlainCard {
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Today's plan", style = MaterialTheme.typography.titleMedium)
+                OutlinedTextField(text, { text = it }, Modifier.weight(1f), maxLines = 4, placeholder = { Text("What matters today?") })
+                Button(::save, enabled = text.isNotBlank()) { Text("Save") }
+            }
+            if (change.isNotBlank()) Text("Yesterday you wanted to change: $change", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        return
+    }
     SectionCard("Today's plan", "What matters today, in your own words.") {
         if (change.isNotBlank()) Notice("Yesterday you wanted to change: $change")
         OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth(), minLines = 4, placeholder = { Text("e.g. Finish the Acme proposal, then review PRs. No news before lunch.") })

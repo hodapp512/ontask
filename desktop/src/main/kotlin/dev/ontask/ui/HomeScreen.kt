@@ -124,7 +124,7 @@ private fun FocusButton(app: App, now: Long, changed: () -> Unit) {
 private fun TodayCard(app: App, date: LocalDate, onReflect: () -> Unit) {
     var editing by remember { mutableStateOf(false) }
     val planned = remember(editing) { app.checkins.done(date, "planning") }
-    if (!planned || editing) { PrioritiesCard(app, date, short = false) { editing = false }; return }
+    if (!planned || editing) { PrioritiesCard(app, date, short = false, compact = true) { editing = false }; return }
     val priorities = remember(editing) { app.priorities.forDate(date) }
     val end = app.settings.schedule.rangesFor(date).maxOfOrNull { it.endMin }
     val evening = app.checkins.get(date, "evening")
