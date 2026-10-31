@@ -6,18 +6,27 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
-enum class UnblockKind { REGULAR, WORK }
+/** REGULAR: not for work, during work hours or a Focus session (friction). WORK: purpose-bound. LEISURE: outside work hours (instant). */
+enum class UnblockKind { REGULAR, WORK, LEISURE }
 
 data class Unblock(val id: Long, val ts: Long, val kind: UnblockKind, val domain: String, val purpose: String?, val expiresTs: Long, val endedTs: Long?)
 
 class UnblockRejected(msg: String) : Exception(msg)
 
-/** Regular unblocks (escalating delay, auto-expiring) and purpose-bound work unblocks (no delay, partner notified). */
+/**
+ * Sites on the block list are blocked around the clock; these are the ways to open one for a while.
+ * During work hours (or a Focus session): regular unblocks (escalating delay, 5–15 min, partner told) and purpose-bound
+ * work unblocks (no delay, partner told). Outside work hours: leisure unblocks (instant, 5 min–2 h, ending when work
+ * hours start).
+ */
 class Unblocks(private val db: Db, private val prefs: Prefs, private val events: Events, private val zone: ZoneId = ZoneId.systemDefault()) {
 
     val delays: List<Int> get() = prefs.str("unblock.delays", "10,30,120,300").split(",").mapNotNull { it.trim().toIntOrNull() }.ifEmpty { listOf(10, 30, 120, 300) }
     val resetHour: Int get() = prefs.int("unblock.reset_hour", 4)
-    val durationsMin: List<Int> = listOf(5, 15, 30)
+    /** Not-for-work unblocks during work hours. */
+    val durationsMin: List<Int> = listOf(5, 10, 15)
+    /** Unblocks outside work hours. */
+    val leisureDurationsMin: List<Int> = listOf(5, 10, 30, 60, 120)
     val maxWorkMinutes get() = prefs.int("unblock.max_work_min", 180)
 
     /** Start of the current "unblock day" (resets at 4am). */
@@ -50,7 +59,21 @@ class Unblocks(private val db: Db, private val prefs: Prefs, private val events:
         val need = nextDelaySec(now)
         if (delayWaitedSec < need) throw UnblockRejected("You need to wait ${need}s before unblocking")
         val out = domains.map { insert(UnblockKind.REGULAR, it, null, now, now + minutes * 60L) }
-        events.emit("unblock", now, "domains" to domains.joinToString(","), "minutes" to minutes, "count_today" to todayCount(now))
+        // work_hours: the partner is told about every one of these (see functions/src/logic/messages.ts).
+        events.emit("unblock", now, "domains" to domains.joinToString(","), "minutes" to minutes, "count_today" to todayCount(now), "work_hours" to true)
+        return out
+    }
+
+    /**
+     * Outside work hours: no delay and nobody is told. Ends at [workStartsAt] (the next start of work hours) if that
+     * comes first, and doesn't count toward the escalating delay.
+     */
+    fun startLeisure(domains: List<String>, minutes: Int, now: Long, workStartsAt: Long?): List<Unblock> {
+        if (minutes !in leisureDurationsMin) throw UnblockRejected("Duration must be one of $leisureDurationsMin minutes")
+        if (domains.isEmpty()) throw UnblockRejected("Pick at least one site")
+        val until = minOf(now + minutes * 60L, workStartsAt ?: Long.MAX_VALUE)
+        val out = domains.map { insert(UnblockKind.LEISURE, it, null, now, until) }
+        events.emit("unblock_leisure", now, "domains" to domains.joinToString(","), "minutes" to minutes)
         return out
     }
 

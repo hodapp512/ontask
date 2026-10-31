@@ -14,12 +14,18 @@ export function partnerMessage(ev: EventDoc, name: string): { type: MessageType;
       return { type: "checkin", text: s("message") ? `Here is ${first}'s evening review.\n\n${s("message")}` : `${first} checked in.` };
     case "work_hours_change":
       return { type: "work_hours_change", text: `${name} reduced their work hours. Reason: "${s("reason")}". ${s("meaning")}` };
+    case "unblock":
+      // Not-for-work unblocks during work hours (evening ones are emitted as "unblock_leisure" and never reach partners).
+      if (p.work_hours !== true) return null;
+      return { type: "unblock_alert", text: `${first} unblocked ${s("domains").split(",").join(", ")} for ${s("minutes")} minutes during work hours (${ordinal(Number(s("count_today")) || 1)} today, not for work).` };
     case "work_unblock":
       return { type: "work_unblock", text: `${name} unblocked ${s("domain")} for ${s("minutes")} minutes for work: "${s("purpose")}". Their activity is being checked against that purpose.` };
     default:
       return null;
   }
 }
+
+const ordinal = (n: number) => n + (n % 100 >= 11 && n % 100 <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] ?? "th");
 
 /** "Dennis Hodapp" -> "Dennis"; used wherever a message talks about the person. */
 export function firstName(name: string): string {

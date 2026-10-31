@@ -47,7 +47,17 @@ export function decide(prefs: PartnerPrefs | undefined, type: MessageType, now: 
   return { channel, defer: inQuietHours(p, now), fellBackToText: fellBack && channel === "text" };
 }
 
-/** Binge alerts: at most [perDay] per tracked user per local day; extras are queued into the next check-in. */
-export function bingeAllowed(sentToday: number, perDay = 2): boolean {
-  return sentToday < perDay;
+/** Alerts about drifting share one budget; everything else (check-ins, work-hours changes, …) is never capped. */
+export const DRIFT_TYPES: readonly MessageType[] = ["binge_alert", "unblock_alert"];
+export const DRIFT_ALERTS_PER_HALF_DAY = 2;
+
+/** Start of the current half-day — midnight to noon, noon to midnight — in [tz], as epoch ms. */
+export function halfDayStart(now: Date, tz: string): number {
+  const { hour, minute } = localParts(now, tz);
+  return now.getTime() - (((hour % 12) * 60 + minute) * 60_000 + now.getUTCSeconds() * 1000 + now.getUTCMilliseconds());
+}
+
+/** At most 2 drifting alerts in the morning and 2 in the afternoon; extras are listed in the evening review. */
+export function driftAllowed(sentThisHalfDay: number, cap = DRIFT_ALERTS_PER_HALF_DAY): boolean {
+  return sentThisHalfDay < cap;
 }

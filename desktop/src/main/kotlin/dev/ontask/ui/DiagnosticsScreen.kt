@@ -125,7 +125,7 @@ fun DiagnosticsScreen(app: App) {
 private fun Hint(text: String) = Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
 private fun sourceHelp(s: Source) = when (s) {
-    Source.RULE -> "OnTask's built-in list, e.g. youtube.com is entertainment"
+    Source.RULE -> "OnTask's built-in list, e.g. netflix.com is entertainment"
     Source.USER_LABEL -> "A rule you made (see below)"
     Source.METADATA -> "Guessed from the app name and window title"
     Source.OCR -> "AI read the text on screen"

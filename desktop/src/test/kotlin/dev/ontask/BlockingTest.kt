@@ -53,6 +53,29 @@ class BlockingTest {
         val u = env().unblocks
         assertFailsWith<UnblockRejected> { u.startRegular(listOf("x.com"), 5, at(10), 3) }
         assertFailsWith<UnblockRejected> { u.startRegular(listOf("x.com"), 7, at(10), 10) }
+        assertFailsWith<UnblockRejected> { u.startRegular(listOf("x.com"), 30, at(10), 10) } // work hours: 5, 10 or 15 only
+    }
+
+    @Test fun leisureUnblocksAreInstantUncountedAndEndWhenWorkStarts() {
+        val e = env(); e.list.add(listOf("reddit.com"), 0)
+        val sunday = at(20, 0, 25) // Sun evening; work starts Mon 9:00
+        assertEquals(at(9, 0, 26), e.settings.schedule.nextWorkStart(sunday, ZoneOffset.UTC))
+        e.unblocks.startLeisure(listOf("reddit.com"), 120, sunday, e.settings.schedule.nextWorkStart(sunday, ZoneOffset.UTC))
+        assertEquals(emptyList(), e.svc.currentlyBlocked(sunday + 60))
+        assertEquals(0, e.unblocks.todayCount(sunday + 60)) // doesn't feed the escalating delay
+        assertEquals(listOf("unblock_leisure"), e.events.pending().map { it.type }) // the partner isn't told
+        assertFailsWith<UnblockRejected> { e.unblocks.startLeisure(listOf("reddit.com"), 15, sunday, null) }
+        // Late evening: a 2-hour unblock is cut off when work starts.
+        val late = at(8, 30)
+        val u = e.unblocks.startLeisure(listOf("reddit.com"), 120, late, e.settings.schedule.nextWorkStart(late, ZoneOffset.UTC)).single()
+        assertEquals(at(9), u.expiresTs)
+    }
+
+    @Test fun focusEndsLeisureUnblocks() {
+        val e = env(); e.list.add(listOf("reddit.com"), 0)
+        e.unblocks.startLeisure(listOf("reddit.com"), 60, at(20), null)
+        e.focus.start(30, at(20, 10)); e.svc.tick(at(20, 10))
+        assertEquals(listOf("reddit.com"), e.svc.currentlyBlocked(at(20, 11)))
     }
 
     @Test fun purposeUnblockHasNoDelayNotifiesAndIsCapped() {
@@ -64,10 +87,10 @@ class BlockingTest {
         assertFailsWith<UnblockRejected> { e.unblocks.startPurpose("youtube.com", "x", 181, at(10)) }
     }
 
-    @Test fun hostsOnlyBlockInWorkHoursAndUnblocksExpire() {
+    @Test fun sitesAreBlockedAroundTheClockAndUnblocksExpire() {
         val e = env(); e.list.add(listOf("reddit.com", "https://www.youtube.com/watch"), 0)
         assertEquals(listOf("reddit.com", "youtube.com"), e.list.all())
-        assertEquals(emptyList(), e.svc.currentlyBlocked(at(20)))            // evening: anything goes
+        assertEquals(listOf("reddit.com", "youtube.com"), e.svc.currentlyBlocked(at(20))) // evenings too
         assertEquals(listOf("reddit.com", "youtube.com"), e.svc.currentlyBlocked(at(10)))
         e.unblocks.startRegular(listOf("reddit.com"), 5, at(10), 10)
         assertEquals(listOf("youtube.com"), e.svc.currentlyBlocked(at(10, 2)))
@@ -92,8 +115,8 @@ class BlockingTest {
         val staged = Files.readString(e.svc.stagedFile)
         assertTrue("0.0.0.0 reddit.com" in staged && "0.0.0.0 www.reddit.com" in staged && "127.0.0.1 localhost" in staged)
         assertEquals(staged, Files.readString(e.svc.dryRunTarget))
-        assertTrue(e.svc.tick(at(18))) // work over -> block section emptied
-        assertFalse("reddit" in Files.readString(e.svc.stagedFile))
+        assertFalse(e.svc.tick(at(18))) // still blocked after work: nothing to rewrite
+        assertTrue("reddit" in Files.readString(e.svc.stagedFile))
     }
 
     @Test fun shorteningWorkHoursNeedsReasonAndNotifies_addingDoesNot() {

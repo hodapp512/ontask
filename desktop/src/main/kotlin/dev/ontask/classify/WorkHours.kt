@@ -66,4 +66,17 @@ data class WorkSchedule(val week: WorkWeek = WorkWeek.DEFAULT, val exceptions: M
     /** End of work for [date] in minutes of day, or null on a day off. */
     fun endMin(date: LocalDate): Int? = rangesFor(date).maxOfOrNull { it.endMin }
     fun startMin(date: LocalDate): Int? = rangesFor(date).minOfOrNull { it.startMin }
+
+    /** When the next stretch of work hours begins after [epochSec] (within a week), or null if none is scheduled. */
+    fun nextWorkStart(epochSec: Long, zone: ZoneId = ZoneId.systemDefault()): Long? {
+        val t = Instant.ofEpochSecond(epochSec).atZone(zone)
+        for (d in 0..7) {
+            val date = t.toLocalDate().plusDays(d.toLong())
+            for (r in rangesFor(date).sortedBy { it.startMin }) {
+                val start = date.atStartOfDay(zone).plusMinutes(r.startMin.toLong()).toEpochSecond()
+                if (start > epochSec) return start
+            }
+        }
+        return null
+    }
 }

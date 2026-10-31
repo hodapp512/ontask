@@ -51,7 +51,8 @@ export const REACTIONS = [
 ] as const;
 
 export const MESSAGE_TYPES: { key: string; label: string }[] = [
-  { key: "binge_alert", label: "Binge alerts" },
+  { key: "binge_alert", label: "Struggling alerts" },
+  { key: "unblock_alert", label: "Unblocks during work hours" },
   { key: "checkin", label: "Daily check-ins" },
   { key: "work_hours_change", label: "Work-hours changes" },
   { key: "missed_checkin", label: "Missed check-ins" },

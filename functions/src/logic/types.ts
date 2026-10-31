@@ -1,7 +1,7 @@
 export type Channel = "push" | "text" | "email" | "off";
 
 /** Message types a partner can configure (DESIGN.md: "Partner settings"). */
-export const MESSAGE_TYPES = ["binge_alert", "checkin", "work_hours_change", "missed_checkin", "work_unblock"] as const;
+export const MESSAGE_TYPES = ["binge_alert", "unblock_alert", "checkin", "work_hours_change", "missed_checkin", "work_unblock"] as const;
 export type MessageType = (typeof MESSAGE_TYPES)[number];
 
 export interface PartnerPrefs {
@@ -11,7 +11,7 @@ export interface PartnerPrefs {
 }
 
 export const DEFAULT_PARTNER_PREFS: PartnerPrefs = {
-  channels: { binge_alert: "push", checkin: "push", work_hours_change: "push", missed_checkin: "push", work_unblock: "push" },
+  channels: { binge_alert: "push", unblock_alert: "push", checkin: "push", work_hours_change: "push", missed_checkin: "push", work_unblock: "push" },
   quietHours: null,
 };
 

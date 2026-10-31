@@ -45,11 +45,11 @@ class BlockingService(
         set(v) { prefs.set("blocking.mode", v.name); lastApplied = null; lastKey = null }
     val port: Int get() = prefs.int("blocking.port", 12901)
 
-    /** Strict mode: work hours, or a running Focus session. */
+    /** Strict mode — unblocking has friction and the partner is told: work hours, or a running Focus session. */
     fun strictNow(now: Long): Boolean = settings().schedule.isWork(now, zone) || focus.active(now) != null
 
+    /** The block list minus anything unblocked right now; applies around the clock (work hours only change the friction). */
     fun currentlyBlocked(now: Long): List<String> {
-        if (!strictNow(now)) return emptyList()
         val open = unblocks.active(now).map { it.domain }.toSet()
         return blocklist.all().filter { it !in open }
     }
@@ -58,6 +58,8 @@ class BlockingService(
     @Synchronized
     fun tick(now: Long): Boolean {
         focus.settle(now)
+        // An evening unblock never carries into work hours or a Focus session.
+        if (strictNow(now)) unblocks.active(now).filter { it.kind == UnblockKind.LEISURE }.forEach { unblocks.end(it.id, now, "work_started") }
         if (mode == BlockMode.OFF) return false
         val blocked = currentlyBlocked(now)
         val key = blocked to (adBlock?.let { if (it.enabled) it.version else -1 } ?: -1)

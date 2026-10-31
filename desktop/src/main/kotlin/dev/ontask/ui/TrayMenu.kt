@@ -92,7 +92,7 @@ fun ApplicationScope.OnTaskTray(app: App, open: (Dest?) -> Unit) {
         svc.mode == BlockMode.OFF -> "Blocking is off"
         focus != null -> "Focus session: ${fmtDuration(focus.plannedEndTs - now)} left, blocking ${blocked.size} sites"
         svc.strictNow(now) -> "Work hours: blocking ${blocked.size} sites"
-        else -> "Outside work hours: nothing blocked"
+        else -> "Outside work hours: blocking ${blocked.size} sites (unblocking is instant)"
     } + if (svc.mode == BlockMode.DRY_RUN) " (test mode)" else ""
 
     var picking by remember { mutableStateOf(false) }
@@ -107,7 +107,7 @@ fun ApplicationScope.OnTaskTray(app: App, open: (Dest?) -> Unit) {
             Item("Today: focused ${fmtDuration(deep)}, wasted ${fmtDuration(wasted)}", enabled = false, onClick = {})
             if (openCount > 0) Item("$openCount site${if (openCount == 1) "" else "s"} unblocked right now", enabled = false, onClick = {})
             Separator()
-            Item(if (blocked.isEmpty()) "Unblock a site… (nothing blocked)" else "Unblock a site…", enabled = blocked.isNotEmpty(), onClick = { changed(); picking = true })
+            Item("Unblock a site…", enabled = blocked.isNotEmpty(), onClick = { changed(); picking = true })
             if (focus != null) Menu("Focus session") {
                 Item("Ends at ${fmtHm(focus.plannedEndTs)} (${fmtDuration(focus.plannedEndTs - now)} left)", enabled = false, onClick = {})
                 Item("End now", onClick = { app.focus.stop(App.nowSec()); retick(); changed() })
@@ -119,8 +119,6 @@ fun ApplicationScope.OnTaskTray(app: App, open: (Dest?) -> Unit) {
             Separator()
             Item("Add site to block…", onClick = { adding = true })
             CheckboxItem("Ad blocking", checked = adOn, onCheckedChange = { app.adBlock.enabled = it; retick(); changed() })
-            val last = app.adBlock.lastRefresh
-            Item("Refresh ad-block list now" + if (last > 0) " (updated ${fmtDuration(now - last)} ago)" else "", enabled = adOn, onClick = { app.refreshAdBlock() })
             Separator()
             Item("Today's report", onClick = { open(Dest.HOME) })
             Item("Settings…", onClick = { open(Dest.SETTINGS) })
@@ -149,21 +147,26 @@ internal fun UnblockPickerWindow(app: App, blocked: List<String>, onClose: () ->
         OnTaskTheme(remember { themeOf(app) }) { Surface(Modifier.fillMaxSize()) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 val site = chosen
+                val strict = remember { app.blocking.strictNow(App.nowSec()) }
                 if (site == null) {
                     Text("Which site?", style = MaterialTheme.typography.titleMedium)
-                    if (blocked.isEmpty()) Text("Nothing is blocked right now — outside work hours, anything goes.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (blocked.isEmpty()) Text("Nothing is blocked right now.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     else OutlinedTextField(filter, { filter = it }, label = { Text("Filter") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                         blocked.filter { filter.isBlank() || it.contains(filter.trim(), ignoreCase = true) }.forEach { d ->
                             TextButton({ chosen = d }, Modifier.fillMaxWidth()) { Text(d, Modifier.fillMaxWidth()) }
                         }
                     }
+                } else if (!strict) {
+                    LeisureUnblockForm(app, site, onDone = onClose)
+                    Spacer(Modifier.weight(1f))
+                    TextButton({ chosen = null }) { Text("← Choose another site") }
                 } else {
                     Text("Is $site for work?", style = MaterialTheme.typography.titleMedium)
                     WorkUnblockForm(app, site, onDone = onClose)
                     HorizontalDivider()
                     Text("Not for work?", style = MaterialTheme.typography.titleSmall)
-                    Text("You can still open it, after a short wait that grows with each unblock today. Your partner isn't told.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("You can still open it for 5–15 minutes, after a short wait that grows with each unblock today. Your partner is told.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     OutlinedButton({ regular = true }) { Text("No, just for a bit…") }
                     Spacer(Modifier.weight(1f))
                     TextButton({ chosen = null }) { Text("← Choose another site") }
@@ -173,6 +176,24 @@ internal fun UnblockPickerWindow(app: App, blocked: List<String>, onClose: () ->
             if (regular) chosen?.let { UnblockDialog(app, listOf(it), onClose = onClose) }
         } }
     }
+}
+
+/** Outside work hours: pick how long and it opens at once — no wait, nobody is told. Ends when work hours start. */
+@Composable
+internal fun LeisureUnblockForm(app: App, site: String, onDone: () -> Unit) {
+    var minutes by remember { mutableStateOf(30) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val now = remember { App.nowSec() }
+    val workStart = remember { app.settings.schedule.nextWorkStart(now) }
+    Text("Open $site for…", style = MaterialTheme.typography.titleMedium)
+    Text("Outside work hours there's no wait. It's blocked again when time's up.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        app.blocking.unblocks.leisureDurationsMin.forEach { m -> FilterChip(minutes == m, { minutes = m }, label = { Text(fmtDuration(m * 60L)) }) }
+    }
+    if (workStart != null && workStart < now + minutes * 60L)
+        Text("Work hours start at ${fmtHm(workStart)}, so it closes then.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+    Button({ try { app.unblockLeisure(listOf(site), minutes); onDone() } catch (e: dev.ontask.block.UnblockRejected) { error = e.message } }) { Text("Open for ${fmtDuration(minutes * 60L)}") }
 }
 
 /** Work unblock: no delay, but a stated purpose and your partner is told. */

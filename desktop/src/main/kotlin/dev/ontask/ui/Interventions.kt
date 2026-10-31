@@ -47,6 +47,8 @@ fun AppOverlays(app: App) {
     val variable by app.variableAsk.collectAsState()
     iv?.let { InterventionWindow(app, it, mode) }
     variable?.let { VariableAskWindow(app, it, mode) }
+    val unblockNudge by app.unblockNudge.collectAsState()
+    unblockNudge?.let { UnblockNudgeWindow(app, it, mode) }
     prompt?.let { PromptWindow(app, it, mode) }
     if (battery) OnTaskTheme(mode) {
         AlertDialog(
@@ -161,3 +163,35 @@ fun PromptWindow(app: App, prompt: Prompt, mode: ThemeMode) {
         }
     }
 }
+
+/** Corner nudge for a not-for-work unblock in work hours: when it opens, and when it's blocked again. */
+@Composable
+fun UnblockNudgeWindow(app: App, n: App.UnblockNudge, mode: ThemeMode) {
+    val sites = n.domains.joinToString(", ")
+    Window(
+        onCloseRequest = { app.unblockNudgeOk() }, title = "OnTask", alwaysOnTop = true, resizable = false, focusable = false,
+        state = rememberWindowState(size = DpSize(440.dp, 190.dp), position = WindowPosition.Aligned(Alignment.BottomEnd)),
+    ) {
+        OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) {
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (n.ending) {
+                    Text("Time's up: $sites ${if (n.domains.size == 1) "is" else "are"} blocked again.", style = MaterialTheme.typography.titleSmall)
+                    Text("Back to what you planned?", style = MaterialTheme.typography.bodyMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button({ app.unblockNudgeOk() }) { Text("OK") }
+                        TextButton({ app.unblockNudgeStruggling() }) { Text("I'm struggling") }
+                    }
+                } else {
+                    Text("You opened $sites for ${n.minutes} min (${ordinal(n.countToday)} today).", style = MaterialTheme.typography.titleSmall)
+                    Text("Back to work when it's up? Your partner has been told.", style = MaterialTheme.typography.bodyMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button({ app.unblockNudgeOk() }) { Text("OK") }
+                        TextButton({ app.unblockNudgeStruggling() }) { Text("I'm struggling") }
+                    }
+                }
+            }
+        } }
+    }
+}
+
+private fun ordinal(n: Int) = "$n" + if (n % 100 in 11..13) "th" else when (n % 10) { 1 -> "st"; 2 -> "nd"; 3 -> "rd"; else -> "th" }

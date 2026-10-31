@@ -1,14 +1,14 @@
 import type { Firestore } from "firebase-admin/firestore";
 import { FieldValue } from "firebase-admin/firestore";
 import { firstName, partnerMessage, withClose, type EventDoc } from "./logic/messages";
-import { bingeAllowed, decide, inQuietHours } from "./logic/routing";
+import { DRIFT_TYPES, decide, driftAllowed, halfDayStart, inQuietHours } from "./logic/routing";
 import { DEFAULT_PARTNER_PREFS, type MessageType, type PartnerPrefs } from "./logic/types";
 import type { Senders } from "./senders";
 
 export interface Link { trackedUid: string; partnerUid: string; partnerPrefs?: PartnerPrefs; status: string }
 
 const TITLES: Record<MessageType, string> = {
-  binge_alert: "Check-in from {name}", checkin: "{name}'s evening review", work_hours_change: "{name} changed their work hours",
+  binge_alert: "Check-in from {name}", unblock_alert: "{name} unblocked a site", checkin: "{name}'s evening review", work_hours_change: "{name} changed their work hours",
   missed_checkin: "{name} hasn't checked in", work_unblock: "{name} unblocked a site for work",
 };
 
@@ -20,12 +20,13 @@ export async function deliverToPartner(
   const msgs = db.collection("links").doc(linkId).collection("messages");
   const body = withClose(type, text);
 
-  if (type === "binge_alert" && !opts.force) {
-    const since = now.getTime() - 86_400_000;
-    const snap = await msgs.where("type", "==", "binge_alert").where("ts", ">=", since).get();
-    const sent = snap.docs.filter((d) => !d.get("queuedForCheckin")).length;
-    if (!bingeAllowed(sent)) {
-      await msgs.add({ type, text: body, ts: now.getTime(), fromUid: link.trackedUid, queuedForCheckin: true, delivery: { channel: "none", ok: false, detail: "rate-limited; included in the next check-in" } });
+  if (DRIFT_TYPES.includes(type) && !opts.force) {
+    // Half-days are in the tracked person's time zone (from their schedule).
+    const tz = ((await db.doc(`users/${link.trackedUid}/schedule/current`).get()).get("tz") as string | undefined) ?? "UTC";
+    const snap = await msgs.where("ts", ">=", halfDayStart(now, tz)).get();
+    const sent = snap.docs.filter((d) => DRIFT_TYPES.includes(d.get("type")) && !d.get("queuedForCheckin") && !d.get("includedInCheckin")).length;
+    if (!driftAllowed(sent)) {
+      await msgs.add({ type, text: body, ts: now.getTime(), fromUid: link.trackedUid, queuedForCheckin: true, delivery: { channel: "none", ok: false, detail: "over the limit of 2 alerts per morning/afternoon; listed in the evening review" } });
       return { delivered: false, reason: "rate_limited" };
     }
   }
@@ -75,7 +76,9 @@ export async function routeEvent(db: Firestore, senders: Senders, uid: string, e
     if (m.type === "checkin") {
       // Fold in alerts that were rate-limited earlier today.
       const queued = await l.ref.collection("messages").where("queuedForCheckin", "==", true).get();
-      const extra = queued.docs.map((q) => String(q.get("text")).split("\n")[0]).filter(Boolean);
+      const tz = ((await db.doc(`users/${uid}/schedule/current`).get()).get("tz") as string | undefined) ?? "UTC";
+      const at = (ms: number) => new Date(ms).toLocaleTimeString("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" });
+      const extra = queued.docs.sort((a, b) => a.get("ts") - b.get("ts")).map((q) => `${String(q.get("text")).split("\n")[0]} (${at(q.get("ts"))})`).filter(Boolean);
       if (extra.length) text += `\nAlso today: ${extra.join(" · ")}`;
       await Promise.all(queued.docs.map((q) => q.ref.update({ queuedForCheckin: false, includedInCheckin: true })));
     }

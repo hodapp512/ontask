@@ -144,10 +144,10 @@ private fun RightNowCard(app: App, now: Long, changed: () -> Unit) {
             Text(when {
                 focus != null -> "Focus session until ${fmtHm(focus.plannedEndTs)} · ${blocked.size} sites blocked"
                 strict -> "Work hours · ${blocked.size} sites blocked"
-                else -> "Outside work hours · nothing blocked"
+                else -> "Outside work hours · ${blocked.size} sites blocked · unblocking is instant"
             })
         }
-        if (svc.mode != BlockMode.LIVE) Text("Blocking is in ${svc.mode.label.lowercase()} — nothing is really blocked. Settings → Block list.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (svc.mode != BlockMode.LIVE) Text("Blocking isn't on yet — nothing is really blocked. Settings → Block list → install the helper and choose On.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         svc.lastError?.let { Notice(it, error = true) }
         active.forEach { u ->
             Row(verticalAlignment = Alignment.CenterVertically) {

@@ -82,7 +82,7 @@ export const acceptInvite = onCall(PUBLIC, async (req) => {
     const [tu, pu] = await Promise.all([tx.get(db.doc(`users/${trackedUid}`)), tx.get(db.doc(`users/${req.auth!.uid}`))]);
     tx.set(db.doc(`links/${linkId}`), {
       trackedUid, partnerUid: req.auth!.uid, trackedName: tu.get("displayName") ?? "Your friend", partnerName: pu.get("displayName") ?? "Your partner", participants: [trackedUid, req.auth!.uid], status: "active", share: "report", createdAt: Date.now(),
-      partnerPrefs: { channels: { binge_alert: "push", checkin: "push", work_hours_change: "push", missed_checkin: "push", work_unblock: "push" }, quietHours: null },
+      partnerPrefs: { channels: { binge_alert: "push", unblock_alert: "push", checkin: "push", work_hours_change: "push", missed_checkin: "push", work_unblock: "push" }, quietHours: null },
     });
     tx.update(ref, { used: true, usedBy: req.auth!.uid });
     return { linkId, trackedUid };

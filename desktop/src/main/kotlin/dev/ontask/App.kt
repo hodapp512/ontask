@@ -94,6 +94,42 @@ class App(val dir: Path = dataDir()) {
     private val _intervention = MutableStateFlow<Intervention?>(null)
     /** Current intervention step to show (null = none). Cleared by the user's action. */
     val intervention: StateFlow<Intervention?> = _intervention
+    /** Corner nudge around a not-for-work unblock in work hours: when it starts, and when it runs out. */
+    data class UnblockNudge(val ending: Boolean, val domains: List<String>, val minutes: Int, val countToday: Int)
+    private val _unblockNudge = MutableStateFlow<UnblockNudge?>(null)
+    val unblockNudge: StateFlow<UnblockNudge?> = _unblockNudge
+    /** Open not-for-work unblocks (id → domain), to notice when they run out. */
+    private val openRegular = HashMap<Long, String>()
+
+    /** A not-for-work unblock in work hours: opens the sites, tells the partner (via the event) and nudges. */
+    fun unblockRegular(domains: List<String>, minutes: Int, delayWaitedSec: Int) {
+        val now = nowSec()
+        val started = unblocks.startRegular(domains, minutes, now, delayWaitedSec)
+        synchronized(openRegular) { started.forEach { openRegular[it.id] = it.domain } }
+        blocking.tick(now)
+        _unblockNudge.value = UnblockNudge(ending = false, domains, minutes, unblocks.todayCount(now))
+    }
+
+    /** Outside work hours: opens the sites at once, until [minutes] pass or work hours start. */
+    fun unblockLeisure(domains: List<String>, minutes: Int) {
+        val now = nowSec()
+        unblocks.startLeisure(domains, minutes, now, settings.schedule.nextWorkStart(now))
+        blocking.tick(now)
+    }
+
+    fun unblockNudgeOk() { _unblockNudge.value = null }
+    fun unblockNudgeStruggling() { _unblockNudge.value = null; _intervention.value = ladder.struggling() }
+
+    private fun checkRegularEnded(now: Long) {
+        val active = unblocks.active(now).filter { it.kind == dev.ontask.block.UnblockKind.REGULAR }
+        val ended = synchronized(openRegular) {
+            active.forEach { openRegular.putIfAbsent(it.id, it.domain) } // also covers unblocks from before a restart
+            val ids = active.map { it.id }.toSet()
+            openRegular.filterKeys { it !in ids }.also { e -> e.keys.forEach { openRegular.remove(it) } }
+        }
+        if (ended.isNotEmpty()) _unblockNudge.value = UnblockNudge(ending = true, ended.values.distinct(), 0, unblocks.todayCount(now))
+    }
+
     /** "Is this work?" for a page or video in a Variable category that AI couldn't decide. */
     data class VariableAsk(val item: String, val title: String?, val site: String?)
     private val _variableAsk = MutableStateFlow<VariableAsk?>(null)
@@ -113,7 +149,7 @@ class App(val dir: Path = dataDir()) {
     @Volatile private var adBlockBusy = false
 
     /** Re-downloads the ad-blocking list now (menu bar and settings). */
-    fun refreshAdBlock() { if (!adBlockBusy) { adBlockBusy = true; scope.launch(IO) { try { adBlock.refresh(nowSec()) } finally { adBlockBusy = false } } } }
+    private fun refreshAdBlock() { if (!adBlockBusy) { adBlockBusy = true; scope.launch(IO) { try { adBlock.refresh(nowSec()) } finally { adBlockBusy = false } } } }
     private var lastAi = 0L; private var lastBattery = 0L; private var lastRhythm = 0L
     private var batteryAsked = false
     private val snoozeUntil = HashMap<Prompt, Long>()
@@ -125,6 +161,8 @@ class App(val dir: Path = dataDir()) {
         Retention.rollup(db, nowSec(), settings.retentionDays)
         if (!prefs.bool("blocklist.seeded", false)) { blocklist.seedDefault(nowSec()); prefs.set("blocklist.seeded", true) }
         tracker.seedTotals(LocalDate.now(), reports.totals(LocalDate.now()))
+        // Ad/malware list: refreshed at startup (unless OnTask just restarted) and then every 24 hours in onTick.
+        if (adBlock.enabled && nowSec() - adBlock.lastRefresh >= 3600) refreshAdBlock()
         scope.launch {
             var lastFlush = nowSec(); var lastRollup = nowSec()
             while (true) {
@@ -152,6 +190,7 @@ class App(val dir: Path = dataDir()) {
 
         if (ai.enabled && !ai.metadataOnly && !live.away && now - lastAi >= prefs.int("ai.interval_sec", 30) && tracker.needsAi() && !aiBusy) { lastAi = now; scope.launch(IO) { aiCycle(live.sample) } }
         variableCheck(now, live)
+        checkRegularEnded(now)
         if (ai.llama.running) ai.llama.stopIfIdle()
         if (cloud.configured && now - lastCloud >= 60) { lastCloud = now; scope.launch(IO) { cloud.syncOnce(now) } }
         if (prefs.get("update.repo") != null && now - lastUpdateCheck >= 7 * 86400) { lastUpdateCheck = now; scope.launch(IO) { checkForUpdates() } }

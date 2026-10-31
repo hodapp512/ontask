@@ -105,7 +105,7 @@ fun UnblockDialog(app: App, domains: List<String>, onClose: () -> Unit) {
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(message, style = MaterialTheme.typography.titleSmall)
-                Text("Unblocks so far today: $count", style = MaterialTheme.typography.bodyMedium)
+                Text("Unblocks so far today: $count. Your partner is told about this one.", style = MaterialTheme.typography.bodyMedium)
                 val priorities = remember { app.priorities.today(now0) }
                 if (priorities.isNotEmpty()) {
                     Text("Today's plan:", style = MaterialTheme.typography.labelMedium)
@@ -119,7 +119,7 @@ fun UnblockDialog(app: App, domains: List<String>, onClose: () -> Unit) {
         },
         confirmButton = {
             Button({
-                try { app.unblocks.startRegular(domains, minutes, App.nowSec(), delay); app.blocking.tick(App.nowSec()); onClose() } catch (e: UnblockRejected) { error = e.message }
+                try { app.unblockRegular(domains, minutes, delay); onClose() } catch (e: UnblockRejected) { error = e.message }
             }, enabled = remaining <= 0) { Text(if (remaining > 0) "Wait ${remaining}s" else "Unblock for $minutes min") }
         },
         dismissButton = { TextButton(onClose) { Text("Never mind") } },

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { partnerMessage, textBeltSafe, withClose } from "../src/logic/messages";
-import { bingeAllowed, decide, inQuietHours, localParts } from "../src/logic/routing";
+import { decide, driftAllowed, halfDayStart, inQuietHours, localParts } from "../src/logic/routing";
 import { checkinState, habitsDue } from "../src/logic/schedule";
 import { buildPrompt, ollamaLibraryUrl, parseCandidates, validateCandidates } from "../src/logic/modelrec";
 import { DEFAULT_PARTNER_PREFS, type PartnerPrefs, type ScheduleDoc } from "../src/logic/types";
@@ -11,6 +11,9 @@ describe("messages", () => {
   it("maps events to partner messages and ignores private ones", () => {
     expect(partnerMessage({ type: "work_unblock", ts: 1, payload: { domain: "youtube.com", minutes: 60, purpose: "Acme onboarding" } }, "Sam")!.text).toContain("Acme onboarding");
     expect(partnerMessage({ type: "checkin", ts: 1, payload: { message: "Today: 3h deep." } }, "Sam Rivera")!.text).toBe("Here is Sam's evening review.\n\nToday: 3h deep.");
+    expect(partnerMessage({ type: "unblock", ts: 1, payload: { domains: "reddit.com,x.com", minutes: 10, count_today: 2, work_hours: true } }, "Sam Rivera")!)
+      .toEqual({ type: "unblock_alert", text: "Sam unblocked reddit.com, x.com for 10 minutes during work hours (2nd today, not for work)." });
+    expect(partnerMessage({ type: "unblock_leisure", ts: 1, payload: { domains: "reddit.com", minutes: 30 } }, "Sam")).toBeNull();
     expect(partnerMessage({ type: "work_hours_change", ts: 1, payload: { reason: "Doctor", meaning: "Blocking off." } }, "Sam")!.text).toContain("Doctor");
     expect(partnerMessage({ type: "unblock", ts: 1, payload: {} }, "Sam")).toBeNull();
     expect(partnerMessage({ type: "focus_start", ts: 1 }, "Sam")).toBeNull();
@@ -43,7 +46,12 @@ describe("routing", () => {
     expect(inQuietHours(p, at("2026-10-30T14:00:00Z"))).toBe(false);  // 09:00 CDT
     expect(decide(p, "checkin", at("2026-10-30T04:00:00Z"), reach).defer).toBe(true);
   });
-  it("rate-limits binge alerts to two per day", () => { expect(bingeAllowed(1)).toBe(true); expect(bingeAllowed(2)).toBe(false); });
+  it("allows two drifting alerts per morning and per afternoon", () => {
+    expect(driftAllowed(1)).toBe(true); expect(driftAllowed(2)).toBe(false);
+    // 10:30 Chicago (CDT, UTC-5) -> the morning began at local midnight; 15:10 -> the afternoon began at noon.
+    expect(new Date(halfDayStart(new Date("2026-10-30T15:30:00Z"), "America/Chicago")).toISOString()).toBe("2026-10-30T05:00:00.000Z");
+    expect(new Date(halfDayStart(new Date("2026-10-30T20:10:00Z"), "America/Chicago")).toISOString()).toBe("2026-10-30T17:00:00.000Z");
+  });
   it("computes local time parts", () => expect(localParts(at("2026-10-30T14:30:00Z"), "America/Chicago")).toMatchObject({ hour: 9, minute: 30, isoWeekday: 5, date: "2026-10-30" }));
 });
 

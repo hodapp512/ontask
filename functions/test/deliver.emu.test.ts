@@ -37,12 +37,18 @@ describe("event routing", () => {
     expect(sent).toHaveLength(0);
   });
 
-  it("rate-limits binge alerts to 2/day and folds extras into the next check-in", async () => {
+  it("caps drifting alerts (binge + unblock) at 2 per half-day and folds extras into the evening review", async () => {
     const now = new Date();
-    for (let i = 1; i <= 3; i++) await routeEvent(db, senders, TRACKED, { type: "binge_alert", ts: i, payload: { message: `alert ${i}` } }, now);
-    expect(sent.map((s) => s.body.split("\n")[0])).toEqual(["alert 1", "alert 2"]);
+    await routeEvent(db, senders, TRACKED, { type: "binge_alert", ts: 1, payload: { message: "alert 1" } }, now);
+    await routeEvent(db, senders, TRACKED, { type: "unblock", ts: 2, payload: { domains: "reddit.com", minutes: 10, count_today: 1, work_hours: true } }, now);
+    await routeEvent(db, senders, TRACKED, { type: "unblock", ts: 3, payload: { domains: "x.com", minutes: 5, count_today: 2, work_hours: true } }, now);
+    expect(sent).toHaveLength(2);
+    expect(sent[1].body).toContain("unblocked reddit.com for 10 minutes during work hours");
+    // Work-purpose unblocks are never capped.
+    await routeEvent(db, senders, TRACKED, { type: "work_unblock", ts: 4, payload: { domain: "youtube.com", minutes: 30, purpose: "Training" } }, now);
+    expect(sent).toHaveLength(3);
     await routeEvent(db, senders, TRACKED, { type: "checkin", ts: 9, payload: { message: "Today: good." } }, now);
-    expect(sent[2].body).toContain("Also today: alert 3");
+    expect(sent[3].body).toMatch(/Also today: .*unblocked x\.com for 5 minutes .*\(\d{1,2}:\d{2} [AP]M\)/);
   });
 
   it("falls back to text when the partner has no push token / hasn't opened the app", async () => {
