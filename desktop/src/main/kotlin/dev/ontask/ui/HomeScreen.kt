@@ -37,6 +37,7 @@ import dev.ontask.plan.Prompt
 import dev.ontask.report.DailyReport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.LocalTime
@@ -71,18 +72,17 @@ fun HomeScreen(app: App) {
         if (name != null) "$hello, $name" else hello,
         today.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL)),
         maxWidth = 1500.dp,
-        actions = {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button({ unblocking = true }) { Text("Unblock…") }
-                FocusButton(app, now) { tick++ }
-                OutlinedButton({ adding = true }) { Text("+ Block a site") }
-            }
-        },
     ) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button({ unblocking = true }) { Text("Unblock…") }
+            FocusButton(app, now) { tick++ }
+            OutlinedButton({ adding = true }) { Text("+ Block a site") }
+            AdsButton(app, tick) { tick++ }
+        }
         HelperBanner(app)
         val summary: @Composable () -> Unit = {
             report?.let { r ->
-                SummaryCard(r, if (date == today) "Today so far" else "Your day", header = { DateBar(date, { date = it }) { tick++ } }) {
+                SummaryCard(r, if (date == today) "Today so far" else "Your day", app, onRelabel = { tick++ }, header = { DateBar(date, { date = it }) { tick++ } }) {
                     WeekExpander(app, today)
                 }
             } ?: Text("Loading…")
@@ -103,6 +103,16 @@ fun HomeScreen(app: App) {
     if (unblocking) UnblockPickerWindow(app, app.blocking.currentlyBlocked(App.nowSec())) { unblocking = false; tick++ }
     if (adding) AddSitesWindow(app) { adding = false; tick++ }
     if (reflecting) ReflectionWindow(app) { reflecting = false; tick++ }
+}
+
+/** One button that turns ad blocking off and back on (the same as the menu bar's Ad blocking switch). */
+@Composable
+private fun AdsButton(app: App, version: Int, changed: () -> Unit) {
+    val on = remember(version) { app.adBlock.enabled }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val toggle = { app.adBlock.enabled = !on; scope.launch(Dispatchers.IO) { app.blocking.tick(App.nowSec()) }; changed() }
+    if (on) OutlinedButton(toggle) { Text("Disable ad blocking") }
+    else Button(toggle, colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)) { Text("Enable ad blocking") }
 }
 
 @Composable
@@ -158,11 +168,8 @@ private fun RightNowCard(app: App, now: Long, changed: () -> Unit) {
                     Dot(levelColor(c.level))
                     Text(listOfNotNull(s.app, domain).joinToString(" · "), Modifier.weight(1f), maxLines = 1)
                     val pattern = domain ?: s.app
-                    if (pattern != null) Picker(c.category.label, Category.assignable, { it.label }) { cat ->
-                        app.ruleStore.label(if (domain != null) RuleKind.DOMAIN else RuleKind.APP, pattern, cat, c.category, App.nowSec()); app.reloadRules(); changed()
-                    }
+                    if (pattern != null) CategoryPicker(app, pattern, c.category, changed)
                 }
-                Text("Wrong label? Pick the right one and OnTask will remember.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

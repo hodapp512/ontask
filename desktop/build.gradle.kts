@@ -99,6 +99,7 @@ compose.desktop {
             appResourcesRootDir.set(layout.buildDirectory.dir("appres"))
             macOS {
                 bundleID = "dev.ontask.app"
+                iconFile.set(project.file("icons/OnTask.icns")) // regenerate with icons/MakeIcons.java
                 entitlementsFile.set(project.file("entitlements.plist"))
                 runtimeEntitlementsFile.set(project.file("entitlements.plist"))
                 infoPlist {

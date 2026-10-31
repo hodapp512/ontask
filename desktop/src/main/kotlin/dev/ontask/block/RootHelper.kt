@@ -51,18 +51,30 @@ class RootHelper(private val daemonDir: File = locateDaemonDir(), private val pr
     }
 }
 
-/** "Start at login" via a per-user LaunchAgent (no admin rights needed). */
-class LoginItem(private val agentsDir: Path = Path.of(System.getProperty("user.home"), "Library", "LaunchAgents")) {
+/**
+ * Starting at login and reopening after a quit or crash, via one per-user LaunchAgent (no admin rights needed).
+ * launchd restarts OnTask whenever it exits unsuccessfully: crashes do that, and so does Quit while "reopen" is on
+ * ([QUIT_REOPEN]). A clean exit (code 0) lets it stay closed.
+ */
+class LoginItem(
+    private val agentsDir: Path = Path.of(System.getProperty("user.home"), "Library", "LaunchAgents"),
+    private val run: (List<String>) -> Int = { cmd -> runCatching { ProcessBuilder(cmd).redirectErrorStream(true).start().also { it.inputStream.readAllBytes() }.waitFor() }.getOrDefault(-1) },
+) {
     private val label = "dev.ontask.app"
     private val plist: Path get() = agentsDir.resolve("$label.plist")
+    private val domain by lazy { "gui/" + (runCatching { ProcessBuilder("id", "-u").start().inputStream.bufferedReader().readText().trim() }.getOrNull() ?: "501") }
 
     val enabled: Boolean get() = Files.exists(plist)
 
     /** Path of the packaged app executable, or null when running from Gradle. */
     fun appExecutable(): String? = System.getProperty("jpackage.app-path")
 
-    fun set(on: Boolean, executable: String? = appExecutable()): Boolean {
-        if (!on) { Files.deleteIfExists(plist); return true }
+    /** True when this process was started by the agent (which sets ONTASK_AGENT). */
+    val managed: Boolean get() = System.getenv("ONTASK_AGENT") == "1"
+
+    /** Writes (or removes, when both are off) the agent. Takes effect for the next start; see [handOff]. */
+    fun set(atLogin: Boolean, executable: String? = appExecutable(), keepAlive: Boolean = true): Boolean {
+        if (!atLogin && !keepAlive) { Files.deleteIfExists(plist); return true }
         val exe = executable ?: return false
         Files.createDirectories(agentsDir)
         Files.writeString(
@@ -72,10 +84,27 @@ class LoginItem(private val agentsDir: Path = Path.of(System.getProperty("user.h
 <plist version="1.0"><dict>
   <key>Label</key><string>$label</string>
   <key>ProgramArguments</key><array><string>$exe</string></array>
-  <key>RunAtLoad</key><true/>
+  <key>EnvironmentVariables</key><dict><key>ONTASK_AGENT</key><string>1</string></dict>
+  <key>RunAtLoad</key>${if (atLogin) "<true/>" else "<false/>"}
+  <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
+  <key>ThrottleInterval</key><integer>5</integer>
+  <key>LimitLoadToSessionType</key><string>Aqua</string>
+  <key>ProcessType</key><string>Interactive</string>
 </dict></plist>
 """,
         )
         return true
+    }
+
+    /** Asks launchd to run OnTask with the current agent (reloading it, in case an older definition is loaded). */
+    fun handOff() {
+        run(listOf("launchctl", "bootout", "$domain/$label"))
+        run(listOf("launchctl", "bootstrap", domain, plist.toString()))
+        run(listOf("launchctl", "kickstart", "$domain/$label"))
+    }
+
+    companion object {
+        /** Exit code for Quit when OnTask should come back (anything but 0 makes launchd restart it). */
+        const val QUIT_REOPEN = 75
     }
 }

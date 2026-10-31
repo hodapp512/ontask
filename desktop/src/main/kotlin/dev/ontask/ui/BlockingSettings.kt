@@ -13,12 +13,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.ontask.App
-import dev.ontask.block.LoginItem
 
 @Composable
 fun BlockingSettings(app: App) {
-    val login = remember { LoginItem() }
-    var loginOn by remember { mutableStateOf(login.enabled) }
     var message by remember { mutableStateOf(app.prefs.str("unblock.message", "Is this really what you want to be doing right now?")) }
     var random by remember { mutableStateOf(app.prefs.bool("unblock.random", false)) }
     var alts by remember { mutableStateOf(app.prefs.str("unblock.alternatives", "")) }
@@ -30,10 +27,6 @@ fun BlockingSettings(app: App) {
             OutlinedTextField(message, { message = it; app.prefs.set("unblock.message", it) }, singleLine = true, modifier = Modifier.fillMaxWidth(0.5f))
         }
         SwitchSetting("Vary the message", "Show a random alternative each time instead of always the same one (add alternatives under Advanced).", random) { random = it; app.prefs.set("unblock.random", it) }
-        SwitchSetting(
-            "Start OnTask at login", if (login.appExecutable() == null) "Available in the installed app (not when running from Gradle)." else "Launch automatically when you log in to your Mac.",
-            loginOn,
-        ) { if (login.set(it)) loginOn = it }
         Expander("Advanced: delays") {
             val labels = listOf("1st", "2nd", "3rd", "4th and later")
             labels.forEachIndexed { i, l ->

@@ -125,17 +125,17 @@ private fun AccessibilityBanner(app: App) {
                 "Fix it removes that old entry and asks again — then switch OnTask on once more.",
             action = "Fix it",
         ) { stuck = false; attempt++; scope.launch { app.permissions.resetAccessibility() } }
-        asked -> Notice("Waiting for you to switch OnTask on under Accessibility… this message goes away by itself.", action = "Open settings again") { scope.launch { app.permissions.requestAccessibility() } }
+        asked -> Notice("Waiting for you to switch OnTask on under Accessibility… this message goes away by itself.", action = "Open settings again") { scope.launch { app.permissions.open(dev.ontask.track.PrivacyPane.ACCESSIBILITY) } }
         else -> Notice(
-            "OnTask can't see window titles yet, so it can't tell one document or chat from another. Allow it under Accessibility, then switch OnTask on.",
-            action = "Open Accessibility settings",
+            "OnTask can't see window titles yet, so it can't tell one document or chat from another. Click Allow, choose Open System Settings in the box macOS shows, then switch OnTask on.",
+            action = "Allow…",
         ) { attempt++; scope.launch { app.permissions.requestAccessibility() } }
     }
 }
 
 /** The phone-style summary: deep-focus share, a bar by level, the timeline, and where the time went. */
 @Composable
-fun SummaryCard(r: DailyReport, title: String, header: @Composable () -> Unit = {}, more: @Composable ColumnScope.() -> Unit = {}) {
+fun SummaryCard(r: DailyReport, title: String, app: App? = null, onRelabel: () -> Unit = {}, header: @Composable () -> Unit = {}, more: @Composable ColumnScope.() -> Unit = {}) {
     val denom = Level.entries.filter { it != Level.AWAY }.sumOf { r.totalsAll[it] ?: 0 }
     val total = Level.entries.sumOf { r.totalsAll[it] ?: 0 }
     PlainCard {
@@ -158,7 +158,7 @@ fun SummaryCard(r: DailyReport, title: String, header: @Composable () -> Unit = 
         }
         val workTotal = r.totalsWork.values.sum()
         if (workTotal > 0 && workTotal < total) Text(
-            "During work hours: ${fmtDuration(r.totalsWork[Level.DEEP] ?: 0)} deep, ${fmtDuration(r.totalsWork[Level.MIXED] ?: 0)} mixed, ${fmtDuration(r.totalsWork[Level.WASTED] ?: 0)} wasted",
+            "During work hours: ${fmtDuration(r.totalsWork[Level.DEEP] ?: 0)} focused, ${fmtDuration(r.totalsWork[Level.MIXED] ?: 0)} mixed, ${fmtDuration(r.totalsWork[Level.WASTED] ?: 0)} wasted",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Timeline(r)
@@ -173,12 +173,14 @@ fun SummaryCard(r: DailyReport, title: String, header: @Composable () -> Unit = 
             r.deepSessions.forEach { Text("${clockRange(it.start, it.end)}  ·  ${fmtDuration(it.seconds)}") }
         }
         if (r.topSubjects.isNotEmpty()) Expander("Where the time went") {
+            if (app != null) Text("Labeled wrong? Change it here — OnTask remembers and fixes past days too.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             r.topSubjects.forEachIndexed { i, s ->
                 if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(s.name, Modifier.weight(0.5f), maxLines = 1)
                     Row(Modifier.weight(0.3f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Dot(levelColor(s.category.level), 8); Text(s.category.label, style = MaterialTheme.typography.bodySmall)
+                        if (app != null) CategoryPicker(app, s.name, s.category, onRelabel)
+                        else { Dot(levelColor(s.category.level), 8); Text(s.category.label, style = MaterialTheme.typography.bodySmall) }
                     }
                     Text(fmtDuration(s.seconds), Modifier.weight(0.2f), style = MaterialTheme.typography.bodyMedium)
                 }

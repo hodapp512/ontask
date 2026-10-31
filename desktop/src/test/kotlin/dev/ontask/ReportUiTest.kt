@@ -31,3 +31,18 @@ class TimelineActivityTest {
         assertEquals(listOf("youtube.com" to 270L, "reddit.com" to 30L), m[0].top())
     }
 }
+
+class RelabelTest {
+    @Test fun correctingALabelFixesHistory() {
+        val db = dev.ontask.db.Db.memory()
+        val rules = dev.ontask.db.RuleStore(db)
+        db.use { c ->
+            c.createStatement().executeUpdate("""INSERT INTO ticks(start_ts,end_ts,n,seconds,app,domain,category,level,source,work_time,proc_ms)
+                VALUES (0,60,12,60,'Safari','youtube.com','ENTERTAINMENT','WASTED','RULE',1,1), (60,120,12,60,'Xcode',NULL,'UNKNOWN','MIXED','METADATA',1,1)""")
+        }
+        assertEquals(1, rules.relabelHistory(dev.ontask.classify.RuleKind.DOMAIN, "youtube.com", dev.ontask.Category.LEARNING))
+        assertEquals(1, rules.relabelHistory(dev.ontask.classify.RuleKind.APP, "Xcode", dev.ontask.Category.CORE_WORK))
+        val levels = db.use { c -> c.createStatement().executeQuery("SELECT level FROM ticks ORDER BY start_ts").use { rs -> buildList { while (rs.next()) add(rs.getString(1)) } } }
+        assertEquals(listOf("DEEP", "DEEP"), levels)
+    }
+}

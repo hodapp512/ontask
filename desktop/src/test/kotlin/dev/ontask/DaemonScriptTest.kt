@@ -53,6 +53,7 @@ class RootHelperTest {
         val li = dev.ontask.block.LoginItem(dir)
         assertTrue(!li.set(true, null)) // not packaged -> refuses
         assertTrue(li.set(true, "/Applications/OnTask.app/Contents/MacOS/OnTask") && li.enabled)
-        li.set(false); assertTrue(!li.enabled)
+        li.set(false, keepAlive = false); assertTrue(!li.enabled)
+        val l2 = dev.ontask.block.LoginItem(dir); l2.set(true, "/x/OnTask"); val xml = Files.readString(dir.resolve("dev.ontask.app.plist")); assertTrue("<key>SuccessfulExit</key><false/>" in xml && "<key>RunAtLoad</key><true/>" in xml)
     }
 }

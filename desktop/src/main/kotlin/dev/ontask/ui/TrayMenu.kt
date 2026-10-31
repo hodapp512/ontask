@@ -59,13 +59,15 @@ object Nav {
     fun open(dest: Dest?) { if (dest != null) requested.value = dest; raises.value++ }
 }
 
-/** Monochrome target glyph. Drawn black: macOS renders it as a template image (see `apple.awt.enableTemplateImages`). */
+/** The logo's check + chevron, drawn black: macOS renders it as a template image (see `apple.awt.enableTemplateImages`). */
 class TrayGlyph(private val color: Color = Color.Black) : Painter() {
     override val intrinsicSize = Size(44f, 44f)
     override fun DrawScope.onDraw() {
-        val s = size.minDimension; val c = Offset(size.width / 2, size.height / 2)
-        drawCircle(color, s * 0.37f, c, style = Stroke(s * 0.11f))
-        drawCircle(color, s * 0.14f, c)
+        val u = size.minDimension / 100f
+        val stroke = Stroke(width = 13 * u, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round)
+        val check = androidx.compose.ui.graphics.Path().apply { moveTo(8 * u, 51 * u); lineTo(30 * u, 73 * u); lineTo(59 * u, 29 * u) }
+        val chevron = androidx.compose.ui.graphics.Path().apply { moveTo(75 * u, 33 * u); lineTo(93 * u, 51 * u); lineTo(75 * u, 69 * u) }
+        drawPath(check, color, style = stroke); drawPath(chevron, color, style = stroke)
     }
 }
 
@@ -124,7 +126,8 @@ fun ApplicationScope.OnTaskTray(app: App, open: (Dest?) -> Unit) {
             Item("Settings…", onClick = { open(Dest.SETTINGS) })
             Item("Open OnTask", onClick = { open(null) })
             Separator()
-            Item("Quit OnTask", onClick = { app.shutdown(); exitApplication() })
+            val reopens = app.prefs.bool("startup.reopen", false)
+            Item(if (reopens) "Quit OnTask (reopens in a few seconds)" else "Quit OnTask", onClick = { exitApplication() })
         },
     )
     if (picking) UnblockPickerWindow(app, blocked) { picking = false; changed() }

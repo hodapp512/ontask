@@ -1,5 +1,6 @@
 package dev.ontask.ui
 
+import dev.ontask.App
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -208,4 +209,37 @@ fun pickTextFile(title: String): java.nio.file.Path? {
     d.isVisible = true
     val f = d.file ?: return null
     return java.nio.file.Path.of(d.directory, f)
+}
+
+/**
+ * Dropdown showing [current]'s category; picking another saves a rule for [name] (an app or a website) and relabels its
+ * past activity, so the change shows everywhere at once.
+ */
+@Composable
+fun CategoryPicker(app: dev.ontask.App, name: String, current: dev.ontask.Category, onChanged: () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        TextButton({ open = true }) {
+            Box(Modifier.size(8.dp).background(levelColor(current.level), androidx.compose.foundation.shape.CircleShape))
+            Text("  ${current.label} ▾", style = MaterialTheme.typography.bodySmall)
+        }
+        DropdownMenu(open, { open = false }) {
+            Text("$name is…", Modifier.padding(horizontal = 12.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            dev.ontask.Category.assignable.forEach { cat ->
+                DropdownMenuItem(
+                    text = { Text(cat.label + if (cat == current) "  ✓" else "") },
+                    leadingIcon = { Box(Modifier.size(8.dp).background(levelColor(cat.level), androidx.compose.foundation.shape.CircleShape)) },
+                    onClick = { open = false; if (cat != current) { reclassify(app, name, current, cat); onChanged() } },
+                )
+            }
+        }
+    }
+}
+
+/** Saves the rule and relabels history. Names with a dot and no spaces are websites; anything else is an app. */
+fun reclassify(app: dev.ontask.App, name: String, from: dev.ontask.Category, to: dev.ontask.Category) {
+    val kind = if ('.' in name && ' ' !in name) dev.ontask.classify.RuleKind.DOMAIN else dev.ontask.classify.RuleKind.APP
+    app.ruleStore.label(kind, name, to, from, App.nowSec())
+    app.ruleStore.relabelHistory(kind, name, to)
+    app.reloadRules()
 }

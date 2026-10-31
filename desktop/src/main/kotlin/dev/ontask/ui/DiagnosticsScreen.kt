@@ -1,6 +1,7 @@
 package dev.ontask.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -50,7 +51,8 @@ fun DiagnosticsScreen(app: App) {
     var aiStats by remember { mutableStateOf(app.ai.stats(App.nowSec() - 86400)) }
 
     // Recomputed every 10 seconds, only while this screen is open.
-    LaunchedEffect(filter) {
+    var relabeled by remember { mutableStateOf(0) }
+    LaunchedEffect(filter, relabeled) {
         while (true) {
             withContext(Dispatchers.IO) {
                 app.tracker.flush()
@@ -78,7 +80,7 @@ fun DiagnosticsScreen(app: App) {
                 else Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Can see window titles: no", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                     val scope = androidx.compose.runtime.rememberCoroutineScope()
-                    Button({ scope.launch { app.permissions.requestAccessibility() } }) { Text("Open Accessibility settings") }
+                    Button({ scope.launch { app.permissions.requestAccessibility() } }) { Text("Allow…") }
                 }
             }
             SectionCard("How much of your Mac it uses", "Target: about 250 MB of memory and under 1% CPU.") {
@@ -106,7 +108,7 @@ fun DiagnosticsScreen(app: App) {
                     Text(fmtTime(r.ts), Modifier.weight(0.09f), style = MaterialTheme.typography.bodySmall)
                     Text(fmtDuration(r.seconds.toLong()), Modifier.weight(0.06f), style = MaterialTheme.typography.bodySmall)
                     Text(listOfNotNull(r.app, r.domain).joinToString(" · ").ifEmpty { "—" } + (r.title?.let { " — ${it.take(60)}" } ?: ""), Modifier.weight(0.45f), style = MaterialTheme.typography.bodySmall, maxLines = 1)
-                    Text(r.category.label, Modifier.weight(0.14f), style = MaterialTheme.typography.bodySmall, color = levelColor(r.level))
+                    Box(Modifier.weight(0.14f)) { (r.domain ?: r.app)?.let { n -> CategoryPicker(app, dev.ontask.track.displayAppName(n), r.category) { relabeled++ } } ?: Text(r.category.label, style = MaterialTheme.typography.bodySmall) }
                     Text(r.source.label + if (r.workTime) "" else " (off-hours)", Modifier.weight(0.2f), style = MaterialTheme.typography.bodySmall)
                 }
             }

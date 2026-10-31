@@ -35,6 +35,7 @@ fun SettingsScreen(app: App, theme: ThemeMode, onTheme: (ThemeMode) -> Unit, ope
                 androidx.compose.material3.Button({ open(Dest.BLOCK_LIST) }) { Text("Edit block list") }
             }
         }
+        StartupSettings(app)
         SectionCard("Appearance") {
             SettingRow("Theme", "Light, dark, or follow your Mac's appearance setting.") {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -60,5 +61,20 @@ fun SettingsScreen(app: App, theme: ThemeMode, onTheme: (ThemeMode) -> Unit, ope
                 KV("Activity reader (ontask-helper)", if (app.helper.status == "running") "Running ✓" else app.helper.status)
             }
         }
+    }
+}
+
+/** Start at login and reopen after quitting: both on by default, kept running by a launchd agent. */
+@Composable
+private fun StartupSettings(app: App) {
+    val login = remember { dev.ontask.block.LoginItem() }
+    var atLogin by remember { mutableStateOf(app.prefs.bool("startup.at_login", false)) }
+    var reopen by remember { mutableStateOf(app.prefs.bool("startup.reopen", false)) }
+    val packaged = login.appExecutable() != null
+    fun apply() { app.prefs.set("startup.at_login", atLogin); app.prefs.set("startup.reopen", reopen); if (packaged) login.set(atLogin, keepAlive = reopen) }
+    SectionCard("Keep OnTask running", if (packaged) "So blocking and tracking don't stop when OnTask is closed." else "Available in the installed app (not when running from Gradle).") {
+        SwitchSetting("Start when you log in", "OnTask opens in the menu bar when you log in to your Mac.", atLogin) { atLogin = it; apply() }
+        SwitchSetting("Reopen if it's quit or crashes", "OnTask comes back a few seconds after it closes. Turn this off to be able to quit it for good.", reopen) { reopen = it; apply() }
+        if (packaged && !login.managed && (atLogin || reopen)) Text("Takes effect the next time OnTask opens.", style = androidx.compose.material3.MaterialTheme.typography.bodySmall)
     }
 }

@@ -48,8 +48,12 @@ class Permissions(private val helper: HelperClient) {
         return PermissionStatus.parse(helper.request("permissions"))
     }
 
-    /** Shows the system prompt the first time and adds the app to the list; then opens the pane to switch it on. */
-    suspend fun requestAccessibility() { helper.request("request_accessibility"); open(PrivacyPane.ACCESSIBILITY) }
+    /**
+     * Shows macOS's own "would like to control this computer" prompt, which adds OnTask to the list and whose
+     * "Open System Settings" button goes to the right pane. Opening the pane as well would show both at once.
+     * Falls back to opening the pane if the prompt can't be shown.
+     */
+    suspend fun requestAccessibility() { if (helper.request("request_accessibility") == null) open(PrivacyPane.ACCESSIBILITY) }
 
     /**
      * Forgets OnTask's own Accessibility entry, then asks again. Needed when System Settings shows OnTask switched on

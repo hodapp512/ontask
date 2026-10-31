@@ -98,6 +98,24 @@ class RuleStore(private val db: Db) {
             .use { it.setLong(1, now); it.setString(2, kind.name); it.setString(3, pattern.trim()); it.setString(4, previous.name); it.setString(5, category.name); it.executeUpdate() }
     }
 
+    /**
+     * Relabels past activity for [pattern] (the detailed history, ~90 days) so reports reflect a correction right away.
+     * Hourly summaries older than that keep their original labels.
+     */
+    fun relabelHistory(kind: RuleKind, pattern: String, category: Category): Int = db.use { c ->
+        val names = if (kind == RuleKind.APP && pattern == "OnTask") listOf("OnTask", "MainKt", "java") else listOf(pattern.trim())
+        val where = when (kind) {
+            RuleKind.DOMAIN -> "domain IN (${names.joinToString(",") { "?" }})"
+            RuleKind.APP -> "domain IS NULL AND app IN (${names.joinToString(",") { "?" }})"
+            RuleKind.TITLE -> "title LIKE ?"
+        }
+        c.prepareStatement("UPDATE ticks SET category=?, level=?, source=? WHERE level != 'AWAY' AND $where").use { ps ->
+            ps.setString(1, category.name); ps.setString(2, category.level.name); ps.setString(3, dev.ontask.Source.USER_LABEL.name)
+            if (kind == RuleKind.TITLE) ps.setString(4, "%${pattern.trim()}%") else names.forEachIndexed { i, n -> ps.setString(4 + i, n) }
+            ps.executeUpdate()
+        }
+    }
+
     fun delete(id: Long) = db.use { c ->
         c.prepareStatement("DELETE FROM rules WHERE id=?").use { it.setLong(1, id); it.executeUpdate() }
     }
