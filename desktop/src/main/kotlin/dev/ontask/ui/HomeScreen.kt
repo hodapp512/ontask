@@ -78,6 +78,7 @@ fun HomeScreen(app: App) {
             FocusButton(app, now) { tick++ }
             AdsButton(app, tick) { tick++ }
         }
+        BlockingHelperBanner(app, now)
         HelperBanner(app)
         val summary: @Composable () -> Unit = {
             report?.let { r ->
@@ -147,8 +148,7 @@ private fun RightNowCard(app: App, now: Long, changed: () -> Unit) {
                 else -> "Outside work hours · ${blocked.size} sites blocked · unblocking is instant"
             })
         }
-        if (svc.mode != BlockMode.LIVE) Text("Blocking isn't on yet — nothing is really blocked. Settings → Block list → install the helper and choose On.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-        svc.lastError?.let { Notice(it, error = true) }
+        if (svc.mode == BlockMode.DRY_RUN) Text("Test mode (for developing OnTask): nothing is really blocked.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         active.forEach { u ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("${u.domain} open" + (if (u.kind == UnblockKind.WORK) " for work" else "") + " · ${fmtDuration(u.expiresTs - now)} left", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
@@ -233,16 +233,12 @@ private fun ReflectionWindow(app: App, onClose: () -> Unit) {
     }
 }
 
-/** Settings → Block list: the sites, ad blocking, and the blocking helper. */
+/** Settings → Block list: the sites and how unblocking works. */
 @Composable
 fun BlockListScreen(app: App) {
     var tick by remember { mutableStateOf(0) }
-    var mode by remember(tick) { mutableStateOf(app.blocking.mode) }
-    Page("Block list", "Sites blocked during work hours and Focus sessions.") {
+    Page("Block list", "Sites blocked around the clock. In work hours and Focus sessions, unblocking takes more effort.") {
         BlocklistCard(app) { tick++ }
         BlockingSettings(app)
-        SectionCard("How blocking works", "OnTask blocks sites by editing your Mac's hosts file through a small helper you install once.") {
-            BlockingSetup(app, mode) { mode = it; tick++ }
-        }
     }
 }

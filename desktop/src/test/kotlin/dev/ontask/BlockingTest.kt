@@ -27,7 +27,7 @@ class BlockingTest {
         val dir = Files.createTempDirectory("ontask-block")
         var settings = Settings(schedule = schedule)
         val unblocks = Unblocks(db, prefs, events, ZoneOffset.UTC); val focus = Focus(db, events); val list = Blocklist(db)
-        val svc = BlockingService(dir, prefs, list, unblocks, focus, ZoneOffset.UTC) { settings }
+        val svc = BlockingService(dir, prefs, list, unblocks, focus, ZoneOffset.UTC) { settings }.also { it.mode = BlockMode.DRY_RUN }
     }
     private fun env() = Env(WorkSchedule(WorkWeek(mapOf(1 to listOf(TimeRange(9 * 60, 17 * 60))))))
 

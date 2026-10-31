@@ -33,9 +33,68 @@ class DaemonScriptTest {
             assertTrue(Files.readString(dir.resolve("log")).contains("refusing"))
         } finally { p.destroy() }
     }
+
+    @Test fun appliesStagedFileOnStartAndStripsOnlyOnTaskSections() {
+        val dir = Files.createTempDirectory("ontask-daemon")
+        val staged = dir.resolve("staged"); val target = dir.resolve("target")
+        val ours = dev.ontask.block.HostsBuilder.build(listOf("reddit.com"), listOf("0.0.0.0 ads.example"))
+        Files.writeString(staged, ours + "192.168.1.5 nas.local\n")
+        val port = 13500 + (ProcessHandle.current().pid() % 400).toInt()
+        val p = ProcessBuilder("bash", script.path, port.toString(), staged.toString(), target.toString())
+            .also { it.environment()["ONTASK_DAEMON_SKIP_DNS"] = "1" }.redirectErrorStream(true).redirectOutput(dir.resolve("log").toFile()).start()
+        try {
+            repeat(30) { if (Files.exists(target)) return@repeat; Thread.sleep(100) }
+            assertTrue("0.0.0.0 reddit.com" in Files.readString(target)) // applied without being asked
+        } finally { p.destroy() }
+        val strip = ProcessBuilder("bash", script.path, "--strip", target.toString()).also { it.environment()["ONTASK_DAEMON_SKIP_DNS"] = "1" }.start()
+        assertEquals(0, strip.waitFor())
+        val left = Files.readString(target)
+        assertTrue("reddit" !in left && "ads.example" !in left && "OnTask" !in left, left)
+        assertTrue("127.0.0.1 localhost" in left && "192.168.1.5 nas.local" in left, left)
+    }
+
+    @Test fun cleansUpOnceTheAppHasBeenGoneLongEnough() {
+        val dir = Files.createTempDirectory("ontask-daemon")
+        val root = dir.resolve("root"); val app = Files.createDirectories(dir.resolve("OnTask.app"))
+        val agent = dir.resolve("dev.ontask.app.plist").also { Files.writeString(it, "<plist/>") }
+        val selfPlist = Files.createDirectories(root.resolve("Library/LaunchDaemons")).resolve("dev.ontask.daemon.plist").also { Files.writeString(it, "x") }
+        val selfScript = Files.createDirectories(root.resolve("Library/PrivilegedHelperTools")).resolve("dev.ontask.daemon.sh").also { Files.writeString(it, "x") }
+        val staged = dir.resolve("staged"); val target = dir.resolve("target")
+        Files.writeString(staged, dev.ontask.block.HostsBuilder.build(listOf("reddit.com")))
+        val port = 13900 + (ProcessHandle.current().pid() % 90).toInt()
+        val p = ProcessBuilder("bash", script.path, port.toString(), staged.toString(), target.toString(), app.toString(), agent.toString())
+            .also { it.environment().putAll(mapOf("ONTASK_DAEMON_SKIP_DNS" to "1", "ONTASK_DAEMON_CHECK_SEC" to "1", "ONTASK_DAEMON_GRACE_SEC" to "2", "ONTASK_DAEMON_PREFIX" to root.toString())) }
+            .redirectErrorStream(true).redirectOutput(dir.resolve("log").toFile()).start()
+        try {
+            Thread.sleep(2500)
+            assertTrue(Files.exists(agent) && p.isAlive) // app still there: nothing happens
+            Files.delete(app)
+            repeat(80) { if (!p.isAlive) return@repeat; Thread.sleep(100) }
+            val log = Files.readString(dir.resolve("log"))
+            assertTrue(!p.isAlive, log)
+            assertTrue("reddit" !in Files.readString(target), log)
+            assertTrue(!Files.exists(agent) && !Files.exists(selfPlist) && !Files.exists(selfScript), log)
+        } finally { p.destroy() }
+    }
 }
 
 class RootHelperTest {
+    @Test fun healthTellsMissingOutdatedBrokenAndOk() {
+        val dir = Files.createTempDirectory("ontask-health")
+        val root = dir.resolve("root")
+        val staged = dir.resolve("hosts").also { Files.writeString(it, "127.0.0.1 localhost\n") }
+        val target = dir.resolve("etc-hosts")
+        val rh = dev.ontask.block.RootHelper(File("../daemon").absoluteFile, prompt = false, root = root)
+        assertEquals(dev.ontask.block.HelperHealth.MISSING, rh.health(staged, target, "/Applications/OnTask.app"))
+        assertTrue(rh.install(staged, 12999, prefix = root, appBundle = "/Applications/OnTask.app", agent = dir.resolve("agent.plist")).ok)
+        assertEquals(dev.ontask.block.HelperHealth.OUTDATED, rh.health(staged, target, "/Other/OnTask.app")) // set up for another copy
+        assertEquals(dev.ontask.block.HelperHealth.NOT_APPLYING, rh.health(staged, target, "/Applications/OnTask.app"))
+        Files.copy(staged, target)
+        assertEquals(dev.ontask.block.HelperHealth.OK, rh.health(staged, target, "/Applications/OnTask.app"))
+        Files.writeString(root.resolve("Library/PrivilegedHelperTools/dev.ontask.daemon.sh"), "# old version")
+        assertEquals(dev.ontask.block.HelperHealth.OUTDATED, rh.health(staged, target, "/Applications/OnTask.app"))
+    }
+
     @Test fun installIntoPrefixAndUninstall() {
         val dir = Files.createTempDirectory("ontask-root")
         val rh = dev.ontask.block.RootHelper(File("../daemon").absoluteFile, prompt = false)

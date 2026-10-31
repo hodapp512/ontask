@@ -26,7 +26,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.ontask.App
-import dev.ontask.block.BlockMode
 import dev.ontask.block.UnblockKind
 import dev.ontask.block.UnblockRejected
 import kotlinx.coroutines.delay
@@ -55,37 +54,6 @@ internal fun BlocklistCard(app: App, changed: () -> Unit) {
             list.value.forEach { d -> InputChip(false, { app.blocking.blocklist.remove(d); reload() }, label = { Text(d) }, trailingIcon = { Text("✕") }) }
         }
     }
-}
-
-@Composable
-internal fun BlockingSetup(app: App, mode: BlockMode, onMode: (BlockMode) -> Unit) {
-    val helper = remember { dev.ontask.block.RootHelper() }
-    var msg by remember { mutableStateOf("") }
-    var confirm by remember { mutableStateOf(false) }
-    Expander("Advanced: blocking mode and root helper") {
-        SettingRow("Blocking mode", mode.explain) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                BlockMode.entries.forEach { m -> FilterChip(mode == m, { app.blocking.mode = m; onMode(m) }, label = { Text(m.label) }) }
-            }
-        }
-        KV("Root helper installed", if (helper.installed) "yes" else "no")
-        KV("Staged hosts file", app.blocking.stagedFile.toString())
-        KV("Daemon port", app.blocking.port.toString())
-        Notice("If another app or script manages /etc/hosts, turn it off before installing — both would overwrite the same file.")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Button({ confirm = true }, enabled = helper.available) { Text(if (helper.installed) "Reinstall helper…" else "Install helper…") }
-            OutlinedButton({ msg = helper.install(app.blocking.stagedFile, app.blocking.port, dryRun = true).output }) { Text("Preview install") }
-            if (helper.installed) TextButton({ msg = helper.uninstall().output }) { Text("Uninstall") }
-        }
-        if (msg.isNotBlank()) Text(msg, style = MaterialTheme.typography.bodySmall)
-    }
-    if (confirm) AlertDialog(
-        onDismissRequest = { confirm = false },
-        title = { Text("Install the blocking helper?") },
-        text = { Text("macOS will ask for your administrator password. This installs a small background daemon that copies OnTask's hosts file to /etc/hosts. Then switch the blocking mode to On.") },
-        confirmButton = { TextButton({ confirm = false; msg = helper.install(app.blocking.stagedFile, app.blocking.port).output.ifBlank { "Done." } }) { Text("Install") } },
-        dismissButton = { TextButton({ confirm = false }) { Text("Cancel") } },
-    )
 }
 
 /** The friction screen: pick a duration, wait out the delay (showing today's count, your plan and your own message). */

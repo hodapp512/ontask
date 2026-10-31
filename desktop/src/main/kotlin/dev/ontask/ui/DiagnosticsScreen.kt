@@ -17,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -74,6 +75,8 @@ fun DiagnosticsScreen(app: App) {
                 val reader = app.helper.status
                 KV("Activity reader", if (reader == "running") "Running ✓" else reader)
                 Hint("A small companion program (ontask-helper) that tells OnTask which app and window are in front, whether you're at the keyboard, and — if you allow it — the text on screen. It's separate from the blocking service, which edits your hosts file.")
+                val blockingHelper by app.helperHealth.collectAsState()
+                KV("Blocking helper", when { app.blocking.mode == dev.ontask.block.BlockMode.DRY_RUN -> "Test mode (not used)"; blockingHelper == dev.ontask.block.HelperHealth.OK -> "Running ✓"; else -> blockingHelper?.problem?.replaceFirstChar { it.uppercase() } ?: "Checking…" })
                 if (app.helper.restarts > 0 || app.helper.failures > 0) KV("Reader hiccups", "restarted ${app.helper.restarts}×, ${app.helper.failures} missed checks")
                 val ax = app.tracker.live.value.sample?.accessibilityTrusted == true
                 if (ax) KV("Can see window titles", "Yes ✓")

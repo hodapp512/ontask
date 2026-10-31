@@ -43,8 +43,11 @@ Function → partner message, against the emulators).
 
 ## Safety and privacy
 
-* The app never writes `/etc/hosts` unless you install the root helper **and** switch the blocking mode to On.
-  If another app manages `/etc/hosts`, turn it off first.
+* The app never writes `/etc/hosts` until you install its root helper (macOS asks for your password). If another
+  app manages `/etc/hosts`, turn it off first.
+* Uninstalling leaves nothing behind: **Settings → Uninstall OnTask…** removes the helper, OnTask's lines in
+  `/etc/hosts` and the login item. If the app is simply deleted, the helper does the same by itself after 24 hours.
+  See [SETUP.md](SETUP.md#uninstalling).
 * No personal data in the repo: contact details live in your Firebase account, API keys in the macOS Keychain or
   Firebase Secret Manager, project settings in the app's local database / `web/.env.local` (gitignored).
 * Screenshots and OCR text are held in memory only for the length of one classification call.

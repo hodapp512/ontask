@@ -50,6 +50,8 @@ fun AppOverlays(app: App) {
     val unblockNudge by app.unblockNudge.collectAsState()
     unblockNudge?.let { UnblockNudgeWindow(app, it, mode) }
     prompt?.let { PromptWindow(app, it, mode) }
+    val helperPrompt by app.helperPrompt.collectAsState()
+    if (helperPrompt) BlockingHelperPromptWindow(app, mode)
     if (battery) OnTaskTheme(mode) {
         AlertDialog(
             onDismissRequest = { app.answerBattery(false) },

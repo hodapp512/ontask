@@ -25,18 +25,41 @@ For development, `./gradlew run` works too, but macOS then files permissions und
 The app is signed ad hoc, so macOS forgets these grants after you install a new build. Build with
 `./gradlew packageDmg -PsigningIdentity="Apple Development: …"` (any code-signing certificate) to keep them.
 
-### Turning blocking on
+### Blocking
 
-Blocking starts in **Test mode**: OnTask writes its hosts file to its own folder and blocks nothing.
+Your block list is blocked around the clock; work hours and Focus sessions only make unblocking harder. Blocking
+works by updating `/etc/hosts`, which needs a small root helper:
 
-1. If another app or script manages `/etc/hosts`, turn it off and remove it first — both would overwrite the same file.
-2. Blocking → Advanced → **Install helper…** (macOS asks for your administrator password once). This installs a small
-   root daemon on `127.0.0.1:12901` that copies OnTask's hosts file to `/etc/hosts`.
-3. Set **Blocking mode** to **On**.
-4. Settings → **Start OnTask at login**.
+* At setup, and whenever OnTask opens and finds the helper missing, outdated or not working, it explains why and
+  shows macOS's password prompt (at most once per launch). Until it's installed, a banner on Home and a row in
+  Settings → Permissions offer the same **Install…** button. Once it works, it doesn't show up anywhere except
+  Diagnostics.
+* The helper is a root LaunchDaemon (`dev.ontask.daemon`, listening on `127.0.0.1:12901`) that copies OnTask's
+  hosts file to `/etc/hosts`. If another app or script manages `/etc/hosts`, turn it off first: both would
+  overwrite the same file.
+* Developing OnTask: set `ONTASK_BLOCKING_TEST=1` (or the `blocking.test_mode` preference) to stage the hosts file in
+  OnTask's own folder and block nothing.
 
-Ad and malware blocking (a public list from GitHub, refreshed daily) is on by default; toggle it from the menu bar or
-Blocking → Ad blocking. Remove everything with Blocking → Advanced → Uninstall.
+Ad and malware blocking (a public list from GitHub, refreshed at startup and daily) is on by default; toggle it from
+the menu bar or Home.
+
+### Uninstalling
+
+Use **Settings → Uninstall OnTask…** (the button at the top). After your administrator password it:
+
+1. removes the blocking helper and OnTask's sections of `/etc/hosts` (your own entries stay);
+2. removes the login item (`~/Library/LaunchAgents/dev.ontask.app.plist`);
+3. optionally deletes your history and settings (`~/Library/Application Support/OnTask`; kept by default, so a
+   reinstall picks up where you left off);
+4. moves OnTask to the Trash and quits.
+
+**If you just drag OnTask to the Trash**, the helper cleans up by itself: it checks every 5 minutes that the app is
+still where it was installed, and once it has been gone for **24 hours** it removes OnTask's lines from `/etc/hosts`,
+the login item, and itself. Sites stay blocked until then; the wait keeps "delete the app" from being a quick way
+around blocking, and covers updates that briefly replace the app. Your data folder is left in place. Moving the app
+somewhere else counts as gone too; open it from its new place and it asks to reinstall the helper.
+
+To remove the helper by hand right away: `sudo bash daemon/uninstall.sh --target /etc/hosts` from this repository.
 
 ## 2. AI classification (optional)
 

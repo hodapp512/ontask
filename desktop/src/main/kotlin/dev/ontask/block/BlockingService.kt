@@ -10,11 +10,11 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 
-enum class BlockMode(val label: String, val explain: String) {
-    OFF("Off", "OnTask never writes a hosts file."),
-    DRY_RUN("Test mode", "OnTask writes its hosts file to its own folder only, so nothing is actually blocked. Useful to check what would be blocked."),
-    LIVE("On", "OnTask's helper applies the block list to your Mac (/etc/hosts). Needs the helper installed."),
-}
+/**
+ * LIVE: the root helper applies the hosts file to /etc/hosts — always, once it's installed. DRY_RUN is for
+ * developing OnTask only (nothing is blocked): set the `blocking.test_mode` preference or ONTASK_BLOCKING_TEST=1.
+ */
+enum class BlockMode { DRY_RUN, LIVE }
 
 /**
  * Decides what should be blocked right now (work hours or Focus session, minus active unblocks), stages the hosts
@@ -41,8 +41,12 @@ class BlockingService(
     @Volatile var lastError: String? = null; private set
 
     var mode: BlockMode
-        get() = runCatching { BlockMode.valueOf(prefs.str("blocking.mode", "DRY_RUN")) }.getOrDefault(BlockMode.DRY_RUN)
-        set(v) { prefs.set("blocking.mode", v.name); lastApplied = null; lastKey = null }
+        get() = if (System.getenv("ONTASK_BLOCKING_TEST") == "1" || prefs.bool("blocking.test_mode", false)) BlockMode.DRY_RUN else BlockMode.LIVE
+        set(v) { prefs.set("blocking.test_mode", v == BlockMode.DRY_RUN); reapply() }
+
+    /** Forgets what was last applied, so the next [tick] stages and applies the hosts file again (e.g. after installing the helper). */
+    @Synchronized
+    fun reapply() { lastApplied = null; lastKey = null }
     val port: Int get() = prefs.int("blocking.port", 12901)
 
     /** Strict mode — unblocking has friction and the partner is told: work hours, or a running Focus session. */
@@ -60,7 +64,6 @@ class BlockingService(
         focus.settle(now)
         // An evening unblock never carries into work hours or a Focus session.
         if (strictNow(now)) unblocks.active(now).filter { it.kind == UnblockKind.LEISURE }.forEach { unblocks.end(it.id, now, "work_started") }
-        if (mode == BlockMode.OFF) return false
         val blocked = currentlyBlocked(now)
         val key = blocked to (adBlock?.let { if (it.enabled) it.version else -1 } ?: -1)
         if (lastApplied != null && key == lastKey) return false
@@ -71,12 +74,13 @@ class BlockingService(
             val tmp = Files.createTempFile(dir, "hosts", ".tmp")
             Files.writeString(tmp, content)
             Files.move(tmp, stagedFile, StandardCopyOption.REPLACE_EXISTING)
+            lastApplied = content; lastKey = key
             when (mode) {
                 BlockMode.DRY_RUN -> Files.writeString(dryRunTarget, content)
+                // Without the helper the file stays staged: the daemon applies it as soon as it's installed and starts.
                 BlockMode.LIVE -> notifyDaemon()
-                BlockMode.OFF -> {}
             }
-            lastApplied = content; lastKey = key; lastError = null; true
+            lastError = null; true
         } catch (e: Exception) {
             lastError = e.message; false
         }
@@ -90,6 +94,6 @@ class BlockingService(
                 return
             } catch (e: IOException) { last = e; Thread.sleep(250) }
         }
-        throw IOException("Could not reach the OnTask daemon on port $port — is the root helper installed?", last)
+        throw IOException("Could not reach OnTask's blocking helper (port $port).", last)
     }
 }

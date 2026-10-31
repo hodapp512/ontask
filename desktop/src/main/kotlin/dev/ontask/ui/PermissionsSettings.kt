@@ -46,6 +46,7 @@ fun PermissionsBody(app: App) {
     LaunchedEffect(Unit) { status = perms.status() }
     val s = status ?: PermissionStatus.unknown
 
+    BlockingHelperRow(app)
     PermissionRow(
         "Accessibility", "Lets OnTask read window titles of apps, so it can tell one document or chat from another.",
         if (status == null) null else s.accessibility, busy,

@@ -81,7 +81,7 @@ private val blocklistStep = Step("Block list", "Sites to block during work hours
     var msg by remember { mutableStateOf("The built-in list (${app.blocklist.all().size} sites) is already loaded.") }
     OutlinedButton({ pickTextFile("Import sites to block")?.let { val n = app.blocklist.importFile(it, App.nowSec()); msg = if (n == 0) "No new sites found in that file." else "Imported $n sites." } }) { Text("Import from file…") }
     Text(msg, style = MaterialTheme.typography.bodyMedium)
-    Text("Blocking starts in Test mode and never touches /etc/hosts until you switch it on (Blocking → Advanced).", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text("These are blocked around the clock once OnTask's blocking helper is installed (next to the permissions, later in setup).", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 private val habitsStep = Step("Habit prompts", "Reminders at set times, like a morning prayer. They go to your phone even when you're away from the Mac.") { app ->

@@ -117,6 +117,70 @@ class App(val dir: Path = dataDir()) {
         blocking.tick(now)
     }
 
+    // ---- Blocking helper -------------------------------------------------------------------------------------
+
+    val rootHelper = dev.ontask.block.RootHelper()
+    private val _helperHealth = MutableStateFlow<dev.ontask.block.HelperHealth?>(null)
+    /** Null until first checked; rechecked every minute. Irrelevant in test mode (see [helperNeeded]). */
+    val helperHealth: StateFlow<dev.ontask.block.HelperHealth?> = _helperHealth
+    private val _helperPrompt = MutableStateFlow(false)
+    /** The "install the blocking helper" window: shown once per launch while the helper is missing or broken. */
+    val helperPrompt: StateFlow<Boolean> = _helperPrompt
+    private var helperPrompted = false
+    private var lastHelperCheck = 0L
+    @Volatile private var helperBusy = false
+    /** Until when the Home banner about the helper is hidden: next launch, or 4 hours after dismissing it. */
+    @Volatile var helperBannerHiddenUntil = 0L; private set
+
+    /** True when blocking can't work: the helper needs installing or fixing (never in developer test mode). */
+    fun helperNeeded(): Boolean = blocking.mode == dev.ontask.block.BlockMode.LIVE && _helperHealth.value.let { it != null && it != dev.ontask.block.HelperHealth.OK }
+
+    fun checkHelper() {
+        if (helperBusy) return
+        helperBusy = true
+        scope.launch(IO) {
+            try {
+                var h = rootHelper.health(blocking.stagedFile)
+                // Possibly just staged, or the daemon missed it: ask it to apply once more before calling it broken.
+                if (h == dev.ontask.block.HelperHealth.NOT_APPLYING) { blocking.reapply(); blocking.tick(nowSec()); delay(3000); h = rootHelper.health(blocking.stagedFile) }
+                _helperHealth.value = h
+                if (!helperPrompted && helperNeeded() && rootHelper.available && prefs.bool("setup.done", false)) { helperPrompted = true; _helperPrompt.value = true }
+            } finally { helperBusy = false }
+        }
+    }
+
+    /** Runs the installer (macOS asks for the admin password). Returns an error message, or null when it worked. */
+    suspend fun installHelper(): String? = kotlinx.coroutines.withContext(IO) {
+        val r = rootHelper.install(blocking.stagedFile, blocking.port)
+        _helperPrompt.value = false
+        blocking.reapply(); blocking.tick(nowSec())
+        delay(1500)
+        _helperHealth.value = rootHelper.health(blocking.stagedFile)
+        when {
+            r.ok -> null
+            "-128" in r.output || "User canceled" in r.output -> "Not installed: the password prompt was cancelled."
+            else -> "Couldn't install the helper: ${r.output}"
+        }
+    }
+
+    fun helperPromptLater() { _helperPrompt.value = false }
+    fun hideHelperBanner() { helperBannerHiddenUntil = nowSec() + 4 * 3600 }
+
+    /**
+     * Removes OnTask from this Mac: the helper and OnTask's lines in /etc/hosts (one admin prompt), the login item,
+     * optionally the data folder, then moves the app to the Trash and quits. Returns an error message if the admin
+     * step failed or was cancelled (nothing else is touched then).
+     */
+    fun uninstallOnTask(deleteData: Boolean): String? {
+        val r = rootHelper.uninstall(target = "/etc/hosts")
+        if (!r.ok) return if ("-128" in r.output || "User canceled" in r.output) "Cancelled: nothing was removed." else "Couldn't remove the blocking helper: ${r.output}"
+        dev.ontask.block.LoginItem().set(atLogin = false, keepAlive = false)
+        shutdown()
+        if (deleteData) runCatching { dir.toFile().deleteRecursively() }
+        dev.ontask.block.RootHelper.appBundle()?.let { b -> runCatching { java.awt.Desktop.getDesktop().moveToTrash(java.io.File(b)) } }
+        kotlin.system.exitProcess(0)
+    }
+
     fun unblockNudgeOk() { _unblockNudge.value = null }
     fun unblockNudgeStruggling() { _unblockNudge.value = null; _intervention.value = ladder.struggling() }
 
@@ -196,6 +260,7 @@ class App(val dir: Path = dataDir()) {
         if (prefs.get("update.repo") != null && now - lastUpdateCheck >= 7 * 86400) { lastUpdateCheck = now; scope.launch(IO) { checkForUpdates() } }
         if (ai.enabled && now - lastBattery >= 60) { lastBattery = now; scope.launch(IO) { batteryCheck() } }
         if (adBlock.refreshDue(now) && !adBlockBusy) { adBlockBusy = true; scope.launch(IO) { try { adBlock.refresh(now) } finally { adBlockBusy = false } } }
+        if (now - lastHelperCheck >= 60) { lastHelperCheck = now; checkHelper() }
         if (now - lastRhythm >= 30) { lastRhythm = now; runCatching { rhythmCheck(now, live.away) } }
     }
 

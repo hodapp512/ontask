@@ -21,6 +21,7 @@ fun SettingsScreen(app: App, theme: ThemeMode, onTheme: (ThemeMode) -> Unit, ope
     fun update(n: dev.ontask.db.Settings) { s = n; app.updateSettings(n) }
 
     Page("Settings", "Changes are saved as you make them.") {
+        UninstallButton(app)
         SectionCard("Work hours", "Inside your work hours, distracting sites are blocked and OnTask watches more closely. Outside them, anything goes.") {
             val hours = remember { s.schedule.week.days.values.sumOf { r -> r.sumOf { it.endMin - it.startMin } } / 60.0 }
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {

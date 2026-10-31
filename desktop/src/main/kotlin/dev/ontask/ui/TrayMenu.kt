@@ -89,7 +89,7 @@ fun ApplicationScope.OnTaskTray(app: App, open: (Dest?) -> Unit) {
     val openCount = remember(now, version) { svc.unblocks.active(now).size }
     val adOn = remember(version) { app.adBlock.enabled }
     val status = when {
-        svc.mode == BlockMode.OFF -> "Blocking is off"
+        app.helperNeeded() -> "Blocking isn't on: the blocking helper ${app.helperHealth.value?.problem}"
         focus != null -> "Focus session: ${fmtDuration(focus.plannedEndTs - now)} left, blocking ${blocked.size} sites"
         svc.strictNow(now) -> "Work hours: blocking ${blocked.size} sites"
         else -> "Outside work hours: blocking ${blocked.size} sites (unblocking is instant)"
@@ -108,21 +108,21 @@ fun ApplicationScope.OnTaskTray(app: App, open: (Dest?) -> Unit) {
             if (openCount > 0) Item("$openCount site${if (openCount == 1) "" else "s"} unblocked right now", enabled = false, onClick = {})
             Separator()
             Item("Unblock a site…", enabled = blocked.isNotEmpty(), onClick = { changed(); picking = true })
-            if (focus != null) Menu("Focus session") {
-                Item("Ends at ${fmtHm(focus.plannedEndTs)} (${fmtDuration(focus.plannedEndTs - now)} left)", enabled = false, onClick = {})
-                Item("End now", onClick = { app.focus.stop(App.nowSec()); retick(); changed() })
-            } else Menu("Start Focus session") {
+            Separator()
+            if (focus != null) {
+                Item("Focus session ends at ${fmtHm(focus.plannedEndTs)} (${fmtDuration(focus.plannedEndTs - now)} left)", enabled = false, onClick = {})
+                Item("End Focus session now", onClick = { app.focus.stop(App.nowSec()); retick(); changed() })
+            } else {
+                Item("Start a Focus session:", enabled = false, onClick = {})
                 listOf(20, 30, 45, 60, 90).forEach { m ->
-                    Item("$m minutes", onClick = { app.focus.start(m, App.nowSec()); retick(); changed() })
+                    Item("    $m minutes", onClick = { app.focus.start(m, App.nowSec()); retick(); changed() })
                 }
             }
             Separator()
             Item("Add site to block…", onClick = { adding = true })
             CheckboxItem("Ad blocking", checked = adOn, onCheckedChange = { app.adBlock.enabled = it; retick(); changed() })
             Separator()
-            Item("Today's report", onClick = { open(Dest.HOME) })
-            Item("Settings…", onClick = { open(Dest.SETTINGS) })
-            Item("Open OnTask", onClick = { open(null) })
+            Item("Show OnTask", onClick = { open(null) })
             Separator()
             val reopens = app.prefs.bool("startup.reopen", false)
             Item(if (reopens) "Quit OnTask (reopens in a few seconds)" else "Quit OnTask", onClick = { exitApplication() })
