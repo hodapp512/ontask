@@ -35,6 +35,11 @@ describe("reports", () => {
   it("partners can't write reports", async () => {
     await assertFails(setDoc(doc(as(PARTNER), "users", TRACKED, "reports", "x"), { a: 1 }));
   });
+  it("page and video titles are yours only, even with the full report shared", async () => {
+    await assertSucceeds(setDoc(doc(as(TRACKED), "users", TRACKED, "reportItems", "2026-10-30"), { topSites: [] }));
+    await assertSucceeds(getDoc(doc(as(TRACKED), "users", TRACKED, "reportItems", "2026-10-30")));
+    await assertFails(getDoc(doc(as(PARTNER), "users", TRACKED, "reportItems", "2026-10-30")));
+  });
 });
 
 describe("private data", () => {
@@ -106,5 +111,6 @@ describe("model recommendation", () => {
     await assertSucceeds(setDoc(doc(as(TRACKED), "users", TRACKED, "labelRequests", "r1"), req));
     await assertFails(setDoc(doc(as(PARTNER), "users", TRACKED, "labelRequests", "r2"), req));
     await assertFails(setDoc(doc(as(TRACKED), "users", TRACKED, "labelRequests", "r3"), { ...req, extra: true }));
+    await assertSucceeds(setDoc(doc(as(TRACKED), "users", TRACKED, "labelRequests", "r4"), { ...req, itemKey: "youtube.com/watch?v=abc", title: "Learning Java" }));
   });
 });

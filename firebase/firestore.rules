@@ -5,6 +5,7 @@ rules_version = '2';
 //   users/{uid}/contact/{doc}       phone / email for channels    (owner only; functions read it)
 //   users/{uid}/events/{id}         outbox written by the Mac     (owner creates; functions process)
 //   users/{uid}/reports/{date}      daily aggregates              (owner writes; partner reads if share == "report")
+//   users/{uid}/reportItems/{date}  page and video titles         (owner only; the partner never reads these)
 //   users/{uid}/schedule/current    work hours, habits, times     (owner)
 //   users/{uid}/devices/{id}        linked Macs and phones        (owner; shown in both apps)
 //   users/{uid}/labelRequests/{id}  category corrections from the phone (owner; the Mac applies and deletes them)
@@ -40,12 +41,15 @@ service cloud.firestore {
         allow write: if isOwner(uid);
         allow read: if isOwner(uid) || partnerSeesReport(uid);
       }
+      match /reportItems/{date} { allow read, write: if isOwner(uid); }
       match /schedule/{doc} { allow read, write: if isOwner(uid); }
       match /devices/{id} { allow read, write: if isOwner(uid); }
       match /labelRequests/{id} {
         allow read, delete: if isOwner(uid);
-        allow create: if isOwner(uid) && request.resource.data.keys().hasOnly(['subject', 'category', 'ts'])
+        allow create: if isOwner(uid) && request.resource.data.keys().hasOnly(['subject', 'category', 'ts', 'itemKey', 'title'])
           && request.resource.data.subject is string && request.resource.data.subject.size() <= 200
+          && (!('itemKey' in request.resource.data) || (request.resource.data.itemKey is string && request.resource.data.itemKey.size() <= 500))
+          && (!('title' in request.resource.data) || (request.resource.data.title is string && request.resource.data.title.size() <= 300))
           && request.resource.data.category is string && request.resource.data.category.size() <= 64;
       }
       match /checkins/{date} {

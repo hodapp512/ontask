@@ -34,9 +34,9 @@ object UiShots {
             Segment(startTs = start, endTs = start + mins * 60L, n = mins * 12, seconds = mins * 60, app = name, bundle = null, title = "Sample window title", url = domain?.let { "https://$it/" },
                 domain = domain, category = cat, source = src, ruleId = null, workTime = h in 9.0..17.0, skippedUnchanged = mins * 12 - 1).let { TickStore(app.db).save(listOf(it)) }
         }
-        seg(8.5, 25, Category.COMMUNICATION, "Slack"); seg(9.0, 70, Category.CORE_WORK, "IntelliJ IDEA"); seg(10.2, 12, Category.SOCIAL, "Google Chrome", "reddit.com")
+        seg(8.5, 25, Category.WORK_SUPPORT, "Slack"); seg(9.0, 70, Category.CORE_WORK, "IntelliJ IDEA"); seg(10.2, 12, Category.ENTERTAINMENT, "Google Chrome", "instagram.com")
         seg(10.4, 55, Category.CORE_WORK, "IntelliJ IDEA"); seg(11.3, 20, Category.WORK_SUPPORT, "Google Chrome", "mail.google.com"); seg(12.0, 45, Category.UNKNOWN, "Mystery", null, Source.METADATA)
-        seg(13.0, 90, Category.CORE_WORK, "Visual Studio Code"); seg(14.6, 25, Category.ENTERTAINMENT, "Google Chrome", "youtube.com"); seg(15.1, 80, Category.LEARNING, "Google Chrome", "coursera.org")
+        seg(13.0, 90, Category.CORE_WORK, "Visual Studio Code"); seg(14.6, 25, Category.ENTERTAINMENT, "Google Chrome", "youtube.com"); seg(15.1, 80, Category.WORK_SUPPORT, "Google Chrome", "coursera.org")
         seg(17.5, 30, Category.AWAY, "x", null, Source.AWAY)
     }
 

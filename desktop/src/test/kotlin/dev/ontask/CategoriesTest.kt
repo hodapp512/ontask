@@ -28,19 +28,19 @@ class CategoriesTest {
     @Test fun addRenameAndRelevel() {
         val client = store.add("Client work", Level.DEEP, variable = false)
         assertTrue(client in Category.assignable)
-        store.update(Category.NEWS, "Reading the news", Level.MIXED, variable = false)
-        assertEquals("Reading the news", Category.valueOf("NEWS").label)
+        store.update(Category.PERSONAL_ADMIN, "Shopping & errands", Level.WASTED, variable = false)
+        assertEquals("Shopping & errands", Category.valueOf("PERSONAL_ADMIN").label)
         // Rules return the edited category, so its new level applies.
-        val c = Classifier(emptyList()).classify(Sample(app = "Safari", url = "https://www.cnn.com/x"))
-        assertEquals(Level.MIXED, c.level)
+        val c = Classifier(emptyList()).classify(Sample(app = "Safari", url = "https://www.amazon.com/x"))
+        assertEquals(Level.WASTED, c.level)
     }
 
     @Test fun deletingResortsThenUnclassified() {
-        tick("Safari", "https://reddit.com/r/kotlin", "r/kotlin", Category.ENTERTAINMENT) // a built-in rule knows reddit
+        tick("Safari", "https://github.com/x", "x", Category.ENTERTAINMENT) // a built-in rule knows github
         tick("Foo", null, "Something", Category.ENTERTAINMENT) // nothing knows Foo
         store.delete(Category.ENTERTAINMENT) { app, bundle, title, url -> Classifier(emptyList()).classify(Sample(app = app, bundleId = bundle, title = title, url = url)).category }
         assertTrue(Category.ENTERTAINMENT !in Category.assignable)
-        assertEquals(listOf("SOCIAL" to "WASTED", "UNKNOWN" to "MIXED"), rows())
+        assertEquals(listOf("CORE_WORK" to "DEEP", "UNKNOWN" to "MIXED"), rows())
         // Built-in rules for the deleted category are skipped.
         assertEquals(Category.UNKNOWN, Classifier(emptyList()).classify(Sample(app = "Spotify")).category)
     }
@@ -53,8 +53,29 @@ class CategoriesTest {
         tick("Safari", "https://www.youtube.com/watch?v=zzz", "Funny cats", Category.VARIABLE)
         val v = Verdicts(db)
         assertNull(v.get("youtube.com/watch?v=abc"))
-        v.set("youtube.com/watch?v=abc", "Kotlin coroutines talk", work = true, Source.USER_LABEL, 0)
-        assertEquals(Level.DEEP, v.get("youtube.com/watch?v=abc"))
+        assertEquals(listOf("youtube.com/watch?v=zzz", "youtube.com/watch?v=abc"), v.unjudged(0, 10).map { it.first }.sorted().reversed())
+        v.set("youtube.com/watch?v=abc", "Kotlin coroutines talk", Category.CORE_WORK, Source.USER_LABEL, null, 0)
+        assertEquals(Category.CORE_WORK, v.get("youtube.com/watch?v=abc"))
+        // The reading keeps its Varies category; its level (and its own category) come from the verdict.
         assertEquals(listOf("VARIABLE" to "DEEP", "VARIABLE" to "MIXED"), rows())
+        assertEquals(listOf("youtube.com/watch?v=zzz"), v.unjudged(0, 10).map { it.first })
+    }
+
+    @Test fun twoMatchingAnswersForASourceMakeARule() {
+        val v = Verdicts(db)
+        val key = "reddit r/firebase"
+        v.set("reddit.com/r/firebase/comments/1", "Rules question", Category.CORE_WORK, Source.USER_LABEL, key, 1)
+        assertNull(v.ruleFor(key)) // one answer isn't enough
+        v.set("reddit.com/r/firebase/comments/2", "Functions v2", Category.CORE_WORK, Source.USER_LABEL, key, 2)
+        assertEquals(Category.CORE_WORK, v.ruleFor(key))
+        assertEquals(listOf(key to Category.CORE_WORK), v.rules())
+        // AI verdicts never teach; disagreeing answers of yours remove the rule.
+        v.set("reddit.com/r/firebase/comments/3", "Meme", Category.ENTERTAINMENT, Source.AI_PAGE, key, 3)
+        assertEquals(Category.CORE_WORK, v.ruleFor(key))
+        v.set("reddit.com/r/firebase/comments/4", "Meme 2", Category.ENTERTAINMENT, Source.USER_LABEL, key, 4)
+        assertNull(v.ruleFor(key))
+        v.set("reddit.com/r/firebase/comments/5", "Meme 3", Category.ENTERTAINMENT, Source.USER_LABEL, key, 5)
+        assertEquals(Category.ENTERTAINMENT, v.ruleFor(key))
+        v.deleteRule(key); assertNull(v.ruleFor(key))
     }
 }

@@ -2,7 +2,6 @@ package dev.ontask
 
 import dev.ontask.block.*
 import dev.ontask.ai.AiService
-import dev.ontask.ai.FewShot
 import dev.ontask.intervene.*
 import dev.ontask.plan.*
 import kotlinx.coroutines.Dispatchers.IO
@@ -75,7 +74,8 @@ class App(val dir: Path = dataDir()) {
         return if (alts.isEmpty()) own else alts.random()
     }
 
-    val cloud by lazy { dev.ontask.cloud.CloudSync(prefs, events, reports, { settings }, habits, checkins, relabel = { name, cat -> reclassify(name, Category.valueOf(cat)) }) }
+    val cloud by lazy { dev.ontask.cloud.CloudSync(prefs, events, reports, { settings }, habits, checkins, relabel = { name, cat -> reclassify(name, Category.valueOf(cat)) },
+        relabelItem = { key, title, cat -> answerVariable(key, title, Category.valueOf(cat)) }) }
     val updates = dev.ontask.cloud.UpdateCheck()
     @Volatile var updateAvailable: dev.ontask.cloud.UpdateInfo? = null; private set
     private var lastCloud = 0L; private var lastUpdateCheck = 0L
@@ -194,12 +194,16 @@ class App(val dir: Path = dataDir()) {
         if (ended.isNotEmpty()) _unblockNudge.value = UnblockNudge(ending = true, ended.values.distinct(), 0, unblocks.todayCount(now))
     }
 
-    /** "Is this work?" for a page or video in a Variable category that AI couldn't decide. */
-    data class VariableAsk(val item: String, val title: String?, val site: String?)
+    /** "I can't tell whether this is work" for a page or video on a Varies site that nothing could decide. */
+    data class VariableAsk(val item: String, val title: String?, val label: String?, val sourceKey: String?)
     private val _variableAsk = MutableStateFlow<VariableAsk?>(null)
     val variableAsk: StateFlow<VariableAsk?> = _variableAsk
+    /** Asked about this run (at most once each); still undecided after AI (shown as Unsure until you answer). */
     private val variableAsked = HashSet<String>()
+    private val variableUnsure = HashMap<String, VariableAsk>()
     private val variableJudging = HashSet<String>()
+    private val pageLookup = dev.ontask.classify.PageLookup()
+    private var lastAskTs = 0L
 
     private val _duePrompt = MutableStateFlow<Prompt?>(null)
     val duePrompt: StateFlow<Prompt?> = _duePrompt
@@ -222,6 +226,7 @@ class App(val dir: Path = dataDir()) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     fun start() {
+        runCatching { migrateCategories() }
         Retention.rollup(db, nowSec(), settings.retentionDays)
         if (!prefs.bool("blocklist.seeded", false)) { blocklist.seedDefault(nowSec()); prefs.set("blocklist.seeded", true) }
         tracker.seedTotals(LocalDate.now(), reports.totals(LocalDate.now()))
@@ -256,7 +261,7 @@ class App(val dir: Path = dataDir()) {
         variableCheck(now, live)
         if (ai.enabled && !ai.metadataOnly && now - lastBackfill >= 120 && !backfillBusy) { lastBackfill = now; backfillBusy = true; scope.launch(IO) { try { judgeEarlier(now) } finally { backfillBusy = false } } }
         checkRegularEnded(now)
-        if (ai.llama.running) ai.llama.stopIfIdle()
+        if (ai.kev.running) ai.kev.stopIfIdle()
         if (cloud.configured && now - lastCloud >= 60) { lastCloud = now; scope.launch(IO) { cloud.syncOnce(now) } }
         if (prefs.get("update.repo") != null && now - lastUpdateCheck >= 7 * 86400) { lastUpdateCheck = now; scope.launch(IO) { checkForUpdates() } }
         if (ai.enabled && now - lastBattery >= 60) { lastBattery = now; scope.launch(IO) { batteryCheck() } }
@@ -266,52 +271,81 @@ class App(val dir: Path = dataDir()) {
     }
 
     /**
-     * A page or video in a Variable category (e.g. YouTube) counts as Mixed until it's decided: a remembered verdict,
-     * else AI on its title against today's plan, else — in work hours or a Focus session — a pop-up asking you.
+     * A page or video on a Varies site (e.g. YouTube) shows as Unsure until it's decided, in this order: a remembered
+     * verdict; a rule learned from your answers for its source (subreddit, group, channel…); AI on its title, address
+     * and looked-up facts; AI again with the text on screen; and finally a question to you. Feeds never get here:
+     * they count as time-wasting from the start.
      */
     private fun variableCheck(now: Long, live: dev.ontask.track.Live) {
         val seg = tracker.currentSegment() ?: return
-        if (live.away || !seg.category.variable || seg.levelOverride != null) return
+        if (live.away || !seg.category.variable || seg.itemCategory != null) return
         val item = dev.ontask.classify.itemKey(seg.app, seg.title, seg.url)
         verdicts.get(item)?.let { tracker.applyVerdict(it); return }
-        val ask = VariableAsk(item, seg.title, seg.domain ?: seg.app)
+        synchronized(variableUnsure) { variableUnsure[item] }?.let { maybeAsk(it, now); return }
         synchronized(variableJudging) { if (!variableJudging.add(item)) return }
-        if (ai.enabled && !ai.metadataOnly && live.sample != null) scope.launch(IO) {
-            val work = ai.judgeWork(live.sample, priorities.today(now))
-            if (work != null) { verdicts.set(item, seg.title, work, Source.AI_PAGE, nowSec()); tracker.applyVerdict(if (work) Level.DEEP else Level.WASTED) }
-            else askVariable(ask, now)
-        } else askVariable(ask, now)
+        val sample = live.sample ?: dev.ontask.Sample(app = seg.app, title = seg.title, url = seg.url)
+        scope.launch(IO) {
+            try {
+                val (cat, key) = judgePage(item, seg.title, sample, now, readScreen = true)
+                if (cat != null) tracker.applyVerdict(cat)
+                else { val ask = VariableAsk(item, seg.title, seg.item, key); synchronized(variableUnsure) { variableUnsure[item] = ask }; maybeAsk(ask, nowSec()) }
+            } finally { synchronized(variableJudging) { variableJudging.remove(item) } }
+        }
+    }
+
+    /** Runs the pipeline for one page; saves and returns its category, or null (with its source) when still unsure. */
+    private fun judgePage(item: String, title: String?, sample: dev.ontask.Sample, now: Long, readScreen: Boolean): Pair<Category?, String?> {
+        val facts = runCatching { pageLookup.lookup(sample.url) }.getOrDefault(emptyMap())
+        val key = dev.ontask.classify.Pages.sourceKey(sample.url, facts["Channel"])
+        verdicts.ruleFor(key)?.let { verdicts.set(item, title, it, Source.RULE, key, now); return it to key }
+        if (!ai.enabled) return null to key
+        val plan = priorities.today(now)
+        ai.judgeItem(sample, plan, facts)?.takeIf { it.probability >= ai.threshold }?.let { verdicts.set(item, title, it.category, Source.AI_PAGE, key, now); return it.category to key }
+        if (readScreen && !ai.metadataOnly) {
+            val text = runBlocking { helper.request("ocr", 15000, mapOf("skipIfUnchanged" to false)) }?.get("text")?.jsonPrimitive?.contentOrNull
+            if (!text.isNullOrBlank()) ai.judgeItem(sample, plan, facts, text)?.takeIf { it.probability >= ai.threshold }
+                ?.let { verdicts.set(item, title, it.category, Source.AI_PAGE, key, now); return it.category to key }
+        }
+        return null to key
+    }
+
+    /** Until when the "I can't tell" question is paused (0 = not paused). */
+    val askPausedUntil: Long get() = prefs.long("ask.paused_until", 0L).takeIf { it > nowSec() } ?: 0L
+    fun pauseAsking(minutes: Int) { prefs.set("ask.paused_until", nowSec() + minutes * 60L); _variableAsk.value = null }
+    fun resumeAsking() { prefs.set("ask.paused_until", 0L) }
+
+    /** Asks about the page you're on: at most once per page, at most every 2 minutes, and not while paused. */
+    private fun maybeAsk(ask: VariableAsk, now: Long) {
+        if (_variableAsk.value != null || askPausedUntil > 0 || now - lastAskTs < 120) return
+        synchronized(variableAsked) { if (!variableAsked.add(ask.item)) return }
+        lastAskTs = now
+        _variableAsk.value = ask
     }
 
     private var lastBackfill = 0L
     @Volatile private var backfillBusy = false
-    /** Items the catch-up already asked about this run (AI unsure or failed), so it moves on to others. */
+    /** Items the catch-up already tried this run (still unsure, or AI failed), so it moves on to others. */
     private val backfillTried = HashSet<String>()
 
-    /** Catches up on videos and pages from the last week that were never judged (AI was off or failing), a few at a time. */
+    /** Catches up on pages and videos from the last week that were never decided, a few at a time, without asking. */
     private fun judgeEarlier(now: Long) {
         val todo = verdicts.unjudged(now - 7 * 86400, 200).filter { it.first !in backfillTried }.take(5)
         for ((item, sample) in todo) {
             if (synchronized(variableJudging) { item in variableJudging }) continue
             backfillTried += item
-            val work = ai.judgeWork(sample, priorities.today(now)) ?: continue
-            verdicts.set(item, sample.title, work, Source.AI_PAGE, nowSec())
+            judgePage(item, sample.title, sample, now, readScreen = false)
         }
     }
 
-    private fun askVariable(ask: VariableAsk, now: Long) {
-        synchronized(variableJudging) { variableJudging.remove(ask.item) }
-        if (!blocking.strictNow(now) || _variableAsk.value != null || !variableAsked.add(ask.item)) return
-        _variableAsk.value = ask
-    }
-
-    /** Answer from the pop-up or a dropdown: [work] true/false saves a verdict; null just closes the pop-up. */
-    fun answerVariable(item: String, title: String?, work: Boolean?) {
+    /** Your answer (the question window or a row's dropdown): [cat] decides the page; null ("Not now") leaves it Unsure. */
+    fun answerVariable(item: String, title: String?, cat: Category?, sourceKey: String? = null) {
         if (_variableAsk.value?.item == item) _variableAsk.value = null
-        if (work == null) return
-        verdicts.set(item, title, work, Source.USER_LABEL, nowSec())
+        if (cat == null) return
+        val key = sourceKey ?: synchronized(variableUnsure) { variableUnsure[item]?.sourceKey }
+        verdicts.set(item, title, cat, Source.USER_LABEL, key, nowSec())
+        synchronized(variableUnsure) { variableUnsure.remove(item) }
         val seg = tracker.currentSegment()
-        if (seg != null && dev.ontask.classify.itemKey(seg.app, seg.title, seg.url) == item) tracker.applyVerdict(if (work) Level.DEEP else Level.WASTED)
+        if (seg != null && dev.ontask.classify.itemKey(seg.app, seg.title, seg.url) == item) tracker.applyVerdict(cat)
     }
 
     private suspend fun aiCycle(sample: dev.ontask.Sample?) {
@@ -321,11 +355,8 @@ class App(val dir: Path = dataDir()) {
             val key = listOf(sample.app, sample.bundleId, dev.ontask.classify.domainOf(sample.url), sample.title?.take(40)).joinToString("|")
             val cached = synchronized(aiCache) { if (aiCache.containsKey(key)) aiCache[key] else null }
             if (cached != null) { tracker.applyAi(cached); return }
-            val r = helper.request("ocr", 15000, mapOf("skipIfUnchanged" to false))
-            val text = r?.get("text")?.jsonPrimitive?.contentOrNull
-            val res = ai.classify(sample, text, priorities.today(nowSec()), ai.recentLabels(), screenshots = {
-                runBlocking { helper.request("screenshot", 15000, mapOf("maxDim" to 1280)) }?.get("images")?.let { arr -> (arr as kotlinx.serialization.json.JsonArray).map { it.jsonPrimitive.content } }
-            })
+            val text = if (ai.metadataOnly) null else helper.request("ocr", 15000, mapOf("skipIfUnchanged" to false))?.get("text")?.jsonPrimitive?.contentOrNull
+            val res = ai.classify(sample, text, priorities.today(nowSec()))?.takeIf { it.probability >= ai.threshold }
             if (res != null) { synchronized(aiCache) { aiCache[key] = res }; tracker.applyAi(res) }
         } catch (e: Exception) {
             aiError = e.message
@@ -404,6 +435,17 @@ class App(val dir: Path = dataDir()) {
     }
 
     /** Deletes a category and re-sorts what was in it with the remaining rules (anything unmatched → Unclassified). */
+    /**
+     * Once after upgrading to the four default categories: old default names you kept are renamed, and anything still
+     * filed under a retired built-in (Learning, Communication, Social, News, Shopping) is sorted again like a delete.
+     */
+    private fun migrateCategories() {
+        if (prefs.bool("categories.v2", false)) return
+        categories.renameOldDefaults()
+        categories.retiredInUse().forEach { deleteCategory(Category(it, it.lowercase().replaceFirstChar { c -> c.uppercase() }, Level.MIXED)) }
+        prefs.set("categories.v2", true)
+    }
+
     fun deleteCategory(c: Category) {
         categories.delete(c) { app, bundle, title, url ->
             val cls = Classifier(ruleStore.userRules().filter { it.category != c })

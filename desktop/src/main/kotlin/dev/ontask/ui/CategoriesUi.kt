@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -36,22 +38,37 @@ import dev.ontask.App
 import dev.ontask.Category
 import dev.ontask.Level
 
-/** "Is this work?" for a page or video on a Varies site that AI couldn't decide (only in work hours / Focus). */
+/** "I can't tell whether this is work" for a page or video on a Varies site that nothing else could decide. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun VariableAskWindow(app: App, ask: App.VariableAsk, mode: ThemeMode) {
+    val cats = remember { Category.assignable.filter { !it.variable } }
     Window(
-        onCloseRequest = { app.answerVariable(ask.item, ask.title, null) }, title = "OnTask — is this work?", alwaysOnTop = true, resizable = false,
-        state = rememberWindowState(size = DpSize(460.dp, 240.dp), position = WindowPosition.Aligned(Alignment.BottomEnd)),
+        onCloseRequest = { app.answerVariable(ask.item, ask.title, null) }, title = "OnTask", alwaysOnTop = true, resizable = false, focusable = false,
+        state = rememberWindowState(size = DpSize(480.dp, 250.dp), position = WindowPosition.Aligned(Alignment.BottomEnd)),
     ) {
         OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Is this for work?", style = MaterialTheme.typography.titleMedium)
-                Text(ask.title ?: ask.site ?: "This page", style = MaterialTheme.typography.bodyMedium, maxLines = 2)
-                Text("${ask.site ?: "This site"} can be work or not, so OnTask asks once per video or page and remembers.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button({ app.answerVariable(ask.item, ask.title, true) }) { Text("Yes, it's work") }
-                    OutlinedButton({ app.answerVariable(ask.item, ask.title, false) }) { Text("No") }
+                Text("I can't tell whether this is work. What is it?", style = MaterialTheme.typography.titleMedium)
+                Text(ask.label ?: ask.title ?: "This page", style = MaterialTheme.typography.bodyMedium, maxLines = 2)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    cats.forEach { c ->
+                        OutlinedButton({ app.answerVariable(ask.item, ask.title, c, ask.sourceKey) }) {
+                            Box(Modifier.size(8.dp).background(levelColor(c.level), CircleShape)); Text("  ${c.label}")
+                        }
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     TextButton({ app.answerVariable(ask.item, ask.title, null) }) { Text("Not now") }
+                    var pause by remember { mutableStateOf(false) }
+                    Box {
+                        TextButton({ pause = true }) { Text("Pause asking ▾") }
+                        DropdownMenu(pause, { pause = false }) {
+                            listOf(15 to "15 minutes", 30 to "30 minutes", 60 to "1 hour", 120 to "2 hours", 1440 to "1 day").forEach { (m, l) ->
+                                DropdownMenuItem({ Text(l) }, { pause = false; app.pauseAsking(m) })
+                            }
+                        }
+                    }
                 }
             }
         } }
@@ -96,6 +113,18 @@ fun CategoriesSettings(app: App) {
             OutlinedTextField(newLabel, { newLabel = it }, singleLine = true, label = { Text("New category, e.g. Client work") }, modifier = Modifier.weight(1f))
             KindPicker(newKind) { newKind = it }
             Button({ app.categories.add(newLabel, newKind.level, newKind.variable); newLabel = ""; reload() }, enabled = newLabel.isNotBlank()) { Text("Add") }
+        }
+        val learned = remember(version) { app.verdicts.rules() }
+        if (learned.isNotEmpty()) {
+            Text("Learned from your answers", style = MaterialTheme.typography.titleSmall)
+            Text("After two matching answers, pages from the same place are sorted without asking.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            learned.forEach { (key, cat) ->
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.size(8.dp).background(levelColor(cat.level), CircleShape))
+                    Text("${key.replaceFirstChar { it.uppercase() }} → ${cat.label}", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    TextButton({ app.verdicts.deleteRule(key); version++ }) { Text("Remove") }
+                }
+            }
         }
     }
     deleting?.let { c ->

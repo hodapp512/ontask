@@ -15,20 +15,20 @@ class Category(val name: String, val label: String, val level: Level, val variab
     override fun toString() = name
 
     companion object {
-        val CORE_WORK = Category("CORE_WORK", "Core work", Level.DEEP)
-        val WORK_SUPPORT = Category("WORK_SUPPORT", "Work support", Level.MIXED)
-        val LEARNING = Category("LEARNING", "Learning", Level.DEEP)
-        val COMMUNICATION = Category("COMMUNICATION", "Communication", Level.MIXED)
-        val ENTERTAINMENT = Category("ENTERTAINMENT", "Entertainment", Level.WASTED)
-        val SOCIAL = Category("SOCIAL", "Social", Level.WASTED)
-        val NEWS = Category("NEWS", "News", Level.WASTED)
-        val SHOPPING = Category("SHOPPING", "Shopping", Level.WASTED)
+        val CORE_WORK = Category("CORE_WORK", "Work", Level.DEEP)
+        val WORK_SUPPORT = Category("WORK_SUPPORT", "Work adjacent", Level.MIXED)
+        val ENTERTAINMENT = Category("ENTERTAINMENT", "Entertainment / News / Social", Level.WASTED)
         val PERSONAL_ADMIN = Category("PERSONAL_ADMIN", "Personal admin", Level.MIXED)
-        val VARIABLE = Category("VARIABLE", "Varies (work or not)", Level.MIXED, variable = true)
+        val VARIABLE = Category("VARIABLE", "Varies", Level.MIXED, variable = true)
         val UNKNOWN = Category("UNKNOWN", "Unclassified", Level.MIXED)
         val AWAY = Category("AWAY", "Away", Level.AWAY)
 
-        val builtIns = listOf(CORE_WORK, WORK_SUPPORT, LEARNING, COMMUNICATION, VARIABLE, ENTERTAINMENT, SOCIAL, NEWS, SHOPPING, PERSONAL_ADMIN)
+        val builtIns = listOf(CORE_WORK, WORK_SUPPORT, VARIABLE, ENTERTAINMENT, PERSONAL_ADMIN)
+
+        /** Built-ins of earlier versions; their history is sorted again into the current ones once (CategoryStore.migrate). */
+        val retired = listOf("LEARNING", "COMMUNICATION", "SOCIAL", "NEWS", "SHOPPING")
+        /** Earlier default labels, replaced by the new ones where you hadn't renamed them yourself. */
+        val oldLabels = mapOf("CORE_WORK" to "Core work", "WORK_SUPPORT" to "Work support", "ENTERTAINMENT" to "Entertainment", "VARIABLE" to "Varies (work or not)")
 
         /** Current categories by name, including UNKNOWN and AWAY. Replaced as a whole when the user edits them. */
         @Volatile var registry: Map<String, Category> = (builtIns + UNKNOWN + AWAY).associateBy { it.name }
@@ -37,6 +37,9 @@ class Category(val name: String, val label: String, val level: Level, val variab
         fun valueOf(name: String): Category = registry[name] ?: UNKNOWN
 
         val entries: List<Category> get() = registry.values.toList()
+
+        /** What feeds and home pages of Varies sites count as: Entertainment, or the first time-wasting category left. */
+        val feed: Category get() = registry["ENTERTAINMENT"] ?: registry.values.firstOrNull { it.level == Level.WASTED && !it.variable } ?: UNKNOWN
 
         /** Categories a user can pick when labelling. */
         val assignable: List<Category> get() = registry.values.filter { it != AWAY && it != UNKNOWN }

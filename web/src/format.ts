@@ -24,10 +24,23 @@ export function deepShare(totals: Partial<Record<LevelKey, number>>): number | n
 /** Timeline segments: seconds from local midnight, k = D|M|W|A (Firestore forbids nested arrays, so these are maps). */
 export type Seg = { a: number; b: number; k: string; t?: { n: string; s: number }[] };
 /** Whole hours around the data (at least 2 h); the full day when there is none. */
+/**
+ * The hours to draw: around the time you were actually at the computer (as on the Mac). Away time doesn't widen it,
+ * and a stray minute far from the rest (the Mac waking at night) is left out: active stretches within an hour of each
+ * other form a session, and sessions with under 5 minutes are dropped unless nothing else is left.
+ */
 export function timelineWindow(segs: Seg[]): [number, number] {
-  if (!segs.length) return [0, 86400];
-  let from = Math.floor(Math.min(...segs.map((s) => s.a)) / 3600) * 3600;
-  let to = Math.min(86400, Math.ceil(Math.max(...segs.map((s) => s.b)) / 3600) * 3600);
+  const active = segs.filter((s) => s.k !== "A").sort((p, q) => p.a - q.a);
+  if (!active.length) return [0, 86400];
+  const sessions: Seg[][] = [[active[0]]];
+  for (const s of active.slice(1)) {
+    const last = sessions[sessions.length - 1];
+    if (s.a - Math.max(...last.map((x) => x.b)) <= 3600) last.push(s); else sessions.push([s]);
+  }
+  const big = sessions.filter((ss) => ss.reduce((n, x) => n + x.b - x.a, 0) >= 300);
+  const kept = (big.length ? big : sessions).flat();
+  let from = Math.floor(Math.min(...kept.map((s) => s.a)) / 3600) * 3600;
+  let to = Math.min(86400, Math.ceil(Math.max(...kept.map((s) => s.b)) / 3600) * 3600);
   if (to - from < 7200) { to = Math.min(86400, from + 7200); from = Math.max(0, to - 7200); }
   return [from, to];
 }

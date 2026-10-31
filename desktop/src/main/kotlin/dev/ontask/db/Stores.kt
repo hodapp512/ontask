@@ -32,10 +32,11 @@ data class Segment(
     var alignment: Int? = null,
     var confidence: Double? = null,
     var dirty: Boolean = true,
-    /** For Variable categories: the verdict for this page or video, once known. */
-    var levelOverride: dev.ontask.Level? = null,
+    /** For Varies categories: the page or video ("YouTube: Learning Java") and, once judged, its category. */
+    val item: String? = null,
+    var itemCategory: Category? = null,
 ) {
-    val level get() = levelOverride ?: category.level
+    val level get() = itemCategory?.level ?: category.level
 }
 
 class TickStore(private val db: Db) {
@@ -46,10 +47,10 @@ class TickStore(private val db: Db) {
         db.tx { c ->
             val ins = c.prepareStatement(
                 """INSERT INTO ticks(start_ts,end_ts,n,seconds,app,bundle,title,url,domain,category,level,source,rule_id,work_time,
-                   skipped_idle,skipped_unchanged,proc_ms,alignment,confidence) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   skipped_idle,skipped_unchanged,proc_ms,alignment,confidence,item,item_cat) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             )
             val upd = c.prepareStatement(
-                "UPDATE ticks SET end_ts=?,n=?,seconds=?,skipped_idle=?,skipped_unchanged=?,proc_ms=?,category=?,level=?,source=?,alignment=?,confidence=? WHERE id=?",
+                "UPDATE ticks SET end_ts=?,n=?,seconds=?,skipped_idle=?,skipped_unchanged=?,proc_ms=?,category=?,level=?,source=?,alignment=?,confidence=?,item_cat=? WHERE id=?",
             )
             for (s in todo) {
                 if (s.id == 0L) {
@@ -62,7 +63,8 @@ class TickStore(private val db: Db) {
                     ins.setInt(i++, if (s.workTime) 1 else 0)
                     ins.setInt(i++, s.skippedIdle); ins.setInt(i++, s.skippedUnchanged); ins.setLong(i++, s.procMs)
                     if (s.alignment == null) ins.setNull(i++, java.sql.Types.INTEGER) else ins.setInt(i++, s.alignment!!)
-                    if (s.confidence == null) ins.setNull(i, java.sql.Types.REAL) else ins.setDouble(i, s.confidence!!)
+                    if (s.confidence == null) ins.setNull(i++, java.sql.Types.REAL) else ins.setDouble(i++, s.confidence!!)
+                    ins.setString(i++, s.item); ins.setString(i, s.itemCategory?.name)
                     ins.executeUpdate()
                     c.createStatement().use { st -> st.executeQuery("SELECT last_insert_rowid()").use { it.next(); s.id = it.getLong(1) } }
                 } else {
@@ -71,7 +73,8 @@ class TickStore(private val db: Db) {
                     upd.setString(7, s.category.name); upd.setString(8, s.level.name); upd.setString(9, s.source.name)
                     if (s.alignment == null) upd.setNull(10, java.sql.Types.INTEGER) else upd.setInt(10, s.alignment!!)
                     if (s.confidence == null) upd.setNull(11, java.sql.Types.REAL) else upd.setDouble(11, s.confidence!!)
-                    upd.setLong(12, s.id)
+                    upd.setString(12, s.itemCategory?.name)
+                    upd.setLong(13, s.id)
                     upd.executeUpdate()
                 }
                 s.dirty = false
@@ -193,4 +196,5 @@ class Prefs(private val db: Db) {
     }
     fun set(key: String, value: Boolean) = set(key, if (value) "1" else "0")
     fun set(key: String, value: Int) = set(key, value.toString())
+    fun set(key: String, value: Long) = set(key, value.toString())
 }

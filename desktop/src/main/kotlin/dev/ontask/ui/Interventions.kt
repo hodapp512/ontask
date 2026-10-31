@@ -130,11 +130,6 @@ private fun StepThree(app: App, iv: Intervention) {
     val what = remember { dev.ontask.classify.domainOf(s?.url) ?: s?.app ?: "something else" }
     var text by remember { mutableStateOf("I've been drifting on $what. I'm getting back to work.\nNo need to reply — but a 👍 helps.") }
     var status by remember { mutableStateOf("") }
-    LaunchedEffect(Unit) {
-        // AI adds a one-line context to the standard template (best effort).
-        withContext(Dispatchers.IO) { app.ai.takeIf { it.enabled }?.contextLine(what, iv.driftSec / 60, app.priorities.today(App.nowSec())) }
-            ?.let { text = "$it\nI'm getting back to work. No need to reply — but a 👍 helps." }
-    }
     Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Want to let your partner know?", style = MaterialTheme.typography.headlineMedium)
         Text("It's your call — nothing is sent unless you confirm. You can edit the message.", style = MaterialTheme.typography.bodyMedium)

@@ -73,6 +73,7 @@ class Tracker(
         } else {
             if (cur != null) closed.add(cur)
             val classification = if (away) Classifier.AWAY else cls.classify(s)
+            val varies = !away && classification.category.variable
             seg = Segment(
                 startTs = nowSec, endTs = nowSec + st.tickSec, n = 1, seconds = st.tickSec,
                 app = if (away) null else s.app, bundle = if (away) null else s.bundleId,
@@ -80,6 +81,9 @@ class Tracker(
                 domain = if (away) null else domainOf(s.url),
                 category = classification.category, source = classification.source, ruleId = classification.ruleId,
                 workTime = workTime, skippedIdle = if (away) 1 else 0, procMs = procMs,
+                item = if (varies) dev.ontask.classify.Pages.label(domainOf(s.url), s.title, s.url) else null,
+                // A feed is time-wasting whatever it shows; no AI, no question.
+                itemCategory = if (varies && dev.ontask.classify.Pages.isFeed(s.url)) Category.feed else null,
             )
             open = seg; openKey = key; openClassifier = cls
         }
@@ -107,7 +111,7 @@ class Tracker(
         val seg = open ?: return false
         if (seg.source != dev.ontask.Source.METADATA) return false
         val old = seg.level
-        seg.category = res.category; seg.source = res.source; seg.alignment = res.alignment; seg.confidence = res.confidence; seg.dirty = true
+        seg.category = res.category; seg.source = res.source; seg.confidence = res.probability; seg.dirty = true
         if (old != seg.level) { // keep running totals consistent
             totals.merge(old, -seg.seconds.toLong(), Long::plus); totals.merge(seg.level, seg.seconds.toLong(), Long::plus)
             _live.value = _live.value.copy(totals = HashMap(totals), classification = Classification(seg.category, seg.source, seg.ruleId))
@@ -115,15 +119,15 @@ class Tracker(
         return true
     }
 
-    /** Sets whether the open page or video in a Variable category is work, keeping today's totals consistent. */
+    /** Sets the category of the open page or video on a Varies site, keeping today's totals consistent. */
     @Synchronized
-    fun applyVerdict(level: Level) {
+    fun applyVerdict(cat: Category) {
         val seg = open ?: return
-        if (!seg.category.variable || seg.levelOverride == level) return
+        if (!seg.category.variable || seg.itemCategory == cat) return
         val old = seg.level
-        seg.levelOverride = level; seg.dirty = true
-        totals.merge(old, -seg.seconds.toLong(), Long::plus); totals.merge(level, seg.seconds.toLong(), Long::plus)
-        _live.value = _live.value.copy(totals = HashMap(totals), classification = Classification(seg.category, seg.source, seg.ruleId, level))
+        seg.itemCategory = cat; seg.dirty = true
+        totals.merge(old, -seg.seconds.toLong(), Long::plus); totals.merge(seg.level, seg.seconds.toLong(), Long::plus)
+        _live.value = _live.value.copy(totals = HashMap(totals), classification = Classification(seg.category, seg.source, seg.ruleId, seg.level))
     }
 
     /** True if the open segment is unclassified and could use AI. */

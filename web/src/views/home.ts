@@ -57,6 +57,8 @@ function yourDay(u: User, schedule: DocumentData | undefined, eveningDone: boole
 
   let macs: DocumentData[] = [];
   let report: DocumentData | undefined;
+  // Titled rows ("YouTube: Learning Java") live in a document only you can read; the shared report has per-site totals.
+  let items: DocumentData | undefined;
   let waitingForMac = false;
   const linkCard = macLinkCard(() => { waitingForMac = true; });
 
@@ -70,7 +72,7 @@ function yourDay(u: User, schedule: DocumentData | undefined, eveningDone: boole
         h("div", {},
           h("h3", {}, "Today so far"),
           h("p", { class: "muted small" }, `💻 ${mac.name ?? "Mac"} · ${mac.lastSyncMs ? "updated " + ago(mac.lastSyncMs) : "not synced yet"}`)),
-        report ? reportBody(report, { uid: u.uid, categories: (schedule?.categories ?? []) as Cat[] }) : h("p", { class: "muted" }, "Nothing tracked yet today. Your Mac sends an update every few minutes while you work."),
+        report ? reportBody(items?.topSites ? { ...report, topSites: items.topSites } : report, { uid: u.uid, categories: (schedule?.categories ?? []) as Cat[] }) : h("p", { class: "muted" }, "Nothing tracked yet today. Your Mac sends an update every few minutes while you work."),
       ));
     }
     kids.push(scheduleCard(schedule, eveningDone));
@@ -79,6 +81,7 @@ function yourDay(u: User, schedule: DocumentData | undefined, eveningDone: boole
 
   onLeave(onSnapshot(collection(db, "users", u.uid, "devices"), (s) => { macs = s.docs.map((d) => d.data()).filter((d) => d.kind === "mac"); draw(); }, () => draw()));
   onLeave(onSnapshot(doc(db, "users", u.uid, "reports", todayKey()), (s) => { report = s.data(); draw(); }, () => draw()));
+  onLeave(onSnapshot(doc(db, "users", u.uid, "reportItems", todayKey()), (s) => { items = s.data(); draw(); }, () => draw()));
   return section;
 }
 
@@ -112,9 +115,12 @@ function macLinkCard(onCodeShown: () => void): HTMLElement {
 
 type Cat = { id: string; label: string; level: string; variable?: boolean };
 
-/** Sends a category correction to the Mac, which applies it on its next sync (about a minute). */
-async function sendCorrection(uid: string, subject: string, category: string) {
-  await addDoc(collection(db, "users", uid, "labelRequests"), { subject, category, ts: Date.now() });
+/**
+ * Sends a category correction to the Mac, which applies it on its next sync (about a minute). With an item key (a
+ * page or video on a Varies site) only that one changes; otherwise the whole app or site.
+ */
+async function sendCorrection(uid: string, subject: string, category: string, itemKey?: string, title?: string) {
+  await addDoc(collection(db, "users", uid, "labelRequests"), { subject, category, ts: Date.now(), ...(itemKey ? { itemKey } : {}), ...(title ? { title } : {}) });
 }
 
 function reportBody(r: DocumentData, edit?: { uid: string; categories: Cat[] }): HTMLElement {
@@ -136,18 +142,20 @@ function reportBody(r: DocumentData, edit?: { uid: string; categories: Cat[] }):
   );
 }
 
-function siteRow(s: { name: string; category?: string; categoryId?: string; seconds: number }, edit?: { uid: string; categories: Cat[] }): HTMLElement {
+function siteRow(s: { name: string; category?: string; categoryId?: string; seconds: number; itemKey?: string; title?: string }, edit?: { uid: string; categories: Cat[] }): HTMLElement {
   if (!edit?.categories.length) return h("p", { class: "row between" }, h("span", {}, s.name), h("span", { class: "muted" }, fmtDuration(s.seconds)));
   const note = h("span", { class: "muted small" });
+  // A page or video gets one of your categories; "Varies" is for whole sites.
+  const options = s.itemKey ? edit.categories.filter((c) => !c.variable) : edit.categories;
   const sel = h("select", {
     class: "cat",
     onchange: async () => {
       sel.disabled = true;
-      try { await sendCorrection(edit.uid, s.name, sel.value); note.textContent = "Updating on your Mac…"; }
+      try { await sendCorrection(edit.uid, s.name, sel.value, s.itemKey, s.title); note.textContent = "Updating on your Mac…"; }
       catch (e: any) { note.textContent = e.message; sel.disabled = false; }
     },
-  }, edit.categories.map((c) => h("option", { value: c.id, selected: c.id === s.categoryId }, c.label)),
-    !edit.categories.some((c) => c.id === s.categoryId) && h("option", { value: "", selected: true, disabled: true }, s.category ?? "Unclassified")) as HTMLSelectElement;
+  }, options.map((c) => h("option", { value: c.id, selected: c.id === s.categoryId }, c.label)),
+    !options.some((c) => c.id === s.categoryId) && h("option", { value: "", selected: true, disabled: true }, s.category ?? "Unclassified")) as HTMLSelectElement;
   return h("div", { class: "site" }, h("div", { class: "row between" }, h("span", {}, s.name), h("span", { class: "muted" }, fmtDuration(s.seconds))), h("div", { class: "row" }, sel, note));
 }
 

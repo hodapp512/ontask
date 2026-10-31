@@ -121,6 +121,11 @@ fun ApplicationScope.OnTaskTray(app: App, open: (Dest?) -> Unit) {
             status?.let { Item(it, enabled = false, onClick = {}) }
             Item("Today: focused ${fmtDuration(deep)}, wasted ${fmtDuration(wasted)}", enabled = false, onClick = {})
             if (openCount > 0) Item("$openCount site${if (openCount == 1) "" else "s"} unblocked right now", enabled = false, onClick = {})
+            val pausedUntil = remember(now, version) { app.askPausedUntil }
+            if (pausedUntil > 0) {
+                Item("Asking paused until ${fmtHm(pausedUntil)}", enabled = false, onClick = {})
+                Item("Resume asking", onClick = { app.resumeAsking(); changed() })
+            }
             Separator()
             Item("Show OnTask", onClick = { open(null) })
             Separator()

@@ -179,7 +179,7 @@ fun SummaryCard(r: DailyReport, title: String, app: App? = null, onRelabel: () -
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(s.name, Modifier.weight(0.5f), maxLines = 1)
                     Row(Modifier.weight(0.3f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        if (app != null) CategoryPicker(app, s.name, s.category, onRelabel)
+                        if (app != null) CategoryPicker(app, s.name, s.category, onRelabel, item = s.itemKey?.let { it to s.title })
                         else { Dot(levelColor(s.category.level), 8); Text(s.category.label, style = MaterialTheme.typography.bodySmall) }
                     }
                     Text(fmtDuration(s.seconds), Modifier.weight(0.2f), style = MaterialTheme.typography.bodyMedium)
@@ -195,7 +195,7 @@ fun SummaryCard(r: DailyReport, title: String, app: App? = null, onRelabel: () -
 @Composable
 private fun Timeline(r: DailyReport) {
     val track = MaterialTheme.colorScheme.surfaceVariant
-    val (from, to) = timelineWindow(r.timeline.map { (it.start - r.dayStart) to (it.end - r.dayStart) })
+    val (from, to) = timelineWindow(r.timeline.map { (it.start - r.dayStart) to (it.end - r.dayStart) }, r.timeline.map { it.level == Level.AWAY })
     val span = (to - from).toFloat()
     var width by remember { mutableStateOf(1) }
     var hover by remember(r) { mutableStateOf<Pair<Run, Float>?>(null) }
@@ -249,11 +249,20 @@ private fun clockRange(a: Long, b: Long): String {
     return "${Instant.ofEpochSecond(a).atZone(z).format(shortTime)}–${Instant.ofEpochSecond(b).atZone(z).format(shortTime)}"
 }
 
-/** Seconds-after-midnight window to draw: whole hours around the data, at least 2 hours; the full day if empty. */
-fun timelineWindow(runs: List<Pair<Long, Long>>): Pair<Long, Long> {
-    if (runs.isEmpty()) return 0L to 86_400L
-    var from = runs.minOf { it.first } / 3600 * 3600
-    var to = ((runs.maxOf { it.second } + 3599) / 3600 * 3600).coerceAtMost(86_400)
+/**
+ * Seconds-after-midnight window to draw: whole hours around the time you were actually at the computer, at least 2
+ * hours; the full day if there's nothing. Away time doesn't widen it, and neither does a stray minute or two far from
+ * the rest (the Mac waking at night): active stretches within an hour of each other form a session, and sessions with
+ * under 5 minutes in them are left out unless nothing else is left.
+ */
+fun timelineWindow(runs: List<Pair<Long, Long>>, away: List<Boolean> = runs.map { false }): Pair<Long, Long> {
+    val active = runs.filterIndexed { i, _ -> !away[i] }.sortedBy { it.first }
+    if (active.isEmpty()) return 0L to 86_400L
+    val sessions = mutableListOf(mutableListOf(active.first()))
+    active.drop(1).forEach { r -> if (r.first - sessions.last().maxOf { it.second } <= 3600) sessions.last().add(r) else sessions.add(mutableListOf(r)) }
+    val kept = sessions.filter { s -> s.sumOf { it.second - it.first } >= 300 }.ifEmpty { sessions }.flatten()
+    var from = kept.minOf { it.first } / 3600 * 3600
+    var to = ((kept.maxOf { it.second } + 3599) / 3600 * 3600).coerceAtMost(86_400)
     if (to - from < 7200) { to = (from + 7200).coerceAtMost(86_400); from = (to - 7200).coerceAtLeast(0) }
     return from to to
 }

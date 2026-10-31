@@ -45,6 +45,8 @@ class CloudSync(
     private val clientFactory: (CloudConfig) -> CloudClient = { CloudClient(it, dev.ontask.ai.Keychain()) },
     /** Applies a correction sent from the phone: file this app or site under that category. */
     private val relabel: (name: String, category: String) -> Unit = { _, _ -> },
+    /** The same for one page or video on a Varies site: [itemKey] gets that category. */
+    private val relabelItem: (itemKey: String, title: String?, category: String) -> Unit = { _, _, _ -> },
     private val zone: ZoneId = ZoneId.systemDefault(),
 ) {
     @Volatile var lastError: String? = null; private set
@@ -156,14 +158,48 @@ class CloudSync(
         val reqs = c.list("users/$uid/labelRequests")
         reqs.forEach { (id, o) ->
             val name = o["subject"]?.jsonPrimitive?.contentOrNull; val cat = o["category"]?.jsonPrimitive?.contentOrNull
-            if (name != null && cat != null && cat in Category.registry) relabel(name, cat)
+            val item = o["itemKey"]?.jsonPrimitive?.contentOrNull
+            if (cat != null && cat in Category.registry) when {
+                item != null -> relabelItem(item, o["title"]?.jsonPrimitive?.contentOrNull, cat)
+                name != null -> relabel(name, cat)
+            }
             c.delete("users/$uid/labelRequests/$id")
         }
         return reqs.isNotEmpty()
     }
 
+    /** Whether your partner may see the titles of pages and videos on Varies sites (otherwise only per-site totals). */
+    var partnerSeesTitles: Boolean
+        get() = prefs.bool("cloud.partner_titles", false)
+        set(v) { prefs.set("cloud.partner_titles", v) }
+
+    /**
+     * The daily report your partner may read (page titles only if [partnerSeesTitles]), and the titled rows in a
+     * document only you can read, for your phone.
+     */
     private fun uploadReport(c: CloudClient, uid: String, date: LocalDate) {
-        c.write("users/$uid/reports", date.toString(), reportPayload(reports.daily(date), System.currentTimeMillis()))
+        val r = reports.daily(date)
+        c.write("users/$uid/reports", date.toString(), reportPayload(r, System.currentTimeMillis(), titles = partnerSeesTitles))
+        c.write("users/$uid/reportItems", date.toString(), buildJsonObject { put("topSites", sitesJson(r.topSubjects, titles = true)); put("updatedAt", System.currentTimeMillis()) })
+    }
+
+    /**
+     * "Where the time went" rows. With [titles], pages and videos on Varies sites are their own rows (with the key the
+     * phone sends back to correct one); without, they're folded into one row per site and category ("YouTube").
+     */
+    fun sitesJson(subjects: List<dev.ontask.report.Subject>, titles: Boolean): JsonArray {
+        val rows = if (titles) subjects else subjects
+            .groupBy { (if (it.isItem) it.name.substringBefore(": ") else it.name) to it.category }
+            .map { (k, v) -> dev.ontask.report.Subject(k.first, k.second, v.sumOf { it.seconds }) }
+            .sortedByDescending { it.seconds }
+        return buildJsonArray {
+            rows.take(12).forEach { s ->
+                add(buildJsonObject {
+                    put("name", s.name); put("category", if (s.isItem && s.category.variable) "Unsure" else s.category.label); put("categoryId", s.category.name); put("seconds", s.seconds)
+                    s.itemKey?.let { put("itemKey", it) }; s.title?.let { put("title", it) }
+                })
+            }
+        }
     }
 
     private fun uploadScheduleIfChanged(c: CloudClient, uid: String) {
@@ -195,7 +231,7 @@ class CloudSync(
 
     // ---- payloads (pure) ---------------------------------------------------------------------------------
 
-    fun reportPayload(r: DailyReport, nowMs: Long): JsonObject = buildJsonObject {
+    fun reportPayload(r: DailyReport, nowMs: Long, titles: Boolean = false): JsonObject = buildJsonObject {
         put("date", r.date.toString())
         put("totals", buildJsonObject { Level.entries.forEach { put(it.name, r.totalsAll[it] ?: 0) } })
         put("workTotals", buildJsonObject { Level.entries.forEach { put(it.name, r.totalsWork[it] ?: 0) } })
@@ -212,7 +248,7 @@ class CloudSync(
         put("deepSessions", buildJsonArray { r.deepSessions.forEach { add(buildJsonObject { put("a", it.start - r.dayStart); put("b", it.end - r.dayStart) }) } })
         put("distractionEvents", r.distractionEvents)
         r.worstHour?.let { put("worstHour", buildJsonObject { put("hour", java.time.Instant.ofEpochSecond(r.dayStart + it.first * 3600L).atZone(zone).hour); put("wastedSec", it.second) }) }
-        put("topSites", buildJsonArray { r.topSubjects.take(8).forEach { add(buildJsonObject { put("name", it.name); put("category", it.category.label); put("categoryId", it.category.name); put("seconds", it.seconds) }) } })
+        put("topSites", sitesJson(r.topSubjects, titles))
         put("updatedAt", nowMs)
     }
 

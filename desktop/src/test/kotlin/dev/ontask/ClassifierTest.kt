@@ -30,9 +30,9 @@ class ClassifierTest {
     }
 
     @Test fun userRuleBeatsBuiltInAndReportsUserSource() {
-        val user = Rule(1, RuleKind.DOMAIN, "youtube.com", Category.LEARNING, user = true)
+        val user = Rule(1, RuleKind.DOMAIN, "youtube.com", Category.WORK_SUPPORT, user = true)
         val r = Classifier(listOf(user)).classify(s(url = "https://youtube.com/watch"))
-        assertEquals(Category.LEARNING, r.category); assertEquals(Source.USER_LABEL, r.source); assertEquals(1L, r.ruleId)
+        assertEquals(Category.WORK_SUPPORT, r.category); assertEquals(Source.USER_LABEL, r.source); assertEquals(1L, r.ruleId)
     }
 
     @Test fun titleKeywordBeatsDomainAndIsCaseInsensitive() {
@@ -44,9 +44,9 @@ class ClassifierTest {
     @Test fun userDomainRuleBeatsUserAppRule() {
         val rules = listOf(
             Rule(1, RuleKind.APP, "Google Chrome", Category.CORE_WORK, user = true),
-            Rule(2, RuleKind.DOMAIN, "reddit.com", Category.SOCIAL, user = true),
+            Rule(2, RuleKind.DOMAIN, "reddit.com", Category.ENTERTAINMENT, user = true),
         )
-        assertEquals(Category.SOCIAL, Classifier(rules).classify(s(app = "Google Chrome", url = "https://old.reddit.com/")).category)
+        assertEquals(Category.ENTERTAINMENT, Classifier(rules).classify(s(app = "Google Chrome", url = "https://old.reddit.com/")).category)
         assertEquals(Category.CORE_WORK, Classifier(rules).classify(s(app = "Google Chrome", url = "https://example.org/")).category)
     }
 

@@ -2,117 +2,118 @@ package dev.ontask
 
 import com.sun.net.httpserver.HttpServer
 import dev.ontask.ai.*
+import dev.ontask.classify.PageLookup
+import dev.ontask.classify.Pages
 import dev.ontask.db.Db
 import dev.ontask.db.Prefs
 import java.net.InetSocketAddress
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class AiTest {
+    /** A fake System One server (the API Kev and Jev share); [handler] gets the request body and returns the response. */
     private fun server(handler: (String) -> String): Pair<HttpServer, String> {
         val s = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-        val seen = StringBuilder()
-        s.createContext("/v1/chat/completions") { ex ->
-            val req = ex.requestBody.readAllBytes().decodeToString(); seen.append(req)
-            val out = handler(req).toByteArray()
+        s.createContext("/v1/systemone") { ex ->
+            val out = handler(ex.requestBody.readAllBytes().decodeToString()).toByteArray()
             ex.responseHeaders.add("Content-Type", "application/json"); ex.sendResponseHeaders(200, out.size.toLong()); ex.responseBody.use { it.write(out) }
         }
         s.start()
-        return s to "http://127.0.0.1:${s.address.port}/v1"
+        return s to "http://127.0.0.1:${s.address.port}"
     }
-    private fun reply(content: String) = """{"choices":[{"message":{"content":${kotlinx.serialization.json.JsonPrimitive(content)}}}],"usage":{"prompt_tokens":100,"completion_tokens":10}}"""
+    private fun answer(choice: String, p: Double, other: String = "Personal admin") =
+        """{"model":"kev-latest","answers":{"c":{"type":"choice","choice":"$choice","confidence":0.5,"probabilities":{"$choice":$p,"$other":${1 - p}}}},"usage":{"input_tokens":120,"output_tokens":20}}"""
 
-    private fun svc(): AiService { val db = Db.memory(); return AiService(Prefs(db), db, Files.createTempDirectory("ai").toFile()) }
+    private fun svc(url: String): AiService { val db = Db.memory(); return AiService(Prefs(db), db, Files.createTempDirectory("ai").toFile(), testUrl = url) }
 
-    @Test fun parsesJsonEvenWithProseAndFences() {
-        val r = AiService.parse("Sure!\n```json\n{\"category\":\"core_work\",\"alignment\":3,\"confidence\":0.9}\n```", Source.OCR)!!
-        assertEquals(Category.CORE_WORK, r.category); assertEquals(3, r.alignment); assertEquals(0.9, r.confidence)
-        assertNull(AiService.parse("no json", Source.OCR)); assertNull(AiService.parse("{\"category\":\"nonsense\"}", Source.OCR))
-        assertNull(AiService.parse("{\"category\":\"AWAY\"}", Source.OCR)) // AI may not pick Away
-    }
-
-    @Test fun textTierClassifiesAndRecordsCall() {
-        val (srv, url) = server { reply("""{"category":"LEARNING","alignment":2,"confidence":0.85}""") }
+    @Test fun asksWithYourCategoriesByLabelAndMapsTheAnswerBack() {
+        var body = ""
+        val (srv, url) = server { body = it; answer("Work", 0.82) }
         try {
-            val s = svc()
-            val cfg = ProviderConfig(ProviderKind.OPENAI, "m", "k", url)
-            val r = s.classify(Sample(app = "Safari", title = "Kotlin docs"), "some page text", listOf("Ship phase 3"), emptyList(), cfgOverride = mapOf(Tier.TEXT to cfg))!!
-            assertEquals(Category.LEARNING, r.category); assertEquals(Source.OCR, r.source)
-            val st = s.stats(0).single(); assertEquals(1, st.calls); assertTrue(st.costUsd > 0)
+            val s = svc(url)
+            val r = s.judgeItem(Sample(app = "Safari", title = "Kotlin Coroutines Explained", url = "https://www.youtube.com/watch?v=x"), listOf("Ship phase 3"), mapOf("Channel" to "Kotlin by JetBrains"))!!
+            assertEquals(Category.CORE_WORK, r.category); assertEquals(0.82, r.probability); assertEquals(Source.AI_PAGE, r.source)
+            // Options are the labels you see (Varies itself isn't one), described for the model; the state carries what was looked up.
+            assertTrue("\"Work\"" in body && "\"Work adjacent\"" in body && "\"Varies\"" !in body, body)
+            assertTrue("Channel: Kotlin by JetBrains" in body && "Today's plan: Ship phase 3" in body, body)
+            val st = s.stats(0).single(); assertEquals(1, st.calls); assertEquals(0, st.failed)
         } finally { srv.stop(0) }
     }
 
-    @Test fun thinkingModelThatNeverAnswersIsAFailureNotUnsure() {
-        val (srv, url) = server { """{"choices":[{"message":{"content":"","reasoning":"Okay, let's see..."},"finish_reason":"length"}],"usage":{"prompt_tokens":100,"completion_tokens":60}}""" }
+    @Test fun aFailureIsRecordedAndPausesFurtherCalls() {
+        var calls = 0
+        val (srv, url) = server { calls++; "not json" }
         try {
-            val s = svc()
-            val cfg = ProviderConfig(ProviderKind.OPENAI, "qwen3-vl:4b", "k", url)
-            assertNull(s.classify(Sample(app = "Safari", title = "x"), null, emptyList(), emptyList(), cfgOverride = mapOf(Tier.TEXT to cfg)))
-            val st = s.stats(0).single(); assertEquals(1, st.failed)
-            assertTrue("only thinks" in (st.lastError ?: ""), st.lastError)
-            assertTrue("only thinks" in (s.lastProblem ?: ""))
+            val s = svc(url)
+            assertNull(s.classify(Sample(app = "Safari", title = "x"), null, emptyList()))
+            assertNull(s.classify(Sample(app = "Safari", title = "y"), null, emptyList()))
+            assertEquals(1, calls) // backed off after the failure
+            assertEquals(1, s.stats(0).single().failed)
+            assertTrue(s.lastProblem != null)
+            s.retryNow(); s.classify(Sample(app = "Safari", title = "z"), null, emptyList()); assertEquals(2, calls)
         } finally { srv.stop(0) }
     }
 
-    @Test fun oldThinkingQwenChoiceMeansTheInstructModel() {
-        val s = svc(); s.choose(Tier.TEXT, ProviderKind.OLLAMA, "qwen3-vl:4b")
-        assertEquals("qwen3-vl:4b-instruct", s.modelOf(Tier.TEXT))
-    }
-
-    @Test fun lowConfidenceFallsBackToVisionTierWithImage() {
-        var visionBody = ""
-        val (text, tUrl) = server { reply("""{"category":"NEWS","confidence":0.3}""") }
-        val (vis, vUrl) = server { visionBody = it; reply("""{"category":"CORE_WORK","alignment":3,"confidence":0.9}""") }
-        try {
-            val s = svc()
-            val r = s.classify(Sample(app = "X"), "text", emptyList(), emptyList(), screenshots = { listOf("QUJD") },
-                cfgOverride = mapOf(Tier.TEXT to ProviderConfig(ProviderKind.OLLAMA, "t", null, tUrl), Tier.VISION to ProviderConfig(ProviderKind.OLLAMA, "v", null, vUrl)))!!
-            assertEquals(Source.VISION, r.source); assertEquals(Category.CORE_WORK, r.category)
-            assertTrue("data:image/png;base64,QUJD" in visionBody)
-        } finally { text.stop(0); vis.stop(0) }
-    }
-
-    @Test fun cloudProviderNeedsAcknowledgement() {
-        val s = svc(); s.choose(Tier.TEXT, ProviderKind.OPENAI, "gpt-4o-mini")
-        assertFailsWith<CloudNoticeRequired> { s.config(Tier.TEXT) }
-        s.acknowledgeCloud(ProviderKind.OPENAI)
-        assertTrue(s.cloudAcknowledged(ProviderKind.OPENAI)); assertTrue(s.cloudAcknowledged(ProviderKind.OLLAMA))
-    }
-
-    @Test fun promptIncludesRulesContextAndFewShots() {
-        val p = AiService.userPrompt(Sample(app = "Chrome", url = "https://www.example.com/x", title = "T"), "ocr text", listOf("P1"), listOf(FewShot("DOMAIN", "example.com", Category.NEWS)))
-        assertTrue("example.com" in p && "P1" in p && "ocr text" in p && "NEWS" in p)
-    }
-
-    @Test fun parsesOllamaTagsAndMatchesNames() {
-        val body = """{"models":[{"name":"qwen3-vl:4b","size":3300000000,"capabilities":["completion","vision"]},{"name":"mistral-nemo:latest","size":7071713227,"capabilities":["completion","tools"]},{"name":"old","size":1}]}"""
-        val ms = OllamaAdmin.parseTags(body)
-        assertEquals(listOf("qwen3-vl:4b", "mistral-nemo:latest", "old"), ms.map { it.name })
-        assertTrue(ms[0].vision && !ms[1].vision && ms[2].capabilities.isEmpty())
-        assertTrue(ms[1].matches("mistral-nemo") && ms[0].matches("qwen3-vl:4b") && !ms[0].matches("qwen3-vl"))
-        assertEquals(emptyList(), OllamaAdmin.parseTags("not json"))
-    }
-
-    @Test fun cloudDefaultsComeFromTheCatalog() {
-        val s = svc()
-        listOf(ProviderKind.CLAUDE, ProviderKind.OPENAI, ProviderKind.GEMINI).forEach { k -> assertEquals(CloudModels.of(k).first().first, s.defaultModel(k)) }
+    @Test fun defaultsToSmallKevOnThisMac() {
+        val db = Db.memory(); val s = AiService(Prefs(db), db, Files.createTempDirectory("ai").toFile())
+        assertEquals(AiProvider.KEV, s.provider); assertEquals(KevSize.SMALL, s.kevSize); assertEquals(0.6, s.threshold)
+        // Jev needs the cloud notice confirmed first.
+        s.provider = AiProvider.JEV; s.enabled = true
+        assertNull(s.classify(Sample(app = "Safari", title = "x"), null, emptyList()))
+        assertTrue(s.lastProblem!!.contains("Jev"))
     }
 }
 
-/** Opt-in: ONTASK_OLLAMA_MODEL=qwen2.5:0.5b ./gradlew test --tests '*OllamaSmoke*' */
-class OllamaSmoke {
-    @Test fun classifiesViaRealOllama() {
-        val model = System.getenv("ONTASK_OLLAMA_MODEL") ?: return
+class PagesTest {
+    @Test fun feedsAreTheHomeAndScrollingPagesOnly() {
+        listOf("https://www.youtube.com/", "https://www.youtube.com/shorts/abc", "https://www.facebook.com/", "https://www.facebook.com/watch/?v=1",
+            "https://www.reddit.com/", "https://www.reddit.com/r/popular/", "https://www.linkedin.com/feed/", "https://vimeo.com/").forEach { assertTrue(Pages.isFeed(it), it) }
+        listOf("https://www.youtube.com/watch?v=abc", "https://www.facebook.com/groups/austinlawn/", "https://www.facebook.com/marketplace/item/1/",
+            "https://www.reddit.com/r/Kotlin/comments/1/x/", "https://www.linkedin.com/jobs/view/1/", "https://vimeo.com/123").forEach { assertTrue(!Pages.isFeed(it), it) }
+    }
+
+    @Test fun sourcesAreSubredditsGroupsChannelsAndPublications() {
+        assertEquals("reddit r/firebase", Pages.sourceKey("https://www.reddit.com/r/Firebase/comments/1/x/"))
+        assertEquals("facebook group standrewvolunteers", Pages.sourceKey("https://www.facebook.com/groups/standrewvolunteers/"))
+        assertEquals("youtube channel Cal Newport", Pages.sourceKey("https://www.youtube.com/watch?v=x", "Cal Newport"))
+        assertNull(Pages.sourceKey("https://www.youtube.com/watch?v=x")) // channel unknown
+        assertEquals("medium @alexkim", Pages.sourceKey("https://medium.com/@alexkim/offline-first"))
+        assertEquals("substack pragmatic", Pages.sourceKey("https://pragmatic.substack.com/p/on-call"))
+    }
+
+    @Test fun labelsNameTheSiteOnce() {
+        assertEquals("YouTube: Learning Java", Pages.label("youtube.com", "Learning Java - YouTube", "https://www.youtube.com/watch?v=x"))
+        assertEquals("YouTube: feed", Pages.label("youtube.com", "YouTube", "https://www.youtube.com/"))
+        assertEquals("Facebook: Austin Lawn Care Tips", Pages.label("facebook.com", "(3) Austin Lawn Care Tips | Facebook", "https://www.facebook.com/groups/a/"))
+        assertEquals("Vimeo: Designing Calm Technology", Pages.label("vimeo.com", "Designing Calm Technology on Vimeo", "https://vimeo.com/1"))
+    }
+
+    @Test fun lookupReadsAPagesOwnDescription() {
+        val s = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        s.createContext("/p") { ex ->
+            val out = """<html><head><meta property="og:site_name" content="The Pragmatic Engineer"><meta name="description" content="How on-call works at big tech &amp; why"></head></html>""".toByteArray()
+            ex.sendResponseHeaders(200, out.size.toLong()); ex.responseBody.use { it.write(out) }
+        }
+        s.start()
+        try {
+            val facts = PageLookup().lookup("http://127.0.0.1:${s.address.port}/p")
+            assertEquals("The Pragmatic Engineer", facts["Publication"]); assertEquals("How on-call works at big tech & why", facts["Description"])
+            assertEquals(emptyMap(), PageLookup().lookup("https://www.facebook.com/groups/x/")) // needs signing in: never fetched
+        } finally { s.stop(0) }
+    }
+}
+
+/** Opt-in: with Kev running (ONTASK_KEV_URL=http://127.0.0.1:8010) ./gradlew test --tests '*KevSmoke*' */
+class KevSmoke {
+    @Test fun decidesViaRealKev() {
+        val url = System.getenv("ONTASK_KEV_URL") ?: return
         val db = Db.memory()
-        val s = AiService(Prefs(db), db, Files.createTempDirectory("ai").toFile())
-        assertTrue(s.ollama.detect())
-        val r = s.classify(Sample(app = "Google Chrome", url = "https://www.youtube.com/watch?v=abc", title = "Funny cat compilation"), "Funny cat compilation 10 hours. Subscribe. Comments", listOf("Finish the report"), emptyList(),
-            cfgOverride = mapOf(Tier.TEXT to ProviderConfig(ProviderKind.OLLAMA, model)))
-        println("OLLAMA RESULT: $r")
-        assertTrue(r != null, "model returned unparseable output")
+        val r = AiService(Prefs(db), db, Files.createTempDirectory("ai").toFile(), testUrl = url)
+            .judgeItem(Sample(app = "Google Chrome", url = "https://www.youtube.com/watch?v=abc", title = "Top 50 Funniest Fails of 2026"), emptyList(), emptyMap())
+        println("KEV RESULT: $r")
+        assertEquals(Category.ENTERTAINMENT, r?.category)
     }
 }

@@ -33,6 +33,8 @@ describe("home screen helpers", () => {
 describe("timeline zoom", () => {
   it("fits whole hours around the data", () => {
     expect(timelineWindow([])).toEqual([0, 86400]);
+    // Away overnight and a 2-minute wake at 3 AM don't stretch the day back to midnight.
+    expect(timelineWindow([{ a: 0, b: 2 * 3600 + 360, k: "A" }, { a: 3 * 3600, b: 3 * 3600 + 120, k: "M" }, { a: 8 * 3600 + 600, b: 12 * 3600, k: "D" }])).toEqual([8 * 3600, 12 * 3600]);
     expect(timelineWindow([{ a: 8 * 3600 + 600, b: 12 * 3600, k: "D" }, { a: 13 * 3600, b: 16 * 3600 + 60, k: "W" }])).toEqual([8 * 3600, 17 * 3600]);
     expect(timelineWindow([{ a: 9 * 3600 + 60, b: 9 * 3600 + 600, k: "D" }])).toEqual([9 * 3600, 11 * 3600]);
   });

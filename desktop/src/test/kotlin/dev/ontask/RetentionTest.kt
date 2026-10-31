@@ -26,7 +26,7 @@ class RetentionTest {
         val db = Db.memory(); val store = TickStore(db)
         val old1 = now - 100 * day; val old2 = old1 + 60 // same hour, same bucket
         val recent = now - 10 * day
-        store.save(listOf(seg(old1, 12, Category.CORE_WORK), seg(old2, 6, Category.CORE_WORK), seg(old1 + 600, 4, Category.SOCIAL, "Chrome", "https://x.com", "x.com"), seg(recent, 3, Category.CORE_WORK)))
+        store.save(listOf(seg(old1, 12, Category.CORE_WORK), seg(old2, 6, Category.CORE_WORK), seg(old1 + 600, 4, Category.ENTERTAINMENT, "Chrome", "https://x.com", "x.com"), seg(recent, 3, Category.CORE_WORK)))
 
         assertEquals(3, Retention.rollup(db, now, 90))
 
@@ -60,7 +60,7 @@ class RetentionTest {
     @Test fun reportsStillSeeRolledUpTimeWithoutDoubleCounting() {
         val db = Db.memory(); val store = TickStore(db)
         val start = Instant.parse("2026-06-01T10:00:00Z").epochSecond
-        store.save(listOf(seg(start, 12, Category.CORE_WORK), seg(start + 600, 6, Category.SOCIAL, "Chrome", "https://x.com", "x.com")))
+        store.save(listOf(seg(start, 12, Category.CORE_WORK), seg(start + 600, 6, Category.ENTERTAINMENT, "Chrome", "https://x.com", "x.com")))
         val date = java.time.LocalDate.of(2026, 6, 1)
         val before = Reports(db, utc).daily(date)
         Retention.rollup(db, now, 90)

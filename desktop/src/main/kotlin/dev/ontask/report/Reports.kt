@@ -6,7 +6,11 @@ import dev.ontask.db.Db
 import java.time.LocalDate
 import java.time.ZoneId
 
-data class Subject(val name: String, val category: Category, val seconds: Long)
+/** A row of "where the time went": an app, a site, or a page or video on a Varies site ("YouTube: …"). */
+data class Subject(val name: String, val category: Category, val seconds: Long, val itemKey: String? = null, val title: String? = null) {
+    /** A page or video on a Varies site: its dropdown changes just this one. Its category is Unsure (Varies) while undecided. */
+    val isItem get() = itemKey != null
+}
 
 data class DailyReport(
     val date: LocalDate,
@@ -25,9 +29,10 @@ class Reports(private val db: Db, private val zone: ZoneId = ZoneId.systemDefaul
 
     // Raw ticks and rolled-up hours, as one relation.
     private val unionSql = """
-        SELECT start_ts AS ts, level, category, work_time, COALESCE(domain, app, '') AS subject, seconds FROM ticks
+        SELECT start_ts AS ts, level, COALESCE(item_cat, category) AS category, work_time, COALESCE(item, domain, app, '') AS subject, seconds,
+               CASE WHEN item IS NOT NULL THEN app END AS i_app, CASE WHEN item IS NOT NULL THEN title END AS i_title, CASE WHEN item IS NOT NULL THEN url END AS i_url FROM ticks
         UNION ALL
-        SELECT hour_ts, level, category, work_time, subject, seconds FROM hourly
+        SELECT hour_ts, level, category, work_time, subject, seconds, NULL, NULL, NULL FROM hourly
     """
 
     fun daily(date: LocalDate): DailyReport {
@@ -71,14 +76,21 @@ class Reports(private val db: Db, private val zone: ZoneId = ZoneId.systemDefaul
 
             val subjects = ArrayList<Subject>()
             c.prepareStatement(
-                """SELECT subject, category, SUM(seconds) s FROM ($unionSql) WHERE ts >= ? AND ts < ? AND level != 'AWAY' AND subject != ''
-                   GROUP BY subject, category ORDER BY s DESC LIMIT 20""",
+                """SELECT subject, category, SUM(seconds) s, MAX(i_app), MAX(i_title), MAX(i_url) FROM ($unionSql) WHERE ts >= ? AND ts < ? AND level != 'AWAY' AND subject != ''
+                   GROUP BY subject, category ORDER BY s DESC LIMIT 40""",
             ).use { ps ->
                 ps.setLong(1, start); ps.setLong(2, end)
-                ps.executeQuery().use { rs -> while (rs.next()) subjects.add(Subject(dev.ontask.track.displayAppName(rs.getString(1)), Category.valueOf(rs.getString(2)), rs.getLong(3))) }
+                ps.executeQuery().use { rs ->
+                    while (rs.next()) {
+                        val url = rs.getString(6); val title = rs.getString(5)
+                        val key = if (url != null || title != null) dev.ontask.classify.itemKey(rs.getString(4), title, url) else null
+                        subjects.add(Subject(if (key != null) rs.getString(1) else dev.ontask.track.displayAppName(rs.getString(1)), Category.valueOf(rs.getString(2)), rs.getLong(3), key, title))
+                    }
+                }
             }
             // Names that display the same (e.g. "MainKt" and "OnTask") become one row.
-            val merged = subjects.groupBy { it.name to it.category }.map { (k, v) -> Subject(k.first, k.second, v.sumOf { it.seconds }) }.sortedByDescending { it.seconds }.take(10)
+            val merged = subjects.groupBy { it.name to it.category }.map { (k, v) -> Subject(k.first, k.second, v.sumOf { it.seconds }, v.firstNotNullOfOrNull { it.itemKey }, v.firstNotNullOfOrNull { it.title }) }
+                .sortedByDescending { it.seconds }.take(20)
             subjects.clear(); subjects.addAll(merged)
 
             DailyReport(date, start, all, work, timeline, Sessions.deepSessions(timeline), Sessions.distractionEvents(timeline), worst, subjects)

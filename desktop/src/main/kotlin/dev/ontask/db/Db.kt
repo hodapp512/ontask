@@ -145,6 +145,15 @@ object Schema {
         """
         ALTER TABLE ai_calls ADD COLUMN error TEXT;
         """,
+        // Pages and videos on Varies sites: each reading knows its item ("YouTube: …") and the category it was judged
+        // to be; verdicts store that category and where the page came from; two matching answers per source make a rule.
+        """
+        ALTER TABLE ticks ADD COLUMN item TEXT;
+        ALTER TABLE ticks ADD COLUMN item_cat TEXT;
+        ALTER TABLE verdicts ADD COLUMN category TEXT;
+        ALTER TABLE verdicts ADD COLUMN source_key TEXT;
+        CREATE TABLE source_rules (source_key TEXT PRIMARY KEY, category TEXT NOT NULL, ts INTEGER NOT NULL);
+        """,
     )
 
     fun migrate(db: Db) = db.use { c ->

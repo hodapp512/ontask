@@ -27,6 +27,20 @@ class CategoryStore(private val db: Db) {
         return list
     }
 
+    /** Earlier default labels you never changed take the new names (e.g. "Core work" → "Work"). */
+    fun renameOldDefaults() = db.use { c ->
+        c.prepareStatement("UPDATE categories SET label=? WHERE name=? AND label=?").use { ps ->
+            Category.oldLabels.forEach { (name, old) -> Category.builtIns.firstOrNull { it.name == name }?.let { ps.setString(1, it.label); ps.setString(2, name); ps.setString(3, old); ps.addBatch() } }
+            ps.executeBatch()
+        }
+    }.also { load() }
+
+    /** Retired built-ins that still have activity or rules filed under them. */
+    fun retiredInUse(): List<String> = Category.retired.filter { name ->
+        db.use { c -> c.prepareStatement("SELECT EXISTS(SELECT 1 FROM ticks WHERE category=?) OR EXISTS(SELECT 1 FROM rules WHERE category=?) OR EXISTS(SELECT 1 FROM hourly WHERE category=?)").use { ps ->
+            repeat(3) { i -> ps.setString(i + 1, name) }; ps.executeQuery().use { rs -> rs.next() && rs.getInt(1) == 1 } } }
+    }
+
     /** Adds a category of the user's own; returns it. */
     fun add(label: String, level: Level, variable: Boolean): Category {
         val name = "c_" + System.currentTimeMillis()
@@ -97,44 +111,69 @@ class CategoryStore(private val db: Db) {
 }
 
 /**
- * Verdicts for pages and videos in Variable categories: work (counts as focused) or not (wasted). Each one is judged
- * once — by AI or by the person — and remembered.
+ * Verdicts for pages and videos on Varies sites: which of your categories each one is. Each is decided once (by a
+ * source rule, AI, or you) and remembered. Two matching answers of yours for the same source (a subreddit, Facebook
+ * group, channel, publication) make a source rule, so the next page from there is decided without asking.
  */
 class Verdicts(private val db: Db) {
-    private val cache = HashMap<String, Level?>()
+    private val cache = HashMap<String, Category?>()
 
     @Synchronized
-    fun get(item: String): Level? = cache.getOrPut(item) {
-        db.use { c -> c.prepareStatement("SELECT level FROM verdicts WHERE item=?").use { ps -> ps.setString(1, item); ps.executeQuery().use { rs -> if (rs.next()) Level.valueOf(rs.getString(1)) else null } } }
+    fun get(item: String): Category? = cache.getOrPut(item) {
+        db.use { c -> c.prepareStatement("SELECT category FROM verdicts WHERE item=? AND category IS NOT NULL").use { ps -> ps.setString(1, item); ps.executeQuery().use { rs -> if (rs.next()) Category.registry[rs.getString(1)] else null } } }
     }
 
-    /** Saves a verdict and re-counts past time on that page or video. */
+    /** Saves a verdict and re-counts past time on that page or video; your own answers may create a source rule. */
     @Synchronized
-    fun set(item: String, title: String?, work: Boolean, source: Source, now: Long) {
-        val level = if (work) Level.DEEP else Level.WASTED
-        cache[item] = level
+    fun set(item: String, title: String?, cat: Category, source: Source, sourceKey: String?, now: Long) {
+        cache[item] = cat
         db.tx { c ->
-            c.prepareStatement("INSERT INTO verdicts(item, title, level, source, ts) VALUES (?,?,?,?,?) ON CONFLICT(item) DO UPDATE SET level=excluded.level, source=excluded.source, ts=excluded.ts")
-                .use { ps -> ps.setString(1, item); ps.setString(2, title); ps.setString(3, level.name); ps.setString(4, source.name); ps.setLong(5, now); ps.executeUpdate() }
+            c.prepareStatement(
+                """INSERT INTO verdicts(item, title, level, category, source, source_key, ts) VALUES (?,?,?,?,?,?,?)
+                   ON CONFLICT(item) DO UPDATE SET level=excluded.level, category=excluded.category, source=excluded.source,
+                     source_key=COALESCE(excluded.source_key, verdicts.source_key), ts=excluded.ts""",
+            ).use { ps -> ps.setString(1, item); ps.setString(2, title); ps.setString(3, cat.level.name); ps.setString(4, cat.name); ps.setString(5, source.name); ps.setString(6, sourceKey); ps.setLong(7, now); ps.executeUpdate() }
             val variable = Category.registry.values.filter { it.variable }.map { it.name }.ifEmpty { listOf("VARIABLE") }
             val ids = c.prepareStatement("SELECT id, app, title, url FROM ticks WHERE category IN (${variable.joinToString(",") { "?" }})").use { ps ->
                 variable.forEachIndexed { i, n -> ps.setString(i + 1, n) }
-                ps.executeQuery().use { rs -> buildList { while (rs.next()) if (itemKey(rs.getString(2), rs.getString(3), rs.getString(4)) == item) add(rs.getLong(1)) } }
+                ps.executeQuery().use { rs -> buildList { while (rs.next()) if (itemKey(rs.getString(2), rs.getString(3), rs.getString(4)) == item && !Pages.isFeed(rs.getString(4))) add(rs.getLong(1)) } }
             }
-            c.prepareStatement("UPDATE ticks SET level=? WHERE id=?").use { ps -> ids.forEach { ps.setString(1, level.name); ps.setLong(2, it); ps.addBatch() }; ps.executeBatch() }
+            c.prepareStatement("UPDATE ticks SET item_cat=?, level=? WHERE id=?").use { ps -> ids.forEach { ps.setString(1, cat.name); ps.setString(2, cat.level.name); ps.setLong(3, it); ps.addBatch() }; ps.executeBatch() }
+            if (source == Source.USER_LABEL && sourceKey != null) learn(c, sourceKey, now)
         }
     }
 
-    /** Pages and videos in Variable categories seen since [sinceTs] with no verdict yet, newest first, as samples to judge. */
+    /** The last two answers of yours for [key] agree → a rule; they disagree → no rule. */
+    private fun learn(c: java.sql.Connection, key: String, now: Long) {
+        val last = c.prepareStatement("SELECT category FROM verdicts WHERE source_key=? AND source=? AND category IS NOT NULL ORDER BY ts DESC LIMIT 2").use { ps ->
+            ps.setString(1, key); ps.setString(2, Source.USER_LABEL.name); ps.executeQuery().use { rs -> buildList { while (rs.next()) add(rs.getString(1)) } }
+        }
+        if (last.size == 2 && last[0] == last[1]) c.prepareStatement("INSERT INTO source_rules(source_key, category, ts) VALUES (?,?,?) ON CONFLICT(source_key) DO UPDATE SET category=excluded.category, ts=excluded.ts")
+            .use { ps -> ps.setString(1, key); ps.setString(2, last[0]); ps.setLong(3, now); ps.executeUpdate() }
+        else if (last.size == 2) c.prepareStatement("DELETE FROM source_rules WHERE source_key=?").use { ps -> ps.setString(1, key); ps.executeUpdate() }
+    }
+
+    fun ruleFor(sourceKey: String?): Category? = sourceKey?.let { k ->
+        db.use { c -> c.prepareStatement("SELECT category FROM source_rules WHERE source_key=?").use { ps -> ps.setString(1, k); ps.executeQuery().use { rs -> if (rs.next()) Category.registry[rs.getString(1)] else null } } }
+    }
+
+    /** Learned source rules, newest first, for Settings → Categories. */
+    fun rules(): List<Pair<String, Category>> = db.use { c ->
+        c.createStatement().use { st -> st.executeQuery("SELECT source_key, category FROM source_rules ORDER BY ts DESC").use { rs -> buildList { while (rs.next()) Category.registry[rs.getString(2)]?.let { add(rs.getString(1) to it) } } } }
+    }
+
+    fun deleteRule(sourceKey: String) = db.use { c -> c.prepareStatement("DELETE FROM source_rules WHERE source_key=?").use { it.setString(1, sourceKey); it.executeUpdate() } }
+
+    /** Pages and videos on Varies sites seen since [sinceTs] and never decided (not feeds), newest first, as samples to judge. */
     fun unjudged(sinceTs: Long, limit: Int): List<Pair<String, dev.ontask.Sample>> {
         val variable = Category.registry.values.filter { it.variable }.map { it.name }.ifEmpty { listOf("VARIABLE") }
         val rows = db.use { c ->
-            c.prepareStatement("SELECT app, title, url FROM ticks WHERE start_ts >= ? AND category IN (${variable.joinToString(",") { "?" }}) ORDER BY start_ts DESC").use { ps ->
+            c.prepareStatement("SELECT app, title, url FROM ticks WHERE start_ts >= ? AND item_cat IS NULL AND category IN (${variable.joinToString(",") { "?" }}) ORDER BY start_ts DESC").use { ps ->
                 ps.setLong(1, sinceTs); variable.forEachIndexed { i, n -> ps.setString(i + 2, n) }
                 ps.executeQuery().use { rs -> buildList { while (rs.next()) add(dev.ontask.Sample(app = rs.getString(1), title = rs.getString(2), url = rs.getString(3))) } }
             }
         }
-        return rows.map { itemKey(it.app, it.title, it.url) to it }.distinctBy { it.first }.filter { get(it.first) == null }.take(limit)
+        return rows.filter { !Pages.isFeed(it.url) }.map { itemKey(it.app, it.title, it.url) to it }.distinctBy { it.first }.filter { get(it.first) == null }.take(limit)
     }
 
     @Synchronized

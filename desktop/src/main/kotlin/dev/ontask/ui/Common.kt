@@ -218,31 +218,26 @@ fun pickTextFile(title: String): java.nio.file.Path? {
 @Composable
 fun CategoryPicker(
     app: dev.ontask.App, name: String, current: dev.ontask.Category, onChanged: () -> Unit,
-    /** For a page or video on a Varies site: its item key, title and current verdict (focused / wasted), to correct just this one. */
-    item: Triple<String, String?, dev.ontask.Level>? = null,
+    /** For a page or video on a Varies site: its item key and title. Picking a category then changes just this one. */
+    item: Pair<String, String?>? = null,
 ) {
     var open by remember { mutableStateOf(false) }
-    val verdict = item?.third?.takeIf { current.variable && it != dev.ontask.Level.MIXED }
+    val unsure = item != null && current.variable
     Box {
         TextButton({ open = true }) {
-            Box(Modifier.size(8.dp).background(levelColor(verdict ?: current.level), androidx.compose.foundation.shape.CircleShape))
-            Text("  ${current.label}" + when (verdict) { dev.ontask.Level.DEEP -> " · work"; dev.ontask.Level.WASTED -> " · not work"; else -> "" } + " ▾", style = MaterialTheme.typography.bodySmall)
+            Box(Modifier.size(8.dp).background(if (unsure) MaterialTheme.colorScheme.outline else levelColor(current.level), androidx.compose.foundation.shape.CircleShape))
+            Text("  ${if (unsure) "Unsure" else current.label} ▾", style = MaterialTheme.typography.bodySmall)
         }
         DropdownMenu(open, { open = false }) {
-            if (item != null && current.variable) {
-                Text("This page or video…", Modifier.padding(horizontal = 12.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                DropdownMenuItem({ Text("Is work" + if (verdict == dev.ontask.Level.DEEP) "  ✓" else "") }, { open = false; app.answerVariable(item.first, item.second, true); onChanged() },
-                    leadingIcon = { Box(Modifier.size(8.dp).background(levelColor(dev.ontask.Level.DEEP), androidx.compose.foundation.shape.CircleShape)) })
-                DropdownMenuItem({ Text("Isn't work" + if (verdict == dev.ontask.Level.WASTED) "  ✓" else "") }, { open = false; app.answerVariable(item.first, item.second, false); onChanged() },
-                    leadingIcon = { Box(Modifier.size(8.dp).background(levelColor(dev.ontask.Level.WASTED), androidx.compose.foundation.shape.CircleShape)) })
-                HorizontalDivider()
-            }
-            Text("$name is…", Modifier.padding(horizontal = 12.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            dev.ontask.Category.assignable.forEach { cat ->
+            Text(if (item != null) "This page or video is…" else "$name is…", Modifier.padding(horizontal = 12.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            dev.ontask.Category.assignable.filter { item == null || !it.variable }.forEach { cat ->
                 DropdownMenuItem(
                     text = { Text(cat.label + if (cat == current) "  ✓" else "") },
                     leadingIcon = { Box(Modifier.size(8.dp).background(levelColor(cat.level), androidx.compose.foundation.shape.CircleShape)) },
-                    onClick = { open = false; if (cat != current) { reclassify(app, name, current, cat); onChanged() } },
+                    onClick = {
+                        open = false
+                        if (cat != current) { if (item != null) app.answerVariable(item.first, item.second, cat) else reclassify(app, name, current, cat); onChanged() }
+                    },
                 )
             }
         }

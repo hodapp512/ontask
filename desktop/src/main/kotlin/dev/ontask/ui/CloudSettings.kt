@@ -92,6 +92,12 @@ fun CloudSettingsBody(app: App) {
         KV("This Mac", "Sending updates" + (app.cloud.lastSyncTs.takeIf { it > 0 }?.let { " · last sent ${fmtTime(it)}" } ?: ""))
         KV("Phones", info?.phones?.takeIf { it.isNotEmpty() }?.joinToString(", ") { (n, seen) -> if (seen > 0) "$n (opened ${fmtAgo(seen / 1000)})" else n } ?: "None yet. Open ${web ?: "the OnTask website"} on your phone and sign in.")
         KV("Accountability partner", info?.partners?.takeIf { it.isNotEmpty() }?.joinToString(", ") ?: "None yet. Invite one below.")
+        var titles by remember { mutableStateOf(app.cloud.partnerSeesTitles) }
+        SwitchSetting(
+            "Allow partner to see individual website page titles",
+            "Off: your partner sees time per site and category (\"YouTube: 40 min Entertainment\"). On: the video and page titles too. Only when you share your full daily report.",
+            titles,
+        ) { titles = it; app.cloud.partnerSeesTitles = it }
         info?.supporting?.takeIf { it.isNotEmpty() }?.let { KV("You support", it.joinToString(", ")) }
         app.cloud.lastError?.let { KV("Last sync problem", it) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
