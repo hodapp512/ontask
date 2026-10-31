@@ -57,8 +57,8 @@ object CheckinDraft {
     /** The drafted check-in the user reviews before it is sent to their partner. */
     fun message(today: DailyReport, yesterday: DailyReport?, rating: Int?, helped: String?, hurt: String?, change: String?, struggles: List<String> = emptyList()): String = buildString {
         val share = deepShare(today); val prev = deepShare(yesterday)
-        append("Today: ${dur(today.totalsAll[Level.DEEP] ?: 0)} deep focus, ${dur(today.totalsAll[Level.WASTED] ?: 0)} wasted")
-        if (share != null) append(" (${share}% deep)")
+        append("Today: ${dur(today.totalsAll[Level.DEEP] ?: 0)} focused, ${dur(today.totalsAll[Level.WASTED] ?: 0)} wasted")
+        if (share != null) append(" (${share}% focused)")
         append(". ${today.deepSessions.size} deep-work session${if (today.deepSessions.size == 1) "" else "s"}")
         today.deepSessions.maxOfOrNull { it.seconds }?.let { append(", longest ${dur(it)}") }
         append(".")

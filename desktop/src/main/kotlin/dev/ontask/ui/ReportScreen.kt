@@ -98,12 +98,38 @@ internal fun HelperBanner(app: App) {
         else "OnTask can't see what you're working on right now, so nothing is being tracked. Quit and reopen OnTask; if it keeps happening, check Diagnostics.",
         error = true,
     )
-    else if (live.sample?.accessibilityTrusted == false) {
-        val scope = androidx.compose.runtime.rememberCoroutineScope()
-        Notice(
+    else if (live.sample?.accessibilityTrusted == false) AccessibilityBanner(app)
+}
+
+/**
+ * Asks for Accessibility, then re-checks every few seconds (restarting the helper so macOS reports the new grant)
+ * until it's granted. If it still isn't after a while, offers to clear OnTask's stale entry and ask again.
+ */
+@Composable
+private fun AccessibilityBanner(app: App) {
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var attempt by remember { mutableStateOf(0) } // bumped on each request, restarting the re-check loop
+    var stuck by remember { mutableStateOf(false) }
+    val asked = attempt > 0
+    LaunchedEffect(attempt) {
+        if (attempt == 0) return@LaunchedEffect
+        repeat(24) { i ->
+            kotlinx.coroutines.delay(5_000)
+            if (app.permissions.status(fresh = true).accessibility == dev.ontask.track.PermState.GRANTED) return@LaunchedEffect
+            if (i == 5) stuck = true
+        }
+    }
+    when {
+        stuck -> Notice(
+            "Switched OnTask on but this message is still here? macOS is remembering an older copy of OnTask. " +
+                "Fix it removes that old entry and asks again — then switch OnTask on once more.",
+            action = "Fix it",
+        ) { stuck = false; attempt++; scope.launch { app.permissions.resetAccessibility() } }
+        asked -> Notice("Waiting for you to switch OnTask on under Accessibility… this message goes away by itself.", action = "Open settings again") { scope.launch { app.permissions.requestAccessibility() } }
+        else -> Notice(
             "OnTask can't see window titles yet, so it can't tell one document or chat from another. Allow it under Accessibility, then switch OnTask on.",
             action = "Open Accessibility settings",
-        ) { scope.launch { app.permissions.requestAccessibility() } }
+        ) { attempt++; scope.launch { app.permissions.requestAccessibility() } }
     }
 }
 
@@ -121,7 +147,7 @@ fun SummaryCard(r: DailyReport, title: String, header: @Composable () -> Unit = 
             return@PlainCard
         }
         Text(
-            if (denom >= 600) "${(r.totalsAll[Level.DEEP] ?: 0) * 100 / denom}% deep focus" else "${fmtDuration(r.totalsAll[Level.DEEP] ?: 0)} deep focus",
+            if (denom >= 600) "${(r.totalsAll[Level.DEEP] ?: 0) * 100 / denom}% focused" else "${fmtDuration(r.totalsAll[Level.DEEP] ?: 0)} focused",
             style = MaterialTheme.typography.headlineMedium,
         )
         Row(Modifier.fillMaxWidth().height(12.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))) {

@@ -59,7 +59,7 @@ function reportCardOf(r: Record<string, any>): HTMLElement {
   const tl = timelineEl((r.timeline ?? []) as Seg[]);
   return h("div", { class: "card" },
     h("h2", {}, "Today"),
-    share !== null && h("p", {}, `${share}% deep focus`),
+    share !== null && h("p", {}, `${share}% focused`),
     bar,
     h("div", { class: "legend" }, LEVELS.map((l) => h("span", {}, h("span", { class: "dot", style: `background:${l.color}` }), `${l.label} ${fmtDuration(totals[l.key] ?? 0)}`))),
     tl,

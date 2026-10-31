@@ -118,7 +118,7 @@ function reportBody(r: DocumentData): HTMLElement {
   const tl = timelineEl((r.timeline ?? []) as Seg[]);
   const sessions = (r.deepSessions ?? []).length;
   return h("div", { class: "stack" },
-    h("p", { class: "big" }, share !== null ? `${share}% deep focus` : `${fmtDuration(totals.DEEP ?? 0)} deep focus`),
+    h("p", { class: "big" }, share !== null ? `${share}% focused` : `${fmtDuration(totals.DEEP ?? 0)} focused`),
     bar,
     h("div", { class: "legend" }, LEVELS.map((l) => h("span", {}, h("span", { class: "dot", style: `background:${l.color}` }), `${l.label} ${fmtDuration(totals[l.key] ?? 0)}`))),
     tl,

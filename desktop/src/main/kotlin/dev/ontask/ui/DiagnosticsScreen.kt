@@ -129,7 +129,7 @@ private fun sourceHelp(s: Source) = when (s) {
 
 @Composable
 private fun ColumnScope.StatsSection(s: DiagStats, tickSec: Int) {
-    SectionCard("What decided each label", "Every $tickSec seconds OnTask checks what you're doing and labels it deep focus, mixed or wasted. This is what made that call, cheapest first.") {
+    SectionCard("What decided each label", "Every $tickSec seconds OnTask checks what you're doing and labels it focused, mixed or wasted. This is what made that call, cheapest first.") {
         Source.entries.forEach { src ->
             val n = s.sourceTicks[src] ?: 0
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

@@ -2,7 +2,7 @@ package dev.ontask
 
 import kotlinx.serialization.Serializable
 
-enum class Level(val label: String) { DEEP("Deep focus"), MIXED("Mixed"), WASTED("Wasted"), AWAY("Away") }
+enum class Level(val label: String) { DEEP("Focused"), MIXED("Mixed"), WASTED("Wasted"), AWAY("Away") }
 
 enum class Category(val label: String, val level: Level) {
     CORE_WORK("Core work", Level.DEEP),

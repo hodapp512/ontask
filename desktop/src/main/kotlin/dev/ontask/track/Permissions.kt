@@ -51,6 +51,16 @@ class Permissions(private val helper: HelperClient) {
     /** Shows the system prompt the first time and adds the app to the list; then opens the pane to switch it on. */
     suspend fun requestAccessibility() { helper.request("request_accessibility"); open(PrivacyPane.ACCESSIBILITY) }
 
+    /**
+     * Forgets OnTask's own Accessibility entry, then asks again. Needed when System Settings shows OnTask switched on
+     * but macOS remembers an earlier build (each unsigned build looks like a different app to it).
+     */
+    suspend fun resetAccessibility() {
+        listOf("dev.ontask.app", "dev.ontask.helper").forEach { id -> runCatching { ProcessBuilder("tccutil", "reset", "Accessibility", id).start().waitFor() } }
+        helper.restart()
+        requestAccessibility()
+    }
+
     suspend fun requestScreenRecording() { helper.request("request_screen_recording"); open(PrivacyPane.SCREEN_RECORDING) }
 
     /** Asks for Automation of one browser (blocks until the user answers the prompt). */

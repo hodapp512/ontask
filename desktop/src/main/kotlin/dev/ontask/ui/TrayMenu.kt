@@ -98,11 +98,11 @@ fun ApplicationScope.OnTaskTray(app: App, open: (Dest?) -> Unit) {
 
     Tray(
         icon = remember { TrayGlyph() },
-        tooltip = "OnTask — deep ${fmtDuration(deep)}, wasted ${fmtDuration(wasted)}",
+        tooltip = "OnTask — focused ${fmtDuration(deep)}, wasted ${fmtDuration(wasted)}",
         onAction = { open(null) },
         menu = {
             Item(status, enabled = false, onClick = {})
-            Item("Today: deep ${fmtDuration(deep)}, wasted ${fmtDuration(wasted)}", enabled = false, onClick = {})
+            Item("Today: focused ${fmtDuration(deep)}, wasted ${fmtDuration(wasted)}", enabled = false, onClick = {})
             if (openCount > 0) Item("$openCount site${if (openCount == 1) "" else "s"} unblocked right now", enabled = false, onClick = {})
             Separator()
             Item(if (blocked.isEmpty()) "Unblock a site… (nothing blocked)" else "Unblock a site…", enabled = blocked.isNotEmpty(), onClick = { changed(); picking = true })

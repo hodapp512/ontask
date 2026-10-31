@@ -1,6 +1,6 @@
 export type LevelKey = "DEEP" | "MIXED" | "WASTED" | "AWAY";
 export const LEVELS: { key: LevelKey; label: string; color: string; short: string }[] = [
-  { key: "DEEP", label: "Deep focus", color: "#2e9e5b", short: "D" },
+  { key: "DEEP", label: "Focused", color: "#2e9e5b", short: "D" },
   { key: "MIXED", label: "Mixed", color: "#e0a526", short: "M" },
   { key: "WASTED", label: "Wasted", color: "#d64545", short: "W" },
   { key: "AWAY", label: "Away", color: "#9aa5b1", short: "A" },

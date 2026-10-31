@@ -209,7 +209,7 @@ private fun WeekExpander(app: App, today: LocalDate) {
             Row(Modifier.fillMaxWidth()) {
                 Text(d.format(DateTimeFormatter.ofPattern("EEE, MMM d")), Modifier.weight(1f))
                 Text(dev.ontask.plan.CheckinDraft.feeling(r), Modifier.weight(1f))
-                Text(share?.let { "$it% deep" } ?: "—", Modifier.weight(1f))
+                Text(share?.let { "$it% focused" } ?: "—", Modifier.weight(1f))
             }
         }
     }
