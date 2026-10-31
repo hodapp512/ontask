@@ -123,7 +123,8 @@ async function sendCorrection(uid: string, subject: string, category: string, it
   await addDoc(collection(db, "users", uid, "labelRequests"), { subject, category, ts: Date.now(), ...(itemKey ? { itemKey } : {}), ...(title ? { title } : {}) });
 }
 
-function reportBody(r: DocumentData, edit?: { uid: string; categories: Cat[] }): HTMLElement {
+/** The "Today so far" view: the same on your phone and for your partner (who can't relabel anything). */
+export function reportBody(r: DocumentData, edit?: { uid: string; categories: Cat[] }): HTMLElement {
   const totals = (r.totals ?? {}) as Partial<Record<LevelKey, number>>;
   const sum = LEVELS.reduce((a, l) => a + (totals[l.key] ?? 0), 0) || 1;
   const share = deepShare(totals);
@@ -136,6 +137,9 @@ function reportBody(r: DocumentData, edit?: { uid: string; categories: Cat[] }):
     h("div", { class: "legend" }, LEVELS.map((l) => h("span", {}, h("span", { class: "dot", style: `background:${l.color}` }), `${l.label} ${fmtDuration(totals[l.key] ?? 0)}`))),
     tl,
     h("p", { class: "muted small" }, `${sessions} focused session${sessions === 1 ? "" : "s"} · ${r.distractionEvents ?? 0} distraction${r.distractionEvents === 1 ? "" : "s"}`),
+    sessions > 0 && h("details", {}, h("summary", {}, "Longest focused sessions"),
+      ([...(r.deepSessions ?? [])] as { a: number; b: number }[]).sort((x, y) => (y.b - y.a) - (x.b - x.a)).slice(0, 5)
+        .map((s) => h("p", { class: "row between" }, h("span", {}, `${clock(Math.floor(s.a / 60))}–${clock(Math.floor(s.b / 60))}`), h("span", { class: "muted" }, fmtDuration(s.b - s.a))))),
     (r.topSites ?? []).length > 0 && h("details", {}, h("summary", {}, "Where the time went"),
       edit?.categories.length ? h("p", { class: "muted small" }, "Labeled wrong? Pick the right category — your Mac updates within a minute.") : null,
       (r.topSites as any[]).slice(0, 8).map((s) => siteRow(s, edit))),
@@ -143,7 +147,9 @@ function reportBody(r: DocumentData, edit?: { uid: string; categories: Cat[] }):
 }
 
 function siteRow(s: { name: string; category?: string; categoryId?: string; seconds: number; itemKey?: string; title?: string }, edit?: { uid: string; categories: Cat[] }): HTMLElement {
-  if (!edit?.categories.length) return h("p", { class: "row between" }, h("span", {}, s.name), h("span", { class: "muted" }, fmtDuration(s.seconds)));
+  if (!edit?.categories.length) return h("div", { class: "site" },
+    h("div", { class: "row between" }, h("span", {}, s.name), h("span", { class: "muted" }, fmtDuration(s.seconds))),
+    s.category && h("span", { class: "muted small" }, s.category));
   const note = h("span", { class: "muted small" });
   // A page or video gets one of your categories; "Varies" is for whole sites.
   const options = s.itemKey ? edit.categories.filter((c) => !c.variable) : edit.categories;
@@ -263,7 +269,7 @@ async function personCard(u: User, linkId: string, l: DocumentData): Promise<HTM
     last && h("div", { class: "msg" }, h("small", {}, ago(last.ts)), last.text),
     h("div", { class: "row" }, REACTIONS.map((r) => h("button", { onclick: send(r.kind) }, r.label))),
     status,
-    h("a", { href: `#/person/${encodeURIComponent(linkId)}` }, "All messages and a note →"),
+    h("a", { href: `#/person/${encodeURIComponent(linkId)}` }, "Full day, earlier days and messages →"),
   );
 }
 

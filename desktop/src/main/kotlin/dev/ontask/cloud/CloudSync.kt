@@ -48,6 +48,10 @@ class CloudSync(
     /** The same for one page or video on a Varies site: [itemKey] gets that category. */
     private val relabelItem: (itemKey: String, title: String?, category: String) -> Unit = { _, _, _ -> },
     private val zone: ZoneId = ZoneId.systemDefault(),
+    /** When you last used the Mac (keyboard, mouse or a video in front of you), epoch seconds; null if unknown. */
+    private val lastActive: () -> Long? = { null },
+    /** Today's plan, for the daily report. */
+    private val plan: (LocalDate) -> List<String> = { emptyList() },
 ) {
     @Volatile var lastError: String? = null; private set
     @Volatile var lastSyncTs: Long = 0; private set
@@ -120,6 +124,8 @@ class CloudSync(
     private fun refreshLinkInfo(c: CloudClient, uid: String) {
         c.write("users/$uid/devices", deviceId(), buildJsonObject {
             put("kind", "mac"); put("name", macName()); put("lastSyncMs", System.currentTimeMillis())
+            // The server sends the daily report once you've been inactive for a while after work.
+            lastActive()?.let { put("lastActiveMs", it * 1000) }
             put("linkedAt", (prefs.long("cloud.linked_at", System.currentTimeMillis() / 1000)) * 1000)
             put("appVersion", dev.ontask.cloud.UpdateCheck.currentVersion())
         })
@@ -168,6 +174,11 @@ class CloudSync(
         return reqs.isNotEmpty()
     }
 
+    /** Whether you get your own daily report by email (on by default). */
+    var reportEmail: Boolean
+        get() = prefs.bool("cloud.report_email", true)
+        set(v) { prefs.set("cloud.report_email", v) }
+
     /** Whether your partner may see the titles of pages and videos on Varies sites (otherwise only per-site totals). */
     var partnerSeesTitles: Boolean
         get() = prefs.bool("cloud.partner_titles", false)
@@ -210,13 +221,29 @@ class CloudSync(
         prefs.set("cloud.schedule_hash", hash)
     }
 
+    /**
+     * Today's plan and, once done, the evening check-in (how the day felt, what helped and hurt, the change for
+     * tomorrow, a note for your partner): the server puts them in the daily report. Re-sent only when they change.
+     */
     private fun uploadCheckinFlag(c: CloudClient, uid: String) {
         val today = LocalDate.now(zone)
-        val key = "cloud.checkin_flag.$today"
-        if (!prefs.bool(key, false) && checkins.done(today, "evening")) {
-            c.write("users/$uid/checkins", today.toString(), buildJsonObject { put("evening", true); put("ts", System.currentTimeMillis()) })
-            prefs.set(key, true)
+        val ev = checkins.get(today, "evening")?.takeIf { it.sent }
+        val payload = buildJsonObject {
+            put("evening", ev != null)
+            put("plan", plan(today).joinToString("\n"))
+            if (ev != null) {
+                put("ts", ev.ts * 1000)
+                ev.rating?.let { put("rating", it); put("feeling", dev.ontask.plan.CheckinDraft.feeling(it)) }
+                ev.helped?.takeIf { it.isNotBlank() }?.let { put("helped", it) }
+                ev.hurt?.takeIf { it.isNotBlank() }?.let { put("hurt", it) }
+                ev.change?.takeIf { it.isNotBlank() }?.let { put("change", it) }
+                ev.message?.takeIf { it.isNotBlank() }?.let { put("note", it) }
+            }
         }
+        val hash = "$today:" + payload.toString().hashCode()
+        if (prefs.get("cloud.checkin_hash") == hash) return
+        c.write("users/$uid/checkins", today.toString(), payload)
+        prefs.set("cloud.checkin_hash", hash)
     }
 
     private fun pullReactions(c: CloudClient, uid: String) {
@@ -259,6 +286,8 @@ class CloudSync(
         val s = settings()
         return buildJsonObject {
             put("tz", zone.id)
+            // Email yourself the daily report too (to your sign-in address).
+            put("reportEmail", reportEmail)
             put("workWeek", buildJsonObject {
                 s.schedule.week.days.forEach { (d, ranges) -> put(d.toString(), buildJsonArray { ranges.forEach { add(buildJsonObject { put("startMin", it.startMin); put("endMin", it.endMin) }) } }) }
             })

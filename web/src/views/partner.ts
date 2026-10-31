@@ -1,10 +1,10 @@
 import type { User } from "firebase/auth";
-import { addDoc, collection, doc, getDoc, getDocs, limit, orderBy, query, where } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, fns } from "../firebase";
 import { h } from "../dom";
-import { LEVELS, REACTIONS, deepShare, fmtDuration, todayKey, type LevelKey, type Seg } from "../format";
-import { timelineEl } from "./home";
+import { REACTIONS, todayKey } from "../format";
+import { reportBody } from "./home";
 
 export async function joinView(u: User, code: string): Promise<HTMLElement> {
   const out = h("div", { class: "card" }, h("p", {}, "Joining…"));
@@ -29,10 +29,28 @@ export async function personView(u: User, linkId: string): Promise<HTMLElement> 
     return h("div", { class: "msg" }, h("small", {}, new Date(d.ts).toLocaleString() + " · " + String(d.type).replace(/_/g, " ")), d.text);
   }) : [h("p", { class: "muted" }, "No messages yet. You'll see check-ins and alerts here.")];
 
+  // The same "Today so far" view they see, live, with earlier days a tap away.
   let reportCard: HTMLElement;
   if (link.share === "report") {
-    const rep = await getDoc(doc(db, "users", tracked, "reports", todayKey())).catch(() => null);
-    reportCard = rep?.exists() ? reportCardOf(rep.data()!) : h("div", { class: "card" }, h("h2", {}, "Today"), h("p", { class: "muted" }, "No report yet today."));
+    const body = h("div", {});
+    let day = new Date(); let stop: (() => void) | undefined;
+    const label = h("strong", { class: "grow", style: "text-align:center" });
+    const next = h("button", { class: "icon-btn", "aria-label": "Next day" }, "→") as HTMLButtonElement;
+    const show = () => {
+      stop?.();
+      const key = todayKey(day), today = key === todayKey();
+      label.textContent = today ? "Today" : day.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+      next.disabled = today;
+      body.replaceChildren(h("p", { class: "muted" }, "Loading…"));
+      stop = onSnapshot(doc(db, "users", tracked, "reports", key), (s) => {
+        body.replaceChildren(s.exists() ? reportBody(s.data()) : h("p", { class: "muted" }, today ? `${link.trackedName ?? "They"} hasn't been at the computer yet today.` : "No report for this day."));
+      }, () => body.replaceChildren(h("p", { class: "muted" }, "Couldn't load this day.")));
+    };
+    next.onclick = () => { day = new Date(day.getTime() + 86_400_000); show(); };
+    const prev = h("button", { class: "icon-btn", "aria-label": "Previous day", onclick: () => { day = new Date(day.getTime() - 86_400_000); show(); } }, "←");
+    show();
+    window.addEventListener("hashchange", () => stop?.(), { once: true });
+    reportCard = h("div", { class: "card" }, h("div", { class: "row" }, prev, label, next), body);
   } else reportCard = h("div", { class: "card" }, h("h2", {}, "Today"), h("p", { class: "muted" }, `${link.trackedName} shares messages only.`));
 
   const reply = h("input", { placeholder: "Add a short note (optional)", maxlength: "280" }) as HTMLInputElement;
@@ -48,22 +66,5 @@ export async function personView(u: User, linkId: string): Promise<HTMLElement> 
     reportCard,
     h("div", { class: "card" }, h("h2", {}, "Send encouragement"), h("div", { class: "row" }, REACTIONS.map((r) => h("button", { onclick: send(r.kind) }, r.label))), reply, status),
     h("div", { class: "card" }, h("h2", {}, "Messages"), feed),
-  );
-}
-
-function reportCardOf(r: Record<string, any>): HTMLElement {
-  const totals = (r.totals ?? {}) as Partial<Record<LevelKey, number>>;
-  const sum = LEVELS.reduce((a, l) => a + (totals[l.key] ?? 0), 0) || 1;
-  const share = deepShare(totals);
-  const bar = h("div", { class: "bar" }); bar.innerHTML = LEVELS.map((l) => `<div style="width:${((totals[l.key] ?? 0) / sum) * 100}%;background:${l.color}"></div>`).join("");
-  const tl = timelineEl((r.timeline ?? []) as Seg[]);
-  return h("div", { class: "card" },
-    h("h2", {}, "Today"),
-    share !== null && h("p", {}, `${share}% focused`),
-    bar,
-    h("div", { class: "legend" }, LEVELS.map((l) => h("span", {}, h("span", { class: "dot", style: `background:${l.color}` }), `${l.label} ${fmtDuration(totals[l.key] ?? 0)}`))),
-    tl,
-    h("p", { class: "muted" }, `${(r.deepSessions ?? []).length} focused sessions · ${r.distractionEvents ?? 0} distraction events` + (r.worstHour ? ` · worst hour ${String(r.worstHour.hour).padStart(2, "0")}:00` : "")),
-    (r.topSites ?? []).length > 0 && h("div", {}, h("p", { class: "muted" }, "Where the time went"), (r.topSites as any[]).slice(0, 6).map((s) => h("p", {}, `${s.name} — ${fmtDuration(s.seconds)}`))),
   );
 }

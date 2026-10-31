@@ -1,7 +1,8 @@
 export type Channel = "push" | "text" | "email" | "off";
 
 /** Message types a partner can configure (DESIGN.md: "Partner settings"). */
-export const MESSAGE_TYPES = ["binge_alert", "unblock_alert", "checkin", "work_hours_change", "missed_checkin", "work_unblock"] as const;
+/** "checkin" is the daily report (with the evening check-in when there was one). */
+export const MESSAGE_TYPES = ["binge_alert", "unblock_alert", "checkin", "work_hours_change", "work_unblock"] as const;
 export type MessageType = (typeof MESSAGE_TYPES)[number];
 
 export interface PartnerPrefs {
@@ -11,7 +12,7 @@ export interface PartnerPrefs {
 }
 
 export const DEFAULT_PARTNER_PREFS: PartnerPrefs = {
-  channels: { binge_alert: "push", unblock_alert: "push", checkin: "push", work_hours_change: "push", missed_checkin: "push", work_unblock: "push" },
+  channels: { binge_alert: "push", unblock_alert: "push", checkin: "push", work_hours_change: "push", work_unblock: "push" },
   quietHours: null,
 };
 
@@ -24,5 +25,6 @@ export interface ScheduleDoc {
   /** yyyy-MM-dd -> ranges (empty = day off) */
   exceptions?: Record<string, { startMin: number; endMin: number }[]>;
   habits: HabitDef[];
-  missedCheckinGraceMin?: number;       // default 120; 0 = never; -1 = summary only
+  /** Email the daily report to yourself too (default true). */
+  reportEmail?: boolean;
 }

@@ -4,7 +4,9 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
 import { randomBytes } from "node:crypto";
-import { deliverToPartner, releaseDeferred, routeEvent, type Link } from "./deliver";
+import { deliverToPartner, releaseDeferred, routeEvent, takeQueuedAlerts, type Link } from "./deliver";
+import { firstName } from "./logic/messages";
+import { ownParts, partnerParts, reportDue, reportHtml, reportText, type CheckinDoc, type ReportDoc } from "./logic/report";
 import { checkinState, habitsDue } from "./logic/schedule";
 import { localParts } from "./logic/routing";
 import { buildPrompt, ollamaLibraryUrl, parseCandidates, validateCandidates, type Recommendation } from "./logic/modelrec";
@@ -82,7 +84,7 @@ export const acceptInvite = onCall(PUBLIC, async (req) => {
     const [tu, pu] = await Promise.all([tx.get(db.doc(`users/${trackedUid}`)), tx.get(db.doc(`users/${req.auth!.uid}`))]);
     tx.set(db.doc(`links/${linkId}`), {
       trackedUid, partnerUid: req.auth!.uid, trackedName: tu.get("displayName") ?? "Your friend", partnerName: pu.get("displayName") ?? "Your partner", participants: [trackedUid, req.auth!.uid], status: "active", share: "report", createdAt: Date.now(),
-      partnerPrefs: { channels: { binge_alert: "push", unblock_alert: "push", checkin: "push", work_hours_change: "push", missed_checkin: "push", work_unblock: "push" }, quietHours: null },
+      partnerPrefs: { channels: { binge_alert: "push", unblock_alert: "push", checkin: "push", work_hours_change: "push", work_unblock: "push" }, quietHours: null },
     });
     tx.update(ref, { used: true, usedBy: req.auth!.uid });
     return { linkId, trackedUid };
@@ -137,7 +139,7 @@ export const sendTestMessage = onCall({ ...PUBLIC, secrets: MSG_SECRETS }, async
   return r;
 });
 
-// ---- Schedules: habit prompts, check-in reminders, missed check-ins -------------------------------------------
+// ---- Schedules: habit prompts, check-in reminders, daily reports ----------------------------------------------
 
 /** Runs every 5 minutes so habit prompts fire even while the Mac sleeps. */
 export const sweep = onSchedule({ schedule: "every 5 minutes", secrets: MSG_SECRETS }, async () => {
@@ -160,15 +162,50 @@ async function checkinSweep(uid: string, s: ScheduleDoc, now: Date, tokens: stri
   const st = checkinState(s, done, now);
   const flag = db.doc(`users/${uid}/sweepState/${date}`);
   const state = (await flag.get()).data() ?? {};
-  if (st.state === "remind" && st.level > (state.reminded ?? 0)) {
+  if (st.state === "remind" && !state.reportSent && st.level > (state.reminded ?? 0)) {
     await senders.push(tokens, "OnTask", st.level >= 3 ? "Your check-in is overdue." : "Time for your evening check-in.", { type: "checkin_reminder" });
     await flag.set({ reminded: st.level }, { merge: true });
   }
-  if (st.state === "missed" && !state.missedNotified) {
-    const name = (await db.doc(`users/${uid}`).get()).get("displayName") ?? "Your friend";
-    const links = await db.collection("links").where("trackedUid", "==", uid).where("status", "==", "active").get();
-    for (const l of links.docs) await deliverToPartner(db, senders, l.id, l.data() as Link, name, "missed_checkin", `${name} hasn't checked in today yet.`, now);
-    await flag.set({ missedNotified: true }, { merge: true });
+  await dailyReportSweep(uid, s, now, date, state);
+}
+
+const WEB_URL = "https://ontask-ed2df.web.app";
+
+/**
+ * The daily report: once you've wrapped up (30 minutes without activity after work ends; 6 PM on days off) or at
+ * 8 PM, every partner gets it over their "Daily report" channel, and you get it by email (with page titles).
+ */
+async function dailyReportSweep(uid: string, s: ScheduleDoc, now: Date, date: string, state: Record<string, unknown>) {
+  if (state.reportSent) return;
+  const macs = await db.collection(`users/${uid}/devices`).where("kind", "==", "mac").get();
+  const lastActive = Math.max(0, ...macs.docs.map((d) => Number(d.get("lastActiveMs") ?? 0)));
+  if (!reportDue(s, now, lastActive || undefined)) return;
+  await db.doc(`users/${uid}/sweepState/${date}`).set({ reportSent: true, reportSentAt: now.getTime() }, { merge: true });
+
+  const [userSnap, rep, items, chk] = await Promise.all([
+    db.doc(`users/${uid}`).get(), db.doc(`users/${uid}/reports/${date}`).get(), db.doc(`users/${uid}/reportItems/${date}`).get(), db.doc(`users/${uid}/checkins/${date}`).get(),
+  ]);
+  const name = (userSnap.get("displayName") as string | undefined) ?? "Your friend";
+  const first = firstName(name);
+  const report = rep.data() as ReportDoc | undefined, checkin = chk.data() as CheckinDoc | undefined;
+  const link = `${WEB_URL}/#/`;
+
+  const links = await db.collection("links").where("trackedUid", "==", uid).where("status", "==", "active").get();
+  const alsoToday: string[] = [];
+  for (const l of links.docs) {
+    const extra = await takeQueuedAlerts(db, l.id, s.tz);
+    extra.forEach((e) => { if (!alsoToday.includes(e)) alsoToday.push(e); });
+    const parts = { ...partnerParts(first), report, checkin, alsoToday: extra, link: `${WEB_URL}/#/person/${encodeURIComponent(l.id)}` };
+    await deliverToPartner(db, senders, l.id, l.data() as Link, name, "checkin", reportText(parts), now, { html: reportHtml(parts) });
+  }
+  if (s.reportEmail !== false) {
+    const email = await admin.auth().getUser(uid).then((u) => u.email).catch(() => undefined);
+    if (email) {
+      // Yours has the titled rows (only you can read them).
+      const mine = { ...ownParts, report: { ...report, topSites: (items.get("topSites") as ReportDoc["topSites"]) ?? report?.topSites }, checkin, alsoToday, link };
+      const r = await senders.email(email, `Your day: ${date}`, reportText(mine), reportHtml(mine));
+      if (!r.ok) console.warn(`report email to ${uid} failed: ${r.detail}`);
+    }
   }
 }
 

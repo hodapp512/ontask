@@ -1,6 +1,6 @@
 import * as admin from "firebase-admin";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { releaseDeferred, routeEvent } from "../src/deliver";
+import { releaseDeferred, routeEvent, takeQueuedAlerts } from "../src/deliver";
 import type { Senders } from "../src/senders";
 
 // Runs against the Firestore emulator (FIRESTORE_EMULATOR_HOST is set by `firebase emulators:exec`).
@@ -37,7 +37,7 @@ describe("event routing", () => {
     expect(sent).toHaveLength(0);
   });
 
-  it("caps drifting alerts (binge + unblock) at 2 per half-day and folds extras into the evening review", async () => {
+  it("caps drifting alerts (binge + unblock) at 2 per half-day and lists extras in the daily report", async () => {
     const now = new Date();
     await routeEvent(db, senders, TRACKED, { type: "binge_alert", ts: 1, payload: { message: "alert 1" } }, now);
     await routeEvent(db, senders, TRACKED, { type: "unblock", ts: 2, payload: { domains: "reddit.com", minutes: 10, count_today: 1, work_hours: true } }, now);
@@ -47,25 +47,28 @@ describe("event routing", () => {
     // Work-purpose unblocks are never capped.
     await routeEvent(db, senders, TRACKED, { type: "work_unblock", ts: 4, payload: { domain: "youtube.com", minutes: 30, purpose: "Training" } }, now);
     expect(sent).toHaveLength(3);
-    await routeEvent(db, senders, TRACKED, { type: "checkin", ts: 9, payload: { message: "Today: good." } }, now);
-    expect(sent[3].body).toMatch(/Also today: .*unblocked x\.com for 5 minutes .*\(\d{1,2}:\d{2} [AP]M\)/);
+    const extra = await takeQueuedAlerts(db, LINK, "America/Chicago");
+    expect(extra.join(" ")).toMatch(/unblocked x\.com for 5 minutes .*\(\d{1,2}:\d{2} [AP]M\)/);
+    expect(await takeQueuedAlerts(db, LINK, "America/Chicago")).toHaveLength(0); // listed once
+    // The check-in itself goes out in the daily report, not as its own message.
+    expect(await routeEvent(db, senders, TRACKED, { type: "checkin", ts: 9, payload: { rating: 4 } }, now)).toBe(0);
   });
 
   it("falls back to text when the partner has no push token / hasn't opened the app", async () => {
     await db.doc(`users/${PARTNER}`).set({ displayName: "Bob", fcmTokens: {}, lastSeenMs: 0 });
-    await routeEvent(db, senders, TRACKED, { type: "checkin", ts: 1, payload: { message: "hi" } }, new Date());
+    await routeEvent(db, senders, TRACKED, { type: "work_hours_change", ts: 1, payload: { reason: "hi", meaning: "" } }, new Date());
     expect(sent[0]).toMatchObject({ kind: "text", to: "+15550001111" });
   });
 
   it("respects an 'off' preference but keeps the message visible in the app", async () => {
-    await db.doc(`links/${LINK}`).update({ partnerPrefs: { channels: { checkin: "off", binge_alert: "push", work_hours_change: "push", missed_checkin: "push", work_unblock: "push" } } });
-    await routeEvent(db, senders, TRACKED, { type: "checkin", ts: 1, payload: { message: "hi" } }, new Date());
+    await db.doc(`links/${LINK}`).update({ partnerPrefs: { channels: { checkin: "push", binge_alert: "push", work_hours_change: "off", work_unblock: "push" } } });
+    await routeEvent(db, senders, TRACKED, { type: "work_hours_change", ts: 1, payload: { reason: "hi", meaning: "" } }, new Date());
     expect(sent).toHaveLength(0); expect((await msgs())[0].delivery.channel).toBe("off");
   });
 
   it("holds messages in quiet hours and releases them afterwards", async () => {
-    await db.doc(`links/${LINK}`).update({ partnerPrefs: { channels: { checkin: "push", binge_alert: "push", work_hours_change: "push", missed_checkin: "push", work_unblock: "push" }, quietHours: { start: "22:00", end: "07:00", tz: "UTC" } } });
-    await routeEvent(db, senders, TRACKED, { type: "checkin", ts: 1, payload: { message: "late" } }, new Date("2026-10-30T23:00:00Z"));
+    await db.doc(`links/${LINK}`).update({ partnerPrefs: { channels: { checkin: "push", binge_alert: "push", work_hours_change: "push", work_unblock: "push" }, quietHours: { start: "22:00", end: "07:00", tz: "UTC" } } });
+    await routeEvent(db, senders, TRACKED, { type: "work_hours_change", ts: 1, payload: { reason: "late", meaning: "" } }, new Date("2026-10-30T23:00:00Z"));
     expect(sent).toHaveLength(0); expect((await msgs())[0].deferred).toBe(true);
     expect(await releaseDeferred(db, senders, new Date("2026-10-30T23:30:00Z"))).toBe(0); // still quiet
     expect(await releaseDeferred(db, senders, new Date("2026-10-31T08:00:00Z"))).toBe(1);

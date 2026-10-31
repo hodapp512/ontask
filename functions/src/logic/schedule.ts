@@ -25,11 +25,11 @@ export function workEndMin(s: ScheduleDoc, now: Date): number | null {
   return r.length ? Math.max(...r.map((x) => x.endMin)) : null;
 }
 
-export type CheckinState = "not_due" | "remind" | "missed" | "done" | "no_work_day";
+export type CheckinState = "not_due" | "remind" | "done" | "no_work_day";
 
 /**
- * Evening check-in state. Reminders escalate every 15 min after work ends; once the grace period (default 2 h)
- * has passed without a check-in the partner is told (unless configured otherwise).
+ * Evening check-in state: phone reminders escalate every 15 min after work ends. There's no "missed check-in"
+ * message any more: the daily report goes to the partner either way, saying "No reflection today".
  */
 export function checkinState(s: ScheduleDoc, done: boolean, now: Date): { state: CheckinState; minutesSinceEnd: number; level: number } {
   const end = workEndMin(s, now);
@@ -38,7 +38,5 @@ export function checkinState(s: ScheduleDoc, done: boolean, now: Date): { state:
   const { hour, minute } = localParts(now, s.tz);
   const since = hour * 60 + minute - end;
   if (since < 0) return { state: "not_due", minutesSinceEnd: since, level: 0 };
-  const grace = s.missedCheckinGraceMin ?? 120;
-  if (grace > 0 && since >= grace) return { state: "missed", minutesSinceEnd: since, level: 0 };
   return { state: "remind", minutesSinceEnd: since, level: Math.min(3, 1 + Math.floor(since / 15)) };
 }

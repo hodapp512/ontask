@@ -21,20 +21,23 @@ data class DayState(
  * Decides which daily-rhythm prompt is due. The day is anchored to first presence at the computer on a work day,
  * not to clock time. Pure function of (schedule, state, now) so it is easy to test.
  */
-class Rhythm(private val zone: ZoneId = ZoneId.systemDefault(), private val middayEnabled: Boolean = true, private val eveningEnabled: Boolean = true) {
+/** [eveningLeadMin]: the evening check-in comes this many minutes before work hours end (default 30). */
+class Rhythm(private val zone: ZoneId = ZoneId.systemDefault(), private val middayEnabled: Boolean = true, private val eveningEnabled: Boolean = true, private val eveningLeadMin: Int = 30) {
 
     fun due(schedule: WorkSchedule, s: DayState, now: Long): Prompt? {
         val date = Instant.ofEpochSecond(now).atZone(zone).toLocalDate()
         if (date != s.date || !schedule.isWorkDay(date)) return null
         val dayStart = date.atStartOfDay(zone).toEpochSecond()
         val endTs = dayStart + schedule.endMin(date)!! * 60L
+        // While you're still at your desk, so the reflection is part of the day's report.
+        val eveningTs = endTs - eveningLeadMin * 60L
         val first = s.firstPresenceTs
 
         if (first == null) {
             // A work day with no computer use is "no computer today", not a missed check-in.
             return if (now >= endTs && !s.eveningDone) Prompt.NO_COMPUTER else null
         }
-        if (now >= endTs) {
+        if (now >= eveningTs) {
             if (s.eveningDone || !eveningEnabled) return null
             if (s.presentNow) return Prompt.EVENING
             // Already left: wait for return, or fall back to the phone in the evening.

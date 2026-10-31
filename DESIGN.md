@@ -108,13 +108,20 @@ Active during work hours and Focus sessions. Thresholds are defaults, configurab
 - **Today's plan** on arrival: one free-form note at the top of Home, starting empty (yesterday's "change for
   tomorrow" is shown as a hint).
 - **Midday check-in** at the midpoint of actual working time; skipped if the day started < ~2h before end of work hours.
-- **Evening check-in + reflection** (one prompt) at end of work hours:
+- **Morning check** (work days, with Today's plan): "Working 9:00–5:00 today?" Yes / start later or finish early / day off.
+- **Evening check-in + reflection** (one prompt) **30 minutes before work hours end** (15–60, in Settings):
   1. Rate today: Rough / Meh / Okay / Good / Great
   2. What helped / what hurt (one line each)
   3. Optional change for tomorrow
-  4. Accountability partner message: review the draft ("Here is X's evening review.", stats + trend) → send via the partner's channels
+  4. An optional note for the partner
+  - Saving it sends nothing by itself; it goes out in the daily report.
+- **Daily report**, every day: after work ends (6 PM on days off), once you've been inactive for 30 minutes, 8 PM at
+  the latest. Decided on the server from the Mac's "last active" time. To each partner over their "Daily report"
+  channel (titles per your setting), and to you by email (with titles; on by default). Includes totals, longest
+  focused sessions, where the time went, the plan, the check-in or "No reflection today", alerts held back by the cap,
+  and a link to the full day.
   - If the user has already left the computer, wait for return or prompt on the phone in the evening.
-- Check-ins: must be marked done; escalating reminders on Mac + phone if not.
+- Check-ins: escalating phone reminders after work ends until done or the report goes. No "missed check-in" message.
 - **Habit prompts** (e.g. morning prayer): user-defined (add/edit/remove), clock-scheduled, delivered to phone even when away from the computer.
 - A work day with no computer use is reported as "no computer today", not a missed check-in.
 - Weekly report compares self-rating vs. measured data.
@@ -150,7 +157,8 @@ Activity log with filters; classification source per tick (rule / metadata / OCR
 - **Partner settings:** per message type (struggling alerts, unblocks during work hours, check-ins, work-hours changes,
   missed check-ins, work unblocks) choose push / text / email / off; quiet hours. Default push, text fallback if the PWA hasn't been opened in a while.
 - **Partner reactions:** one-tap (👍 / Proud of you / Call me when you can / Take a walk) + optional short reply → notification on user's Mac and phone. No partner-initiated nudging, no unblock approvals.
-- **Missed check-in:** partner notified after a grace period (~2h) by default; user can change to summary-only or never.
+- **Partner view:** the same "Today so far" view you see (bar, timeline, where the time went, longest focused
+  sessions), live, with earlier days.
 
 ## Server (Firebase)
 

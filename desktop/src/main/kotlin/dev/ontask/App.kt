@@ -75,7 +75,11 @@ class App(val dir: Path = dataDir()) {
     }
 
     val cloud by lazy { dev.ontask.cloud.CloudSync(prefs, events, reports, { settings }, habits, checkins, relabel = { name, cat -> reclassify(name, Category.valueOf(cat)) },
-        relabelItem = { key, title, cat -> answerVariable(key, title, Category.valueOf(cat)) }) }
+        relabelItem = { key, title, cat -> answerVariable(key, title, Category.valueOf(cat)) },
+        lastActive = { lastActiveTs.takeIf { it > 0 } }, plan = { priorities.forDate(it) }) }
+    /** Last moment you were at the Mac (not Away), for the daily report's "you've wrapped up" rule. */
+    @Volatile private var lastActiveTs = 0L
+    private var wasAway = false
     val updates = dev.ontask.cloud.UpdateCheck()
     @Volatile var updateAvailable: dev.ontask.cloud.UpdateInfo? = null; private set
     private var lastCloud = 0L; private var lastUpdateCheck = 0L
@@ -251,6 +255,10 @@ class App(val dir: Path = dataDir()) {
     /** Everything that happens once per tick beyond tracking: interventions, AI, battery, daily rhythm. */
     private fun onTick(now: Long) {
         val live = tracker.live.value
+        if (!live.away) lastActiveTs = now
+        // Stepping away: sync now, so the server sees the final numbers and when you stopped.
+        if (live.away && !wasAway && cloud.configured) { lastCloud = now; scope.launch(IO) { cloud.syncOnce(now, force = true) } }
+        wasAway = live.away
         val wasted = !live.away && live.classification?.level == Level.WASTED
         ladder.cfg = ladder.cfg.copy(lockSec = prefs.int("ladder.lock_sec", 30).coerceIn(30, 180), step1WastedSec = prefs.int("ladder.step1_sec", 180))
         val iv = ladder.tick(now, wasted, blocking.strictNow(now), unblocks.unblocksInLast(now, ladder.cfg.unblockWindowSec.toLong()))
@@ -378,7 +386,7 @@ class App(val dir: Path = dataDir()) {
         val zone = ZoneId.systemDefault(); val date = java.time.Instant.ofEpochSecond(now).atZone(zone).toLocalDate()
         val (first, last) = reports.presence(date)
         val state = DayState(date, first, !away, priorities.forDate(date).isNotEmpty() || checkins.done(date, "planning"), checkins.done(date, "midday"), checkins.done(date, "evening"), last)
-        val due = Rhythm(zone, prefs.bool("rhythm.midday", true), prefs.bool("rhythm.evening_at_end", true)).due(settings.schedule, state, now)
+        val due = Rhythm(zone, prefs.bool("rhythm.midday", true), prefs.bool("rhythm.evening_at_end", true), prefs.int("rhythm.evening_lead_min", 30)).due(settings.schedule, state, now)
         when (due) {
             null -> {}
             Prompt.NO_COMPUTER -> markOnce("no_computer:$date") { checkins.save(Checkin(date, "evening", now, null, null, null, null, "No computer today", false)); events.emit("no_computer_day", now, "date" to date.toString()) }

@@ -11,7 +11,8 @@ export function partnerMessage(ev: EventDoc, name: string): { type: MessageType;
     case "binge_alert":
       return { type: "binge_alert", text: s("message") || `${name} has been drifting off task and wanted you to know.` };
     case "checkin":
-      return { type: "checkin", text: s("message") ? `Here is ${first}'s evening review.\n\n${s("message")}` : `${first} checked in.` };
+      // The check-in goes out in the daily report (see sweep), not on its own.
+      return null;
     case "work_hours_change":
       return { type: "work_hours_change", text: `${name} reduced their work hours. Reason: "${s("reason")}". ${s("meaning")}` };
     case "unblock":

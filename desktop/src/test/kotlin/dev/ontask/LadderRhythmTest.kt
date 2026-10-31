@@ -74,7 +74,13 @@ class LadderRhythmTest {
     }
 
     @Test fun middaySkippedWhenDayStartedLate() {
-        assertNull(r.due(sched, st(first = at(15, 30), plan = true), at(16, 30)))
+        assertNull(r.due(sched, st(first = at(15, 30), plan = true), at(16, 15)))
+    }
+
+    @Test fun eveningComesBeforeWorkEnds() {
+        assertNull(r.due(sched, st(plan = true, mid = true), at(16, 29)))
+        assertEquals(Prompt.EVENING, r.due(sched, st(plan = true, mid = true), at(16, 30))) // 30 min before 5 PM
+        assertEquals(Prompt.EVENING, Rhythm(utc, eveningLeadMin = 60).due(sched, st(plan = true, mid = true), at(16, 0)))
     }
 
     @Test fun eveningWaitsForReturnThenFallsBackToPhone() {

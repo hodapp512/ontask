@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { partnerMessage, textBeltSafe, withClose } from "../src/logic/messages";
 import { decide, driftAllowed, halfDayStart, inQuietHours, localParts } from "../src/logic/routing";
 import { checkinState, habitsDue } from "../src/logic/schedule";
+import { ownParts, partnerParts, reportDue, reportHtml, reportText } from "../src/logic/report";
 import { buildPrompt, ollamaLibraryUrl, parseCandidates, validateCandidates } from "../src/logic/modelrec";
 import { DEFAULT_PARTNER_PREFS, type PartnerPrefs, type ScheduleDoc } from "../src/logic/types";
 
@@ -10,7 +11,7 @@ const at = (iso: string) => new Date(iso);
 describe("messages", () => {
   it("maps events to partner messages and ignores private ones", () => {
     expect(partnerMessage({ type: "work_unblock", ts: 1, payload: { domain: "youtube.com", minutes: 60, purpose: "Acme onboarding" } }, "Sam")!.text).toContain("Acme onboarding");
-    expect(partnerMessage({ type: "checkin", ts: 1, payload: { message: "Today: 3h deep." } }, "Sam Rivera")!.text).toBe("Here is Sam's evening review.\n\nToday: 3h deep.");
+    expect(partnerMessage({ type: "checkin", ts: 1, payload: { rating: 4 } }, "Sam Rivera")).toBeNull(); // goes out in the daily report
     expect(partnerMessage({ type: "unblock", ts: 1, payload: { domains: "reddit.com,x.com", minutes: 10, count_today: 2, work_hours: true } }, "Sam Rivera")!)
       .toEqual({ type: "unblock_alert", text: "Sam unblocked reddit.com, x.com for 10 minutes during work hours (2nd today, not for work)." });
     expect(partnerMessage({ type: "unblock_leisure", ts: 1, payload: { domains: "reddit.com", minutes: 30 } }, "Sam")).toBeNull();
@@ -69,16 +70,50 @@ describe("schedule", () => {
     expect(habitsDue([{ ...s.habits[0], days: [1] }], s.tz, at("2026-10-30T11:32:00Z"))).toHaveLength(0);
     expect(habitsDue([{ ...s.habits[0], enabled: false }], s.tz, at("2026-10-30T11:32:00Z"))).toHaveLength(0);
   });
-  it("escalates reminders, then reports a missed check-in after the 2h grace period", () => {
+  it("escalates reminders after work ends, and never turns into a missed check-in", () => {
     expect(checkinState(s, false, at("2026-10-30T21:00:00Z")).state).toBe("not_due");                       // 16:00 local
     expect(checkinState(s, false, at("2026-10-30T22:20:00Z"))).toMatchObject({ state: "remind", level: 2 }); // 17:20
-    expect(checkinState(s, false, at("2026-10-30T23:05:00Z")).state).toBe("remind");                         // 18:05
-    expect(checkinState(s, false, at("2026-10-31T00:05:00Z")).state).toBe("missed");                         // 19:05
+    expect(checkinState(s, false, at("2026-10-31T00:05:00Z"))).toMatchObject({ state: "remind", level: 3 }); // 19:05
     expect(checkinState(s, true, at("2026-10-31T00:05:00Z")).state).toBe("done");
-  });
-  it("honours 'never' and treats days off as not a missed check-in", () => {
-    expect(checkinState({ ...s, missedCheckinGraceMin: 0 }, false, at("2026-10-31T03:00:00Z")).state).toBe("remind");
     expect(checkinState(s, false, at("2026-10-31T20:00:00Z")).state).toBe("no_work_day");                    // Saturday
+  });
+});
+
+describe("daily report", () => {
+  // Fridays 9:00-17:00 in Chicago (UTC-5 on these dates).
+  const s: ScheduleDoc = { tz: "America/Chicago", workWeek: { "5": [{ startMin: 540, endMin: 1020 }] }, habits: [] };
+  const local = (day: number) => (hhmm: string) => new Date(Date.UTC(2026, 9, day, Number(hhmm.slice(0, 2)) + 5, Number(hhmm.slice(3))));
+  const fri = local(30), sat = local(31);
+  it("waits for work to end, then for 30 minutes without activity", () => {
+    expect(reportDue(s, fri("16:50"), fri("16:40").getTime())).toBe(false);   // still working hours
+    expect(reportDue(s, fri("17:20"), fri("17:10").getTime())).toBe(false);   // active 10 min ago
+    expect(reportDue(s, fri("17:45"), fri("17:10").getTime())).toBe(true);    // 35 min without activity
+    expect(reportDue(s, fri("17:20"), fri("16:00").getTime())).toBe(false);   // left early: 30 min counted from 5 PM
+    expect(reportDue(s, fri("17:30"), fri("16:00").getTime())).toBe(true);
+    expect(reportDue(s, fri("17:31"), undefined)).toBe(true);                 // laptop closed, no recent signal
+  });
+  it("starts at 6 PM on a day off and goes by 8 PM regardless", () => {
+    expect(reportDue(s, sat("17:00"), sat("10:00").getTime())).toBe(false);
+    expect(reportDue(s, sat("18:30"), sat("10:00").getTime())).toBe(true);
+    expect(reportDue(s, sat("19:59"), sat("19:58").getTime())).toBe(false);
+    expect(reportDue(s, sat("20:00"), sat("19:59").getTime())).toBe(true);    // still active at 8 PM
+  });
+  const report = { totals: { DEEP: 3 * 3600, MIXED: 3600, WASTED: 1800 }, deepSessions: [{ a: 0, b: 40 * 60 }, { a: 0, b: 90 * 60 }], topSites: [{ name: "IntelliJ IDEA", category: "Work", seconds: 7200 }] };
+  it("says how the day went, with the check-in or without", () => {
+    const t = reportText({ ...partnerParts("Sam"), report, checkin: { evening: true, plan: "Ship the report", feeling: "🙂 Okay", note: "Long day" }, alsoToday: ["Sam unblocked x.com (3:10 PM)"], link: "https://x/#/" });
+    expect(t).toContain("Here is Sam's day.");
+    expect(t).toContain("67% focused");
+    expect(t).toContain("Longest focused session 1h 30m (2 in all)");
+    expect(t).toContain("Plan: Ship the report");
+    expect(t).toContain('"Long day"');
+    expect(t).toContain("Also today: Sam unblocked x.com (3:10 PM)");
+    expect(reportText({ ...partnerParts("Sam"), report, link: "l" })).toContain("No reflection today.");
+    expect(reportText({ ...ownParts, link: "l" })).toContain("You didn't use the computer today.");
+  });
+  it("escapes what people typed in the email", () => {
+    const h = reportHtml({ ...ownParts, report, checkin: { evening: true, note: "<script>x</script>" }, link: "https://x/#/" });
+    expect(h).toContain("&lt;script&gt;");
+    expect(h).toContain("Open today in OnTask");
   });
 });
 

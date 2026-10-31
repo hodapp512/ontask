@@ -8,13 +8,13 @@ import type { Senders } from "./senders";
 export interface Link { trackedUid: string; partnerUid: string; partnerPrefs?: PartnerPrefs; status: string }
 
 const TITLES: Record<MessageType, string> = {
-  binge_alert: "Check-in from {name}", unblock_alert: "{name} unblocked a site", checkin: "{name}'s evening review", work_hours_change: "{name} changed their work hours",
-  missed_checkin: "{name} hasn't checked in", work_unblock: "{name} unblocked a site for work",
+  binge_alert: "Check-in from {name}", unblock_alert: "{name} unblocked a site", checkin: "{name}'s day", work_hours_change: "{name} changed their work hours",
+  work_unblock: "{name} unblocked a site for work",
 };
 
 /** Sends one message to one partner over their configured channel and records it on the link. */
 export async function deliverToPartner(
-  db: Firestore, senders: Senders, linkId: string, link: Link, trackedName: string, type: MessageType, text: string, now: Date, opts: { force?: boolean } = {},
+  db: Firestore, senders: Senders, linkId: string, link: Link, trackedName: string, type: MessageType, text: string, now: Date, opts: { force?: boolean; html?: string } = {},
 ): Promise<{ delivered: boolean; reason?: string; channel?: string }> {
   const prefs = link.partnerPrefs ?? DEFAULT_PARTNER_PREFS;
   const msgs = db.collection("links").doc(linkId).collection("messages");
@@ -53,7 +53,7 @@ export async function deliverToPartner(
       res = r;
       if (r.invalidTokens.length) await db.doc(`users/${link.partnerUid}`).update(Object.fromEntries(r.invalidTokens.map((t) => [`fcmTokens.${t}`, FieldValue.delete()])));
     } else if (d.channel === "text") res = await senders.text(phone!, `${title}: ${body}`);
-    else res = await senders.email(email!, title, body);
+    else res = await senders.email(email!, title, body, opts.html);
   } catch (e) {
     // A failing channel must not lose the message: it is still recorded (and visible in the app) with the error.
     res = { ok: false, detail: `send failed: ${String(e).slice(0, 200)}` };
@@ -72,20 +72,20 @@ export async function routeEvent(db: Firestore, senders: Senders, uid: string, e
   const links = await db.collection("links").where("trackedUid", "==", uid).where("status", "==", "active").get();
   let n = 0;
   for (const l of links.docs) {
-    let text = m.text;
-    if (m.type === "checkin") {
-      // Fold in alerts that were rate-limited earlier today.
-      const queued = await l.ref.collection("messages").where("queuedForCheckin", "==", true).get();
-      const tz = ((await db.doc(`users/${uid}/schedule/current`).get()).get("tz") as string | undefined) ?? "UTC";
-      const at = (ms: number) => new Date(ms).toLocaleTimeString("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" });
-      const extra = queued.docs.sort((a, b) => a.get("ts") - b.get("ts")).map((q) => `${String(q.get("text")).split("\n")[0]} (${at(q.get("ts"))})`).filter(Boolean);
-      if (extra.length) text += `\nAlso today: ${extra.join(" · ")}`;
-      await Promise.all(queued.docs.map((q) => q.ref.update({ queuedForCheckin: false, includedInCheckin: true })));
-    }
+    const text = m.text;
     const r = await deliverToPartner(db, senders, l.id, l.data() as Link, name, m.type, text, now);
     if (r.delivered) n++;
   }
   return n;
+}
+
+/** Alerts held back by the cap today, with their times, for the daily report ("Also today"); marks them as included. */
+export async function takeQueuedAlerts(db: Firestore, linkId: string, tz: string): Promise<string[]> {
+  const queued = await db.collection("links").doc(linkId).collection("messages").where("queuedForCheckin", "==", true).get();
+  const at = (ms: number) => new Date(ms).toLocaleTimeString("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" });
+  const extra = queued.docs.sort((a, b) => a.get("ts") - b.get("ts")).map((q) => `${String(q.get("text")).split("\n")[0]} (${at(q.get("ts"))})`).filter(Boolean);
+  await Promise.all(queued.docs.map((q) => q.ref.update({ queuedForCheckin: false, includedInCheckin: true })));
+  return extra;
 }
 
 /** Sends messages held for quiet hours once the window has ended. */

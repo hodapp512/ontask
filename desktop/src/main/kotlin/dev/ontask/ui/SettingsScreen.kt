@@ -29,6 +29,7 @@ fun SettingsScreen(app: App, theme: ThemeMode, onTheme: (ThemeMode) -> Unit, ope
                 androidx.compose.material3.Button({ open(Dest.WORK_HOURS) }) { Text("Edit work hours") }
             }
         }
+        RhythmSettings(app)
         SectionCard("Block list", "Blocked around the clock.") {
             val n = remember { app.blocking.blocklist.all().size }
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
@@ -78,5 +79,22 @@ private fun StartupSettings(app: App) {
         SwitchSetting("Start when you log in", "OnTask opens in the menu bar when you log in to your Mac.", atLogin) { atLogin = it; apply() }
         SwitchSetting("Reopen if it's quit or crashes", "OnTask comes back a few seconds after it closes. Turn this off to be able to quit it for good.", reopen) { reopen = it; apply() }
         if (packaged && !login.managed && (atLogin || reopen)) Text("Takes effect the next time OnTask opens.", style = androidx.compose.material3.MaterialTheme.typography.bodySmall)
+    }
+}
+
+/** Midday and evening check-ins; the evening one comes a set time before work hours end. */
+@Composable
+private fun RhythmSettings(app: App) {
+    var midday by remember { mutableStateOf(app.prefs.bool("rhythm.midday", true)) }
+    var evening by remember { mutableStateOf(app.prefs.bool("rhythm.evening_at_end", true)) }
+    var lead by remember { mutableStateOf(app.prefs.int("rhythm.evening_lead_min", 30)) }
+    SectionCard("Daily rhythm") {
+        SwitchSetting("Midday check-in", "Halfway through your working time.", midday) { midday = it; app.prefs.set("rhythm.midday", it) }
+        SwitchSetting("Evening check-in", "How the day felt, before your daily report goes out.", evening) { evening = it; app.prefs.set("rhythm.evening_at_end", it) }
+        if (evening) SettingRow("Evening check-in comes", "Before your work hours end, so you do it while you're still at the desk.") {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf(15, 30, 45, 60).forEach { m -> FilterChip(lead == m, { lead = m; app.prefs.set("rhythm.evening_lead_min", m) }, label = { Text("$m min before") }) }
+            }
+        }
     }
 }

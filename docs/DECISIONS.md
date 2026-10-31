@@ -185,3 +185,27 @@ Format: **Decision** — why. *Rejected:* alternatives, and why not.
   call Gemini). No application restriction: the Mac app calls the APIs directly, without a website referrer.
 - **No day-off planning prompts.** Asking "any work today?" on days without work hours, and offering a work block when
   work is detected on a day off, were considered and dropped.
+
+## 2026-10-31 · Daily report, morning check, partner view (grilled)
+
+- **A daily report goes to the partner every day, automatically,** whether or not you did the evening check-in, so
+  they always see how the time was spent. It includes the check-in (how it felt, what helped and hurt, tomorrow's
+  change, an optional note) when there was one, otherwise "No reflection today". It replaces the "missed check-in"
+  message and the separate evening-review message. It's the "Daily report" message type and is never capped.
+- **When it goes:** after work hours end (6 PM on days off), once you've had **30 minutes without activity**, and by
+  **8 PM** at the latest (or when work ends, if that's later). Activity = keyboard, mouse or a video in front of you
+  (the same as Away detection). The Mac reports when you were last active; the server decides, so a closed laptop
+  still gets its report out. *Rejected:* a fixed 6 PM / 7 PM time (mid-work on long days, or long after you stopped).
+- **The evening check-in comes 30 minutes before work hours end** (Settings → Daily rhythm: 15–60 min), while you're
+  still at the desk, so it can be part of the report. Saving it no longer sends anything by itself.
+- **You get your own copy by email** (on by default, to your sign-in address), with page titles; the partner's copy
+  follows their channel and your title setting. Both link to the full day in the phone app.
+- **The partner sees the same "Today so far" view as you:** bar, timeline (tap for what you did), where the time went,
+  longest focused sessions, distractions; live as your Mac syncs, with earlier days. Read-only.
+- **Morning check on work days:** "Working 9:00 AM–5:00 PM today?" — Yes / Start later or finish early / Day off, in
+  the same window as Today's plan. Shortening still asks for a reason and tells the partner.
+- **Today's plan stays as it is** (AI context, the unblock delay screen, the midday check-in, the report).
+  *Rejected:* a "plan vs. reality" comparison; dropping it.
+- **Timeline hover shows the category** ("Entertainment / News / Social", "Unsure" for undecided pages) instead of
+  Focused/Mixed/Wasted, names videos and pages ("youtube.com – Learning Java"), and puts the time on a smaller line
+  below. Stretches are split by category (still colored by level).

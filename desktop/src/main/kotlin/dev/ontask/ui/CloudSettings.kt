@@ -92,6 +92,8 @@ fun CloudSettingsBody(app: App) {
         KV("This Mac", "Sending updates" + (app.cloud.lastSyncTs.takeIf { it > 0 }?.let { " · last sent ${fmtTime(it)}" } ?: ""))
         KV("Phones", info?.phones?.takeIf { it.isNotEmpty() }?.joinToString(", ") { (n, seen) -> if (seen > 0) "$n (opened ${fmtAgo(seen / 1000)})" else n } ?: "None yet. Open ${web ?: "the OnTask website"} on your phone and sign in.")
         KV("Accountability partner", info?.partners?.takeIf { it.isNotEmpty() }?.joinToString(", ") ?: "None yet. Invite one below.")
+        var mine by remember { mutableStateOf(app.cloud.reportEmail) }
+        SwitchSetting("Email me my daily report", "The same report your partner gets, with page titles, sent to ${app.prefs.get("cloud.account_email") ?: "your sign-in address"} once you've wrapped up for the day.", mine) { mine = it; app.cloud.reportEmail = it }
         var titles by remember { mutableStateOf(app.cloud.partnerSeesTitles) }
         SwitchSetting(
             "Allow partner to see individual website page titles",
