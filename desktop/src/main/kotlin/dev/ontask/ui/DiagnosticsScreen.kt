@@ -74,7 +74,12 @@ fun DiagnosticsScreen(app: App) {
                 Hint("A small companion program (ontask-helper) that tells OnTask which app and window are in front, whether you're at the keyboard, and — if you allow it — the text on screen. It's separate from the blocking service, which edits your hosts file.")
                 if (app.helper.restarts > 0 || app.helper.failures > 0) KV("Reader hiccups", "restarted ${app.helper.restarts}×, ${app.helper.failures} missed checks")
                 val ax = app.tracker.live.value.sample?.accessibilityTrusted == true
-                KV("Can see window titles", if (ax) "Yes ✓" else "No — grant Accessibility in Settings → Permissions")
+                if (ax) KV("Can see window titles", "Yes ✓")
+                else Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Can see window titles: no", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    val scope = androidx.compose.runtime.rememberCoroutineScope()
+                    Button({ scope.launch { app.permissions.requestAccessibility() } }) { Text("Open Accessibility settings") }
+                }
             }
             SectionCard("How much of your Mac it uses", "Target: about 250 MB of memory and under 1% CPU.") {
                 KV("Memory (OnTask)", r.self.rssMb?.let { "%.0f MB".format(it) } ?: "?")

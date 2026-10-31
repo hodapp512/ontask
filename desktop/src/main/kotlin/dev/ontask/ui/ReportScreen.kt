@@ -49,6 +49,7 @@ import dev.ontask.classify.RuleKind
 import dev.ontask.classify.domainOf
 import dev.ontask.report.DailyReport
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
@@ -97,8 +98,13 @@ internal fun HelperBanner(app: App) {
         else "OnTask can't see what you're working on right now, so nothing is being tracked. Quit and reopen OnTask; if it keeps happening, check Diagnostics.",
         error = true,
     )
-    else if (live.sample?.accessibilityTrusted == false)
-        Notice("Window titles of non-browser apps are hidden until you grant Accessibility access (System Settings → Privacy & Security). Diagnostics has a shortcut.")
+    else if (live.sample?.accessibilityTrusted == false) {
+        val scope = androidx.compose.runtime.rememberCoroutineScope()
+        Notice(
+            "OnTask can't see window titles yet, so it can't tell one document or chat from another. Allow it under Accessibility, then switch OnTask on.",
+            action = "Open Accessibility settings",
+        ) { scope.launch { app.permissions.requestAccessibility() } }
+    }
 }
 
 /** The phone-style summary: deep-focus share, a bar by level, the timeline, and where the time went. */

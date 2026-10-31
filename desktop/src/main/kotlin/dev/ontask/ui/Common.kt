@@ -20,6 +20,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -189,11 +190,16 @@ fun KV(k: String, v: String) {
 fun Dot(color: Color, size: Int = 10) = Box(Modifier.size(size.dp).clip(CircleShape).background(color))
 
 @Composable
-fun Notice(text: String, error: Boolean = false) {
+fun Notice(text: String, error: Boolean = false, action: String? = null, onAction: () -> Unit = {}) {
     Card(
         Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = if (error) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer),
-    ) { Text(text, Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium) }
+    ) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = if (action != null) 6.dp else 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(text, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+            if (action != null) Button(onAction) { Text(action) }
+        }
+    }
 }
 
 /** Native macOS file chooser for a text or hosts file; null if cancelled. */

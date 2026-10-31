@@ -49,24 +49,14 @@ private fun PlanBody(app: App, prompt: Prompt, date: LocalDate, onDone: () -> Un
 
 @Composable
 internal fun PrioritiesCard(app: App, date: LocalDate, short: Boolean, onDone: () -> Unit) {
-    val items = remember { mutableStateListOf<String>().apply { addAll(app.priorities.forDate(date).ifEmpty { app.priorities.previous(date) }.ifEmpty { listOf("") }) } }
-    var change by remember { mutableStateOf(app.checkins.get(date.minusDays(1), "evening")?.change.orEmpty()) }
-    var saved by remember { mutableStateOf(false) }
-    SectionCard("Today's priorities", "Pre-filled from your last plan — edit only what changed. Up to 5.") {
+    var text by remember { mutableStateOf(app.priorities.forDate(date).ifEmpty { app.priorities.previous(date) }.joinToString("\n")) }
+    val change = remember { app.checkins.get(date.minusDays(1), "evening")?.change.orEmpty() }
+    SectionCard("Today's plan", "What matters today, in your own words. Pre-filled from your last plan — change what's different.") {
         if (change.isNotBlank()) Notice("Yesterday you wanted to change: $change")
-        items.forEachIndexed { i, t ->
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(t, { items[i] = it; saved = false }, Modifier.weight(1f), singleLine = true, label = { Text("Priority ${i + 1}") })
-                if (items.size > 1) TextButton({ items.removeAt(i); saved = false }) { Text("Remove") }
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (items.size < 5) OutlinedButton({ items.add("") }) { Text("Add priority") }
-            Button({
-                app.priorities.set(date, items.toList()); app.checkins.save(Checkin(date, "planning", App.nowSec(), null, null, null, null, null, false)); saved = true; onDone()
-            }) { Text(if (short) "Save plan" else "Start my day") }
-            if (saved) Text("Saved.", style = MaterialTheme.typography.bodySmall)
-        }
+        OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth(), minLines = 4, placeholder = { Text("e.g. Finish the Acme proposal, then review PRs. No news before lunch.") })
+        Button({
+            app.priorities.set(date, listOf(text)); app.checkins.save(Checkin(date, "planning", App.nowSec(), null, null, null, null, null, false)); onDone()
+        }, enabled = text.isNotBlank()) { Text(if (short) "Save plan" else "Start my day") }
     }
 }
 
@@ -75,8 +65,7 @@ internal fun MiddayCard(app: App, date: LocalDate, onDone: () -> Unit) {
     val p = app.priorities.forDate(date)
     var note by remember { mutableStateOf("") }
     SectionCard("Midday check-in", "Halfway through the day: are you still working on what you planned?") {
-        p.forEach { Text("• $it") }
-        if (p.isEmpty()) Text("No priorities set today.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (p.isEmpty()) Text("No plan set today.", color = MaterialTheme.colorScheme.onSurfaceVariant) else Text(p.joinToString("\n"))
         OutlinedTextField(note, { note = it }, Modifier.fillMaxWidth(), label = { Text("Anything to adjust for the afternoon? (optional)") })
         Button({ app.checkins.save(Checkin(date, "midday", App.nowSec(), null, null, null, note.ifBlank { null }, null, false)); app.events.emit("checkin_midday", App.nowSec(), "note" to note); onDone() }) { Text("Mark midday check-in done") }
     }

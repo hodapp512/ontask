@@ -88,7 +88,7 @@ internal fun BlockingSetup(app: App, mode: BlockMode, onMode: (BlockMode) -> Uni
     )
 }
 
-/** The friction screen: pick a duration, wait out the delay (showing today's count, priorities and your own message). */
+/** The friction screen: pick a duration, wait out the delay (showing today's count, your plan and your own message). */
 @Composable
 fun UnblockDialog(app: App, domains: List<String>, onClose: () -> Unit) {
     val now0 = remember { App.nowSec() }
@@ -108,8 +108,8 @@ fun UnblockDialog(app: App, domains: List<String>, onClose: () -> Unit) {
                 Text("Unblocks so far today: $count", style = MaterialTheme.typography.bodyMedium)
                 val priorities = remember { app.priorities.today(now0) }
                 if (priorities.isNotEmpty()) {
-                    Text("Today's priorities:", style = MaterialTheme.typography.labelMedium)
-                    priorities.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) }
+                    Text("Today's plan:", style = MaterialTheme.typography.labelMedium)
+                    Text(priorities.joinToString("\n"), style = MaterialTheme.typography.bodyMedium)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     app.unblocks.durationsMin.forEach { m -> FilterChip(minutes == m, { minutes = m }, label = { Text("$m min") }) }

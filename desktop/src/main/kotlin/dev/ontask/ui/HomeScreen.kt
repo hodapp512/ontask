@@ -168,7 +168,7 @@ private fun RightNowCard(app: App, now: Long, changed: () -> Unit) {
     }
 }
 
-/** Priorities (editable inline in the morning, a short list after) and the evening reflection, which opens in its own window. */
+/** Today's plan (a free-form note, editable inline in the morning, shown as text after) and the evening reflection, which opens in its own window. */
 @Composable
 private fun TodayCard(app: App, date: LocalDate, onReflect: () -> Unit) {
     var editing by remember { mutableStateOf(false) }
@@ -179,11 +179,10 @@ private fun TodayCard(app: App, date: LocalDate, onReflect: () -> Unit) {
     val evening = app.checkins.get(date, "evening")
     PlainCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Today's priorities", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Text("Today's plan", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             TextButton({ editing = true }) { Text("Edit") }
         }
-        priorities.forEach { Text("• $it") }
-        if (priorities.isEmpty()) Text("None set.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (priorities.isEmpty()) Text("Nothing planned yet.", color = MaterialTheme.colorScheme.onSurfaceVariant) else Text(priorities.joinToString("\n"))
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(

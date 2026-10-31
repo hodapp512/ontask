@@ -106,8 +106,8 @@ private fun StepTwo(app: App, iv: Intervention, lockLeft: Int) {
         Text(app.unblockMessage(), style = MaterialTheme.typography.titleMedium)
         Text("You've been off track for ${iv.driftSec / 60} min. Unblocks in the last hour: ${iv.unblocks}.", style = MaterialTheme.typography.bodyLarge)
         if (priorities.isNotEmpty()) {
-            Text("Today's priorities", style = MaterialTheme.typography.titleSmall)
-            priorities.forEach { Text("• $it") }
+            Text("Today's plan", style = MaterialTheme.typography.titleSmall)
+            Text(priorities.joinToString("\n"))
         }
         if (lockLeft > 0) Text("You can respond in ${lockLeft}s…", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
