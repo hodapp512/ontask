@@ -47,9 +47,14 @@ class Reports(private val db: Db, private val zone: ZoneId = ZoneId.systemDefaul
             }
 
             val raw = ArrayList<Run>()
-            c.prepareStatement("SELECT start_ts, end_ts, level FROM ticks WHERE start_ts >= ? AND start_ts < ? ORDER BY start_ts").use { ps ->
+            c.prepareStatement("SELECT start_ts, end_ts, level, COALESCE(domain, app, '') FROM ticks WHERE start_ts >= ? AND start_ts < ? ORDER BY start_ts").use { ps ->
                 ps.setLong(1, start); ps.setLong(2, end)
-                ps.executeQuery().use { rs -> while (rs.next()) raw.add(Run(rs.getLong(1), rs.getLong(2), Level.valueOf(rs.getString(3)))) }
+                ps.executeQuery().use { rs ->
+                    while (rs.next()) {
+                        val a = rs.getLong(1); val b = rs.getLong(2); val subject = rs.getString(4)
+                        raw.add(Run(a, b, Level.valueOf(rs.getString(3)), if (subject.isBlank()) emptyMap() else mapOf(dev.ontask.track.displayAppName(subject) to b - a)))
+                    }
+                }
             }
             val timeline = Sessions.merge(raw)
 

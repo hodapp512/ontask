@@ -22,7 +22,7 @@ export function deepShare(totals: Partial<Record<LevelKey, number>>): number | n
 }
 
 /** Timeline segments: seconds from local midnight, k = D|M|W|A (Firestore forbids nested arrays, so these are maps). */
-export type Seg = { a: number; b: number; k: string };
+export type Seg = { a: number; b: number; k: string; t?: { n: string; s: number }[] };
 /** Whole hours around the data (at least 2 h); the full day when there is none. */
 export function timelineWindow(segs: Seg[]): [number, number] {
   if (!segs.length) return [0, 86400];
@@ -36,7 +36,7 @@ export function timelineSvg(segs: Seg[], width = 320, height = 22): string {
   const color = (k: string) => LEVELS.find((l) => l.short === k)?.color ?? "#ccc";
   const [from, to] = timelineWindow(segs);
   const x = (t: number) => ((t - from) / (to - from)) * width;
-  const rects = segs.map(({ a, b, k }) => `<rect x="${x(a)}" y="0" width="${Math.max(x(b) - x(a), 1)}" height="${height}" fill="${color(k)}"/>`).join("");
+  const rects = segs.map(({ a, b, k }, i) => `<rect data-i="${i}" x="${x(a)}" y="0" width="${Math.max(x(b) - x(a), 1)}" height="${height}" fill="${color(k)}"/>`).join("");
   const hours = (to - from) / 3600, step = [1, 2, 3, 4, 6].find((n) => hours / n <= 5) ?? 6;
   const labels: string[] = [];
   for (let hr = 0; hr <= hours; hr += step) labels.push(`<span>${clock(from / 60 + hr * 60).replace(":00", "")}</span>`);
@@ -80,4 +80,19 @@ export function ago(ms: number, now = Date.now()): string {
   if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
   const days = Math.floor(s / 86400);
   return days === 1 ? "yesterday" : `${days} days ago`;
+}
+
+/** The stretch at [frac] (0..1 across the drawn window), or the nearest one within a few percent. */
+export function segAt(segs: Seg[], frac: number): Seg | undefined {
+  const [from, to] = timelineWindow(segs);
+  const t = from + frac * (to - from), slack = (to - from) * 0.015;
+  return segs.find((s) => t >= s.a && t < s.b)
+    ?? segs.filter((s) => t >= s.a - slack && t < s.b + slack).sort((p, q) => Math.min(Math.abs(t - p.a), Math.abs(t - p.b)) - Math.min(Math.abs(t - q.a), Math.abs(t - q.b)))[0];
+}
+
+/** "Wasted · 2:10 PM–2:40 PM · 30m — youtube.com 25m, reddit.com 5m". */
+export function segDetail(s: Seg): string {
+  const level = LEVELS.find((l) => l.short === s.k)?.label ?? "";
+  const what = (s.t ?? []).map((x) => `${x.n} ${fmtDuration(x.s)}`).join(", ") || (s.k === "A" ? "away from the computer" : "no app recorded");
+  return `${level} · ${clock(Math.floor(s.a / 60))}–${clock(Math.floor(s.b / 60))} · ${fmtDuration(s.b - s.a)} — ${what}`;
 }

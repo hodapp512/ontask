@@ -35,3 +35,4 @@ details.card > summary { color:var(--text); font-weight:600; }
 .notice.row { flex-wrap:wrap; }
 a { color:var(--primary); }
 .axis { display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-top:2px; }
+.tl svg { cursor:pointer; touch-action:pan-y; } .tl rect.dim { opacity:.45; } .tl-detail { min-height:2.6em; }

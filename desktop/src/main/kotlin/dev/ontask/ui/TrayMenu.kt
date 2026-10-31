@@ -38,6 +38,10 @@ import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.material3.OutlinedButton
 import dev.ontask.App
 import dev.ontask.Level
 import dev.ontask.block.BlockMode
@@ -91,7 +95,6 @@ fun ApplicationScope.OnTaskTray(app: App, open: (Dest?) -> Unit) {
 
     var picking by remember { mutableStateOf(false) }
     var adding by remember { mutableStateOf(false) }
-    var forWork by remember { mutableStateOf(false) }
 
     Tray(
         icon = remember { TrayGlyph() },
@@ -103,12 +106,11 @@ fun ApplicationScope.OnTaskTray(app: App, open: (Dest?) -> Unit) {
             if (openCount > 0) Item("$openCount site${if (openCount == 1) "" else "s"} unblocked right now", enabled = false, onClick = {})
             Separator()
             Item(if (blocked.isEmpty()) "Unblock a site… (nothing blocked)" else "Unblock a site…", enabled = blocked.isNotEmpty(), onClick = { changed(); picking = true })
-            Item("Unblock for work…", onClick = { forWork = true })
             if (focus != null) Menu("Focus session") {
                 Item("Ends at ${fmtHm(focus.plannedEndTs)} (${fmtDuration(focus.plannedEndTs - now)} left)", enabled = false, onClick = {})
                 Item("End now", onClick = { app.focus.stop(App.nowSec()); retick(); changed() })
             } else Menu("Start Focus session") {
-                listOf(25, 45, 60, 90).forEach { m ->
+                listOf(20, 30, 45, 60, 90).forEach { m ->
                     Item("$m minutes", onClick = { app.focus.start(m, App.nowSec()); retick(); changed() })
                 }
             }
@@ -127,34 +129,67 @@ fun ApplicationScope.OnTaskTray(app: App, open: (Dest?) -> Unit) {
     )
     if (picking) UnblockPickerWindow(app, blocked) { picking = false; changed() }
     if (adding) AddSitesWindow(app) { adding = false; changed() }
-    if (forWork) WorkUnblockWindow(app) { forWork = false; changed() }
 }
 
 internal fun themeOf(app: App) = runCatching { ThemeMode.valueOf(app.prefs.str("theme", "SYSTEM")) }.getOrDefault(ThemeMode.SYSTEM)
 
-/** Choose a blocked site, then hand over to the regular [UnblockDialog] (delay and friction included). */
+/** One way to unblock: choose a site, say whether it's for work, then either wait out the delay or state the purpose. */
 @Composable
 internal fun UnblockPickerWindow(app: App, blocked: List<String>, onClose: () -> Unit) {
     var filter by remember { mutableStateOf("") }
     var chosen by remember { mutableStateOf<String?>(null) }
+    var regular by remember { mutableStateOf(false) }
     Window(
         onCloseRequest = onClose, title = "Unblock a site", alwaysOnTop = true, resizable = false,
-        state = rememberWindowState(size = DpSize(460.dp, 540.dp), position = WindowPosition.Aligned(Alignment.Center)),
+        state = rememberWindowState(size = DpSize(520.dp, 560.dp), position = WindowPosition.Aligned(Alignment.Center)),
     ) {
         OnTaskTheme(remember { themeOf(app) }) { Surface(Modifier.fillMaxSize()) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Which site?", style = MaterialTheme.typography.titleMedium)
-                OutlinedTextField(filter, { filter = it }, label = { Text("Filter") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-                    blocked.filter { filter.isBlank() || it.contains(filter.trim(), ignoreCase = true) }.forEach { d ->
-                        TextButton({ chosen = d }, Modifier.fillMaxWidth()) { Text(d, Modifier.fillMaxWidth()) }
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                val site = chosen
+                if (site == null) {
+                    Text("Which site?", style = MaterialTheme.typography.titleMedium)
+                    if (blocked.isEmpty()) Text("Nothing is blocked right now — outside work hours, anything goes.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    else OutlinedTextField(filter, { filter = it }, label = { Text("Filter") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                        blocked.filter { filter.isBlank() || it.contains(filter.trim(), ignoreCase = true) }.forEach { d ->
+                            TextButton({ chosen = d }, Modifier.fillMaxWidth()) { Text(d, Modifier.fillMaxWidth()) }
+                        }
                     }
+                } else {
+                    Text("Is $site for work?", style = MaterialTheme.typography.titleMedium)
+                    WorkUnblockForm(app, site, onDone = onClose)
+                    HorizontalDivider()
+                    Text("Not for work?", style = MaterialTheme.typography.titleSmall)
+                    Text("You can still open it, after a short wait that grows with each unblock today. Your partner isn't told.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedButton({ regular = true }) { Text("No, just for a bit…") }
+                    Spacer(Modifier.weight(1f))
+                    TextButton({ chosen = null }) { Text("← Choose another site") }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { TextButton(onClose) { Text("Cancel") } }
             }
-            chosen?.let { UnblockDialog(app, listOf(it), onClose = onClose) }
+            if (regular) chosen?.let { UnblockDialog(app, listOf(it), onClose = onClose) }
         } }
     }
+}
+
+/** Work unblock: no delay, but a stated purpose and your partner is told. */
+@Composable
+internal fun WorkUnblockForm(app: App, site: String, onDone: () -> Unit) {
+    var purpose by remember { mutableStateOf("") }
+    var minutes by remember { mutableStateOf(60) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val max = app.blocking.unblocks.maxWorkMinutes
+    Text("Opens right away. Your partner is told the site and why, and OnTask checks you stay on that purpose.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    OutlinedTextField(purpose, { purpose = it; error = null }, label = { Text("What for? e.g. Acme customer: onboarding videos") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("For", style = MaterialTheme.typography.bodyMedium)
+        listOf(15, 30, 60, 120, 180).filter { it <= max }.forEach { m -> FilterChip(minutes == m, { minutes = m }, label = { Text(fmtDuration(m * 60L)) }) }
+    }
+    error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+    Button({
+        try { val now = App.nowSec(); app.blocking.unblocks.startPurpose(site, purpose, minutes, now); app.blocking.tick(now); onDone() }
+        catch (e: dev.ontask.block.UnblockRejected) { error = e.message }
+    }, enabled = purpose.isNotBlank()) { Text("Yes, unblock for work") }
 }
 
 @Composable
@@ -183,19 +218,6 @@ internal fun AddSitesWindow(app: App, onClose: () -> Unit) {
                     }, enabled = text.isNotBlank()) { Text("Add") }
                 }
             }
-        } }
-    }
-}
-
-/** "Unblock for work" in its own small window (from the menu bar or the Home screen). */
-@Composable
-internal fun WorkUnblockWindow(app: App, onClose: () -> Unit) {
-    Window(
-        onCloseRequest = onClose, title = "Unblock for work", alwaysOnTop = true, resizable = false,
-        state = rememberWindowState(size = DpSize(560.dp, 420.dp), position = WindowPosition.Aligned(Alignment.Center)),
-    ) {
-        OnTaskTheme(remember { themeOf(app) }) { Surface(Modifier.fillMaxSize()) {
-            Column(Modifier.padding(12.dp)) { PurposeCard(app, App.nowSec()) { onClose() } }
         } }
     }
 }

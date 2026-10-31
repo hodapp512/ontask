@@ -4,7 +4,7 @@ import { httpsCallable } from "firebase/functions";
 import QRCode from "qrcode";
 import { db, fns } from "../firebase";
 import { h } from "../dom";
-import { LEVELS, REACTIONS, ago, clock, deepShare, firstName, fmtDuration, greeting, timelineSvg, todayKey, type LevelKey, type Seg } from "../format";
+import { LEVELS, REACTIONS, ago, clock, deepShare, firstName, fmtDuration, greeting, segAt, segDetail, timelineSvg, todayKey, type LevelKey, type Seg } from "../format";
 import { enablePush, pushState } from "../session";
 
 type Cleanup = () => void;
@@ -115,7 +115,7 @@ function reportBody(r: DocumentData): HTMLElement {
   const sum = LEVELS.reduce((a, l) => a + (totals[l.key] ?? 0), 0) || 1;
   const share = deepShare(totals);
   const bar = h("div", { class: "bar" }); bar.innerHTML = LEVELS.map((l) => `<div style="width:${((totals[l.key] ?? 0) / sum) * 100}%;background:${l.color}"></div>`).join("");
-  const tl = h("div", {}); tl.innerHTML = timelineSvg((r.timeline ?? []) as Seg[]);
+  const tl = timelineEl((r.timeline ?? []) as Seg[]);
   const sessions = (r.deepSessions ?? []).length;
   return h("div", { class: "stack" },
     h("p", { class: "big" }, share !== null ? `${share}% deep focus` : `${fmtDuration(totals.DEEP ?? 0)} deep focus`),
@@ -233,6 +233,22 @@ async function personCard(u: User, linkId: string, l: DocumentData): Promise<HTM
     status,
     h("a", { href: `#/person/${encodeURIComponent(linkId)}` }, "All messages and a note →"),
   );
+}
+
+/** Timeline whose stretches show what you did when tapped (or hovered with a mouse). */
+export function timelineEl(segs: Seg[]): HTMLElement {
+  const detail = h("p", { class: "muted small tl-detail" }, segs.length ? "Tap the timeline to see what you did." : "");
+  const box = h("div", { class: "tl" }); box.innerHTML = timelineSvg(segs);
+  const svg = box.querySelector("svg")!;
+  const show = (e: PointerEvent) => {
+    const rect = svg.getBoundingClientRect();
+    const seg = segAt(segs, (e.clientX - rect.left) / rect.width);
+    svg.querySelectorAll("rect[data-i]").forEach((el) => el.classList.toggle("dim", !!seg && el.getAttribute("data-i") !== String(segs.indexOf(seg))));
+    if (seg) detail.textContent = segDetail(seg);
+  };
+  svg.addEventListener("pointerdown", show);
+  svg.addEventListener("pointermove", (e) => { if (e.pointerType === "mouse") show(e); });
+  return h("div", {}, box, detail);
 }
 
 const initial = (name?: string) => (name ?? "?").trim().charAt(0).toUpperCase() || "?";

@@ -53,12 +53,6 @@ fun SettingsScreen(app: App, theme: ThemeMode, onTheme: (ThemeMode) -> Unit, ope
             ) { update(s.copy(awayAfterSec = it * 60)) }
         }
         PermissionsSettings(app)
-        SectionCard("Your data", "Everything OnTask records stays in a database on this Mac.") {
-            SliderSetting(
-                "Keep detailed history", "Keep detailed history for this many days. Older data is kept forever as hourly summaries.",
-                s.retentionDays, 7..365, "days", step = 1,
-            ) { update(s.copy(retentionDays = it)) }
-        }
         ExtraSettings(app)
         Expander("Advanced") {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {

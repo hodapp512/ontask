@@ -126,16 +126,3 @@ internal fun EveningCard(app: App, date: LocalDate, onDone: () -> Unit) {
     }
 }
 
-@Composable
-internal fun WeeklyCard(app: App, today: LocalDate) {
-    val ratings = remember { app.checkins.ratings(today, 7) }
-    SectionCard("This week: how you felt vs. what was measured", "Your self-rating next to the deep-focus share OnTask measured.") {
-        if (ratings.isEmpty()) EmptyState("No ratings yet", "Say how each day felt in the evening reflection to see the comparison.")
-        ratings.forEach { (d, r) ->
-            val share = CheckinDraft.deepShare(app.reports.daily(d))
-            Row(Modifier.fillMaxWidth()) {
-                Text(d.toString(), Modifier.weight(1f)); Text("Felt: ${CheckinDraft.feeling(r)}", Modifier.weight(1f)); Text(share?.let { "Measured: $it% deep" } ?: "Measured: —", Modifier.weight(1f))
-            }
-        }
-    }
-}

@@ -187,7 +187,11 @@ class CloudSync(
         put("timeline", buildJsonArray {
             // Coarsened: runs under a minute are dropped, capped to keep the document small.
             r.timeline.filter { it.seconds >= 60 }.take(500).forEach { run ->
-                add(buildJsonObject { put("a", run.start - r.dayStart); put("b", run.end - r.dayStart); put("k", run.level.name.first().toString()) })
+                add(buildJsonObject {
+                    put("a", run.start - r.dayStart); put("b", run.end - r.dayStart); put("k", run.level.name.first().toString())
+                    // What the stretch was made of, for the phone's timeline details.
+                    run.top(3).takeIf { it.isNotEmpty() }?.let { top -> put("t", buildJsonArray { top.forEach { (n, sec) -> add(buildJsonObject { put("n", n); put("s", sec) }) } }) }
+                })
             }
         })
         put("deepSessions", buildJsonArray { r.deepSessions.forEach { add(buildJsonObject { put("a", it.start - r.dayStart); put("b", it.end - r.dayStart) }) } })

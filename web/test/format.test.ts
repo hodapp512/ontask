@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deepShare, fmtDuration, timelineSvg, todayKey, ago, firstName, greeting, timelineWindow } from "../src/format";
+import { deepShare, fmtDuration, timelineSvg, todayKey, ago, firstName, greeting, timelineWindow, segAt, segDetail } from "../src/format";
 
 describe("format", () => {
   it("formats durations", () => { expect(fmtDuration(45)).toBe("45s"); expect(fmtDuration(300)).toBe("5m"); expect(fmtDuration(5400)).toBe("1h 30m"); });
@@ -36,4 +36,13 @@ describe("timeline zoom", () => {
     expect(timelineWindow([{ a: 8 * 3600 + 600, b: 12 * 3600, k: "D" }, { a: 13 * 3600, b: 16 * 3600 + 60, k: "W" }])).toEqual([8 * 3600, 17 * 3600]);
     expect(timelineWindow([{ a: 9 * 3600 + 60, b: 9 * 3600 + 600, k: "D" }])).toEqual([9 * 3600, 11 * 3600]);
   });
+});
+
+describe("timeline details", () => {
+  const segs = [{ a: 9 * 3600, b: 10 * 3600, k: "D", t: [{ n: "Xcode", s: 3000 }] }, { a: 10 * 3600, b: 10 * 3600 + 600, k: "W", t: [{ n: "youtube.com", s: 600 }] }];
+  it("finds the stretch under the pointer", () => {
+    expect(segAt(segs, 0.25)?.k).toBe("D");
+    expect(segAt(segs, 0.55)?.k).toBe("W");
+  });
+  it("describes it", () => expect(segDetail(segs[1])).toContain("youtube.com 10m"));
 });

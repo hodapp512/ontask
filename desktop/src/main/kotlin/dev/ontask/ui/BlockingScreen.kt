@@ -34,43 +34,6 @@ import kotlinx.coroutines.delay
 internal fun fmtDelay(s: Int) = if (s >= 60 && s % 60 == 0) "${s / 60}m" else "${s}s"
 private val App.unblocks get() = blocking.unblocks
 
-@Composable
-internal fun FocusCard(app: App, now: Long, changed: () -> Unit) {
-    val active = app.focus.active(now)
-    SectionCard("Focus session", "Apply work-hours blocking for a set time, even outside work hours. It's logged as a deep-work attempt.") {
-        if (active != null) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("${fmtDuration(active.plannedEndTs - now)} remaining", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-                OutlinedButton({ app.focus.stop(now); app.blocking.tick(now); changed() }) { Text("End early") }
-            }
-        } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(25, 45, 60, 90, 120).forEach { m -> OutlinedButton({ app.focus.start(m, now); app.blocking.tick(now); changed() }) { Text("$m min") } }
-            }
-        }
-    }
-}
-
-@Composable
-internal fun PurposeCard(app: App, now: Long, changed: () -> Unit) {
-    var site by remember { mutableStateOf<String?>(null) }
-    var purpose by remember { mutableStateOf("") }
-    var minutes by remember { mutableStateOf(60) }
-    var error by remember { mutableStateOf<String?>(null) }
-    SectionCard("Unblock for work", "For sites you genuinely need for a task. No delay, but your partner is told what and why, and drifting off-purpose can end it early.") {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Picker(site ?: "Site", app.blocking.blocklist.all(), { it }) { site = it }
-            OutlinedTextField(purpose, { purpose = it }, label = { Text("Purpose, e.g. Acme customer: onboarding videos") }, singleLine = true, modifier = Modifier.weight(1f))
-        }
-        SliderSetting("Duration", "How long the site stays open (up to ${app.unblocks.maxWorkMinutes / 60} hours).", minutes, 5..app.unblocks.maxWorkMinutes, "min", step = 5, format = { fmtDuration(it * 60L) }) { minutes = it }
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        Button({
-            try { app.unblocks.startPurpose(site ?: throw UnblockRejected("Choose a site"), purpose, minutes, now); app.blocking.tick(now); purpose = ""; error = null; changed() }
-            catch (e: UnblockRejected) { error = e.message }
-        }) { Text("Unblock for work") }
-    }
-}
-
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun BlocklistCard(app: App, changed: () -> Unit) {

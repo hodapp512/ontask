@@ -3,10 +3,20 @@ package dev.ontask.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.layout.onSizeChanged
+import dev.ontask.report.Run
+import java.time.LocalTime
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -52,12 +62,11 @@ import java.time.format.FormatStyle
 fun DateBar(date: LocalDate, onDate: (LocalDate) -> Unit, onRefresh: () -> Unit) {
     var picking by remember { mutableStateOf(false) }
     val fmt = remember { DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL) }
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        OutlinedButton({ onDate(date.minusDays(1)) }) { Text("◀") }
-        OutlinedButton({ picking = true }, Modifier.weight(1f)) { Text("📅  " + fmt.format(date)) }
-        OutlinedButton({ onDate(date.plusDays(1)) }, enabled = date < LocalDate.now()) { Text("▶") }
-        TextButton({ onDate(LocalDate.now()) }, enabled = date != LocalDate.now()) { Text("Today") }
-        TextButton(onRefresh) { Text("Refresh") }
+    // Compact: ◀ [Today ▾] ▶ — the middle opens a calendar.
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        TextButton({ onDate(date.minusDays(1)) }) { Text("◀") }
+        TextButton({ picking = true }) { Text(if (date == LocalDate.now()) "📅 Today" else "📅 " + DateTimeFormatter.ofPattern("EEE, MMM d").format(date)) }
+        TextButton({ onDate(date.plusDays(1)) }, enabled = date < LocalDate.now()) { Text("▶") }
     }
     if (picking) {
         val state = rememberDatePickerState(
@@ -92,99 +101,118 @@ internal fun HelperBanner(app: App) {
         Notice("Window titles of non-browser apps are hidden until you grant Accessibility access (System Settings → Privacy & Security). Diagnostics has a shortcut.")
 }
 
+/** The phone-style summary: deep-focus share, a bar by level, the timeline, and where the time went. */
 @Composable
-internal fun NowCard(app: App, onLabeled: () -> Unit) {
-    val live by app.tracker.live.collectAsState()
-    SectionCard("Right now", "What OnTask sees at this moment and how it labeled it. If it's wrong, correct it here and OnTask will remember.") {
-        val s = live.sample; val c = live.classification
-        if (live.away) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) { Dot(levelColor(Level.AWAY)); Text("You're away — not counted against you.") }
-        else if (s == null || c == null) Text("Waiting for the first reading…", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        else {
-            val domain = domainOf(s.url)
-            Text(listOfNotNull(s.app, domain).joinToString("  ·  "), style = MaterialTheme.typography.titleSmall)
-            s.title?.let { Text(it.take(120), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1) }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Dot(levelColor(c.level))
-                Text("${c.category.label} → ${c.level.label}", Modifier.weight(1f), color = levelColor(c.level))
-                Text(c.source.label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            val kind = if (domain != null) RuleKind.DOMAIN else RuleKind.APP
-            val pattern = domain ?: s.app
-            if (pattern != null) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Wrong? Teach OnTask that $pattern is:", style = MaterialTheme.typography.bodySmall)
-                Picker("choose category", Category.assignable, { it.label }) { cat ->
-                    app.ruleStore.label(kind, pattern, cat, c.category, App.nowSec()); app.reloadRules(); onLabeled()
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun ReportBody(r: DailyReport) {
+fun SummaryCard(r: DailyReport, title: String, header: @Composable () -> Unit = {}, more: @Composable ColumnScope.() -> Unit = {}) {
     val denom = Level.entries.filter { it != Level.AWAY }.sumOf { r.totalsAll[it] ?: 0 }
-    if (r.totalsAll.isEmpty() && r.timeline.isEmpty()) {
-        EmptyState("Nothing recorded for this day", "Tracking starts automatically while OnTask is running. Pick another day or check Diagnostics if you expected data.")
-        return
-    }
-    SectionCard("Time by level", if (denom > 0) "Deep share of tracked time: ${(r.totalsAll[Level.DEEP] ?: 0) * 100 / denom}% (away excluded)" else null) {
-        Row(Modifier.fillMaxWidth()) {
-            androidx.compose.foundation.layout.Spacer(Modifier.weight(1.2f)); HeaderCell("All day"); HeaderCell("Work hours")
+    val total = Level.entries.sumOf { r.totalsAll[it] ?: 0 }
+    PlainCard {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f)); header()
         }
-        Level.entries.forEach { l ->
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Row(Modifier.weight(1.2f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) { Dot(levelColor(l)); Text(l.label) }
-                Cell(fmtDuration(r.totalsAll[l] ?: 0)); Cell(fmtDuration(r.totalsWork[l] ?: 0))
-            }
+        if (total == 0L) {
+            Text("Nothing tracked for this day. OnTask records automatically while it's running.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            return@PlainCard
         }
-    }
-    SectionCard("Timeline", "From your first to your last activity today. Gaps mean the Mac was off or asleep.") { Timeline(r) }
-    SectionCard("Deep-work sessions", "Stretches of 25 minutes or more without a distraction.") {
-        val longest = r.deepSessions.maxOfOrNull { it.seconds }
-        KV("Deep-work sessions (25+ min)", "${r.deepSessions.size}" + (longest?.let { " · longest ${fmtDuration(it)}" } ?: ""))
-        r.deepSessions.forEach { Text("${fmtHm(it.start)}–${fmtHm(it.end)}  (${fmtDuration(it.seconds)})", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 12.dp)) }
-        KV("Distraction events (30 s+ wasted)", r.distractionEvents.toString())
-        KV("Worst hour", r.worstHour?.let { "%02d:00 — %s wasted".format(Instant.ofEpochSecond(r.dayStart + it.first * 3600L).atZone(ZoneId.systemDefault()).hour, fmtDuration(it.second)) } ?: "None 🎉")
-    }
-    SectionCard("Where the time went", "Your top apps and websites today.") {
-        if (r.topSubjects.isEmpty()) Text("No apps or sites recorded.")
-        r.topSubjects.forEachIndexed { i, s ->
-            if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(s.name, Modifier.weight(0.5f), maxLines = 1)
-                Row(Modifier.weight(0.3f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Dot(levelColor(s.category.level), 8); Text(s.category.label, style = MaterialTheme.typography.bodySmall)
+        Text(
+            if (denom >= 600) "${(r.totalsAll[Level.DEEP] ?: 0) * 100 / denom}% deep focus" else "${fmtDuration(r.totalsAll[Level.DEEP] ?: 0)} deep focus",
+            style = MaterialTheme.typography.headlineMedium,
+        )
+        Row(Modifier.fillMaxWidth().height(12.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))) {
+            Level.entries.forEach { l -> val v = r.totalsAll[l] ?: 0; if (v > 0) androidx.compose.foundation.layout.Box(Modifier.weight(v.toFloat()).fillMaxHeight().background(levelColor(l))) }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Level.entries.forEach { l -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) { Dot(levelColor(l), 10); Text("${l.label} ${fmtDuration(r.totalsAll[l] ?: 0)}") } }
+        }
+        val workTotal = r.totalsWork.values.sum()
+        if (workTotal > 0 && workTotal < total) Text(
+            "During work hours: ${fmtDuration(r.totalsWork[Level.DEEP] ?: 0)} deep, ${fmtDuration(r.totalsWork[Level.MIXED] ?: 0)} mixed, ${fmtDuration(r.totalsWork[Level.WASTED] ?: 0)} wasted",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Timeline(r)
+        Text(
+            "${r.deepSessions.size} deep-work session${if (r.deepSessions.size == 1) "" else "s"}" +
+                (r.deepSessions.maxOfOrNull { it.seconds }?.let { " (longest ${fmtDuration(it)})" } ?: "") +
+                " · ${r.distractionEvents} distraction${if (r.distractionEvents == 1) "" else "s"}" +
+                (r.worstHour?.let { " · most wasted around ${LocalTime.of(Instant.ofEpochSecond(r.dayStart + it.first * 3600L).atZone(ZoneId.systemDefault()).hour, 0).format(DateTimeFormatter.ofPattern("h a"))}" } ?: ""),
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (r.deepSessions.isNotEmpty()) Expander("Deep-work sessions") {
+            r.deepSessions.forEach { Text("${clockRange(it.start, it.end)}  ·  ${fmtDuration(it.seconds)}") }
+        }
+        if (r.topSubjects.isNotEmpty()) Expander("Where the time went") {
+            r.topSubjects.forEachIndexed { i, s ->
+                if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(s.name, Modifier.weight(0.5f), maxLines = 1)
+                    Row(Modifier.weight(0.3f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Dot(levelColor(s.category.level), 8); Text(s.category.label, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Text(fmtDuration(s.seconds), Modifier.weight(0.2f), style = MaterialTheme.typography.bodyMedium)
                 }
-                Text(fmtDuration(s.seconds), Modifier.weight(0.2f), style = MaterialTheme.typography.bodyMedium)
             }
         }
+        more()
     }
 }
 
-@Composable private fun androidx.compose.foundation.layout.RowScope.HeaderCell(t: String) =
-    Text(t, Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-@Composable private fun androidx.compose.foundation.layout.RowScope.Cell(t: String) = Text(t, Modifier.weight(1f))
-
-
+/** Colored stretches across the active part of the day; hover one to see when it was and what you did. */
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 private fun Timeline(r: DailyReport) {
     val track = MaterialTheme.colorScheme.surfaceVariant
     val (from, to) = timelineWindow(r.timeline.map { (it.start - r.dayStart) to (it.end - r.dayStart) })
     val span = (to - from).toFloat()
-    Canvas(Modifier.fillMaxWidth().height(32.dp)) {
-        drawRoundRect(track, size = size, cornerRadius = CornerRadius(6f))
-        r.timeline.forEach { run ->
-            val x0 = ((run.start - r.dayStart - from) / span * size.width).coerceIn(0f, size.width)
-            val x1 = ((run.end - r.dayStart - from) / span * size.width).coerceIn(0f, size.width)
-            drawRect(levelColor(run.level), Offset(x0, 0f), Size(maxOf(x1 - x0, 1.5f), size.height))
+    var width by remember { mutableStateOf(1) }
+    var hover by remember(r) { mutableStateOf<Pair<Run, Float>?>(null) }
+    fun runAt(x: Float): Run? {
+        val t = r.dayStart + from + (x / width * span).toLong()
+        val slack = (4f / width * span).toLong() // a few pixels, so thin stretches can be hovered too
+        return r.timeline.firstOrNull { t >= it.start && t < it.end } ?: r.timeline.filter { t >= it.start - slack && t < it.end + slack }.minByOrNull { minOf(kotlin.math.abs(t - it.start), kotlin.math.abs(t - it.end)) }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        androidx.compose.foundation.layout.Box {
+            Canvas(
+                Modifier.fillMaxWidth().height(32.dp)
+                    .onSizeChanged { width = it.width.coerceAtLeast(1) }
+                    .onPointerEvent(PointerEventType.Move) { e -> val x = e.changes.first().position.x; hover = runAt(x)?.let { it to x } }
+                    .onPointerEvent(PointerEventType.Exit) { hover = null },
+            ) {
+                drawRoundRect(track, size = size, cornerRadius = CornerRadius(6f))
+                r.timeline.forEach { run ->
+                    val x0 = ((run.start - r.dayStart - from) / span * size.width).coerceIn(0f, size.width)
+                    val x1 = ((run.end - r.dayStart - from) / span * size.width).coerceIn(0f, size.width)
+                    val on = hover?.first == run
+                    drawRect(levelColor(run.level).copy(alpha = if (hover == null || on) 1f else 0.55f), Offset(x0, 0f), Size(maxOf(x1 - x0, 1.5f), size.height))
+                }
+            }
+            hover?.let { (run, x) ->
+                androidx.compose.ui.window.Popup(offset = androidx.compose.ui.unit.IntOffset((x - 120).toInt().coerceAtLeast(0), 90)) {
+                    androidx.compose.material3.Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), tonalElevation = 6.dp, shadowElevation = 6.dp) {
+                        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp).widthIn(max = 320.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Dot(levelColor(run.level), 8)
+                                Text("${run.level.label} · ${clockRange(run.start, run.end)} · ${fmtDuration(run.seconds)}", style = MaterialTheme.typography.labelLarge)
+                            }
+                            val top = run.top(3)
+                            if (top.isEmpty()) Text(if (run.level == Level.AWAY) "Away from the computer" else "No app recorded", style = MaterialTheme.typography.bodySmall)
+                            top.forEach { (n, sec) -> Text("$n — ${fmtDuration(sec)}", style = MaterialTheme.typography.bodySmall, maxLines = 1) }
+                        }
+                    }
+                }
+            }
         }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            timelineLabels(from, to).forEach { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
+        Text("Hover over the timeline to see what you did.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        timelineLabels(from, to).forEach { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-    }
-    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        Level.entries.forEach { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) { Dot(levelColor(it), 8); Text(it.label, style = MaterialTheme.typography.labelSmall) } }
-    }
+}
+
+private val shortTime = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
+private fun clockRange(a: Long, b: Long): String {
+    val z = ZoneId.systemDefault()
+    return "${Instant.ofEpochSecond(a).atZone(z).format(shortTime)}–${Instant.ofEpochSecond(b).atZone(z).format(shortTime)}"
 }
 
 /** Seconds-after-midnight window to draw: whole hours around the data, at least 2 hours; the full day if empty. */

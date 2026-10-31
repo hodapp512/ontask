@@ -66,10 +66,10 @@ fun fmtHm(epochSec: Long): String = fmtTime(epochSec).take(5)
 
 /** A scrolling, centered page with a title and a one-line description. */
 @Composable
-fun Page(title: String, subtitle: String? = null, actions: @Composable () -> Unit = {}, content: @Composable ColumnScope.() -> Unit) {
+fun Page(title: String, subtitle: String? = null, actions: @Composable () -> Unit = {}, maxWidth: androidx.compose.ui.unit.Dp = ContentMaxWidth, content: @Composable ColumnScope.() -> Unit) {
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.TopCenter) {
         Column(
-            Modifier.widthIn(max = ContentMaxWidth).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 20.dp),
+            Modifier.widthIn(max = maxWidth).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -81,6 +81,14 @@ fun Page(title: String, subtitle: String? = null, actions: @Composable () -> Uni
             }
             content()
         }
+    }
+}
+
+/** A card without a title row, for content that builds its own header. */
+@Composable
+fun PlainCard(content: @Composable ColumnScope.() -> Unit) {
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
     }
 }
 

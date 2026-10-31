@@ -3,7 +3,8 @@ import { addDoc, collection, doc, getDoc, getDocs, limit, orderBy, query, where 
 import { httpsCallable } from "firebase/functions";
 import { db, fns } from "../firebase";
 import { h } from "../dom";
-import { LEVELS, REACTIONS, deepShare, fmtDuration, timelineSvg, todayKey, type LevelKey, type Seg } from "../format";
+import { LEVELS, REACTIONS, deepShare, fmtDuration, todayKey, type LevelKey, type Seg } from "../format";
+import { timelineEl } from "./home";
 
 export async function joinView(u: User, code: string): Promise<HTMLElement> {
   const out = h("div", { class: "card" }, h("p", {}, "Joining…"));
@@ -55,7 +56,7 @@ function reportCardOf(r: Record<string, any>): HTMLElement {
   const sum = LEVELS.reduce((a, l) => a + (totals[l.key] ?? 0), 0) || 1;
   const share = deepShare(totals);
   const bar = h("div", { class: "bar" }); bar.innerHTML = LEVELS.map((l) => `<div style="width:${((totals[l.key] ?? 0) / sum) * 100}%;background:${l.color}"></div>`).join("");
-  const tl = h("div", {}); tl.innerHTML = timelineSvg((r.timeline ?? []) as Seg[]);
+  const tl = timelineEl((r.timeline ?? []) as Seg[]);
   return h("div", { class: "card" },
     h("h2", {}, "Today"),
     share !== null && h("p", {}, `${share}% deep focus`),

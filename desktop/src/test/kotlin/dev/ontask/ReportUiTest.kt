@@ -19,3 +19,15 @@ class ReportUiTest {
         assertEquals("Safari", displayAppName("Safari"))
     }
 }
+
+class TimelineActivityTest {
+    @Test fun mergedStretchesKeepWhatYouDid() {
+        val m = dev.ontask.report.Sessions.merge(listOf(
+            dev.ontask.report.Run(0, 60, Level.WASTED, mapOf("youtube.com" to 60)),
+            dev.ontask.report.Run(60, 90, Level.WASTED, mapOf("reddit.com" to 30)),
+            dev.ontask.report.Run(90, 300, Level.WASTED, mapOf("youtube.com" to 210)),
+        ))
+        assertEquals(1, m.size)
+        assertEquals(listOf("youtube.com" to 270L, "reddit.com" to 30L), m[0].top())
+    }
+}

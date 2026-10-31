@@ -2,9 +2,11 @@ package dev.ontask.report
 
 import dev.ontask.Level
 
-/** A stretch of time at one level (adjacent same-level segments merged). */
-data class Run(val start: Long, val end: Long, val level: Level) {
+/** A stretch of time at one level (adjacent same-level segments merged), with seconds per app or site in it. */
+data class Run(val start: Long, val end: Long, val level: Level, val activity: Map<String, Long> = emptyMap()) {
     val seconds get() = end - start
+    /** The [n] apps or sites that took the most time in this stretch. */
+    fun top(n: Int = 3): List<Pair<String, Long>> = activity.entries.sortedByDescending { it.value }.take(n).map { it.key to it.value }
 }
 
 data class DeepSession(val start: Long, val end: Long) {
@@ -21,7 +23,10 @@ object Sessions {
         val out = ArrayList<Run>()
         for (r in raw) {
             val last = out.lastOrNull()
-            if (last != null && last.level == r.level && r.start - last.end <= maxGap) out[out.lastIndex] = last.copy(end = maxOf(last.end, r.end))
+            if (last != null && last.level == r.level && r.start - last.end <= maxGap) {
+                val act = HashMap(last.activity); r.activity.forEach { (k, v) -> act.merge(k, v, Long::plus) }
+                out[out.lastIndex] = last.copy(end = maxOf(last.end, r.end), activity = act)
+            }
             else out.add(r)
         }
         return out
