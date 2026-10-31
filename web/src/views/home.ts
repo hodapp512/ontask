@@ -129,7 +129,7 @@ function reportBody(r: DocumentData, edit?: { uid: string; categories: Cat[] }):
     bar,
     h("div", { class: "legend" }, LEVELS.map((l) => h("span", {}, h("span", { class: "dot", style: `background:${l.color}` }), `${l.label} ${fmtDuration(totals[l.key] ?? 0)}`))),
     tl,
-    h("p", { class: "muted small" }, `${sessions} deep-work session${sessions === 1 ? "" : "s"} · ${r.distractionEvents ?? 0} distraction${r.distractionEvents === 1 ? "" : "s"}`),
+    h("p", { class: "muted small" }, `${sessions} focused session${sessions === 1 ? "" : "s"} · ${r.distractionEvents ?? 0} distraction${r.distractionEvents === 1 ? "" : "s"}`),
     (r.topSites ?? []).length > 0 && h("details", {}, h("summary", {}, "Where the time went"),
       edit?.categories.length ? h("p", { class: "muted small" }, "Labeled wrong? Pick the right category — your Mac updates within a minute.") : null,
       (r.topSites as any[]).slice(0, 8).map((s) => siteRow(s, edit))),

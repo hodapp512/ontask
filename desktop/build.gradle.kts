@@ -27,9 +27,14 @@ tasks.processResources { filesMatching("version.properties") { expand("version" 
 
 // The Swift helper is built before `run` so the app can launch it.
 val helperDir = layout.projectDirectory.dir("../helper")
-// "-" is ad-hoc. Pass -PsigningIdentity="Apple Development: ..." (any code-signing certificate in your keychain) so macOS
-// privacy permissions survive rebuilds; ad-hoc grants are tied to one exact build.
-val signingIdentity = (findProperty("signingIdentity") as String?) ?: "-"
+// macOS ties privacy permissions (Accessibility, Screen Recording) to the signing certificate. "-" is ad hoc: grants
+// then belong to one exact build and are lost on every rebuild. Builds use, in order: -PsigningIdentity="…", the local
+// certificate made by scripts/make-signing-cert.sh ("OnTask Local Signing"), or ad hoc.
+val localSigningName = "OnTask Local Signing"
+val signingIdentity = (findProperty("signingIdentity") as String?) ?: run {
+    val p = ProcessBuilder("security", "find-identity", "-p", "codesigning").redirectErrorStream(true).start()
+    if (p.inputStream.bufferedReader().readText().contains("\"$localSigningName\"")) localSigningName else "-"
+}
 val buildHelper = tasks.register<Exec>("buildHelper") {
     workingDir = helperDir.asFile
     commandLine("swift", "build", "-c", "release")

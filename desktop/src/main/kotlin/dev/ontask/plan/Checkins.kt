@@ -59,7 +59,7 @@ object CheckinDraft {
         val share = deepShare(today); val prev = deepShare(yesterday)
         append("Today: ${dur(today.totalsAll[Level.DEEP] ?: 0)} focused, ${dur(today.totalsAll[Level.WASTED] ?: 0)} wasted")
         if (share != null) append(" (${share}% focused)")
-        append(". ${today.deepSessions.size} deep-work session${if (today.deepSessions.size == 1) "" else "s"}")
+        append(". ${today.deepSessions.size} focused session${if (today.deepSessions.size == 1) "" else "s"} of 25+ minutes")
         today.deepSessions.maxOfOrNull { it.seconds }?.let { append(", longest ${dur(it)}") }
         append(".")
         if (share != null && prev != null) append(" " + when { share > prev + 2 -> "Better than yesterday."; share < prev - 2 -> "Not as good as yesterday."; else -> "About the same as yesterday." })

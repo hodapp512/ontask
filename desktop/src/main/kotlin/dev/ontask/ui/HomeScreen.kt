@@ -63,7 +63,6 @@ fun HomeScreen(app: App) {
     }
 
     var unblocking by remember { mutableStateOf(false) }
-    var adding by remember { mutableStateOf(false) }
     var reflecting by remember { mutableStateOf(false) }
     val name = app.prefs.get("cloud.account_name")?.trim()?.split(Regex("\\s+"))?.firstOrNull()
     val hour = LocalTime.now().hour
@@ -77,7 +76,6 @@ fun HomeScreen(app: App) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Button({ unblocking = true }) { Text("Unblock…") }
             FocusButton(app, now) { tick++ }
-            OutlinedButton({ adding = true }) { Text("+ Block a site") }
             AdsButton(app, tick) { tick++ }
         }
         HelperBanner(app)
@@ -102,7 +100,6 @@ fun HomeScreen(app: App) {
         }
     }
     if (unblocking) UnblockPickerWindow(app, app.blocking.currentlyBlocked(App.nowSec())) { unblocking = false; tick++ }
-    if (adding) AddSitesWindow(app) { adding = false; tick++ }
     if (reflecting) ReflectionWindow(app) { reflecting = false; tick++ }
 }
 

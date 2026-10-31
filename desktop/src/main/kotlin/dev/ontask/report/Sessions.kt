@@ -33,7 +33,7 @@ object Sessions {
     }
 
     /**
-     * Deep-work session: an uninterrupted stretch of DEEP/MIXED time (no WASTED, no AWAY, no gap over a minute)
+     * Focused session: an uninterrupted stretch of DEEP/MIXED time (no WASTED, no AWAY, no gap over a minute)
      * lasting 25+ minutes that includes some deep focus.
      */
     fun deepSessions(runs: List<Run>): List<DeepSession> {

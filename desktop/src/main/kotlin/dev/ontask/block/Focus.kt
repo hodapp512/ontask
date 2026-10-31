@@ -4,7 +4,7 @@ import dev.ontask.db.Db
 
 data class FocusSession(val id: Long, val startTs: Long, val plannedEndTs: Long, val endedTs: Long?, val completed: Boolean)
 
-/** On-demand Focus session: applies work-hours (strict) rules for a chosen duration; logged as a deep-work attempt. */
+/** On-demand Focus session: applies work-hours (strict) rules for a chosen duration; logged as a focus attempt. */
 class Focus(private val db: Db, private val events: Events) {
     fun start(minutes: Int, now: Long): FocusSession {
         require(minutes in 5..480) { "Focus sessions last 5–480 minutes" }

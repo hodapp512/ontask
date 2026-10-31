@@ -13,7 +13,7 @@ OnTask is a personal productivity tool for Mac + phone. Open source, MIT license
 ## Blocking (Mac)
 
 - **Mechanism:** `/etc/hosts`, written by a small root bash daemon. Tamper monitor/restore is dropped. A browser extension (path-level rules) is deferred until clearly needed.
-- **Work hours = strict mode by default.** No opt-in focus mode. An on-demand **Focus session** applies work-hours rules for a chosen duration outside work hours, logged as a deep-work attempt.
+- **Work hours = strict mode by default.** No opt-in focus mode. An on-demand **Focus session** applies work-hours rules for a chosen duration outside work hours, logged as a focus attempt.
 - **Work hours** are built in: weekly template + per-day exceptions, edited via a visual calendar UI. Configured at first run, editable anytime in settings.
   - Removing/shortening work hours (any time) → asks for a reason → partner is notified with the reason and its meaning.
   - Adding hours never notifies.
@@ -45,7 +45,7 @@ OnTask is a personal productivity tool for Mac + phone. Open source, MIT license
 - **Categories:** Core work, Work support (email, admin), Learning, Communication, Entertainment, Social, News, Shopping, Personal admin.
 - **Goal-alignment score** 1–3 against today's priorities.
 - Context comes from the calendar: anything goes outside work hours/Focus sessions; strict inside.
-- "Deep work session" ≈ 25+ minutes without distraction events.
+- "Focused session" ≈ 25+ minutes without distraction events.
 
 ### Away detection
 - Signals: input idle time, screen locked/asleep, media playing (watching a video with no input ≠ away).
@@ -105,7 +105,7 @@ Active during work hours and Focus sessions. Thresholds are defaults, configurab
 ## Reports & diagnostics
 
 ### Daily report
-Deep / mixed / wasted / away totals; timeline strip colored by level; deep-work sessions (count, longest); distraction events; regular vs. work unblocks; check-ins done/missed; priorities vs. where time went; worst hour; weekly heat map by hour.
+Deep / mixed / wasted / away totals; timeline strip colored by level; focused sessions of 25+ min (count, longest); distraction events; regular vs. work unblocks; check-ins done/missed; priorities vs. where time went; worst hour; weekly heat map by hour.
 
 ### Diagnostics
 Activity log with filters; classification source per tick (rule / metadata / OCR / vision / user label) as %; avg processing time per tick and per model; ticks skipped (idle/unchanged); CPU and memory; classifier-vs-user-label disagreement rate (the key accuracy metric); rules list; cloud API calls and estimated cost; sync and notification delivery status.

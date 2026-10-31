@@ -163,14 +163,14 @@ fun SummaryCard(r: DailyReport, title: String, app: App? = null, onRelabel: () -
         )
         Timeline(r)
         Text(
-            "${r.deepSessions.size} deep-work session${if (r.deepSessions.size == 1) "" else "s"}" +
+            "${r.deepSessions.size} focused session${if (r.deepSessions.size == 1) "" else "s"} (25+ min)" +
                 (r.deepSessions.maxOfOrNull { it.seconds }?.let { " (longest ${fmtDuration(it)})" } ?: "") +
                 " · ${r.distractionEvents} distraction${if (r.distractionEvents == 1) "" else "s"}" +
                 (r.worstHour?.let { " · most wasted around ${LocalTime.of(Instant.ofEpochSecond(r.dayStart + it.first * 3600L).atZone(ZoneId.systemDefault()).hour, 0).format(DateTimeFormatter.ofPattern("h a"))}" } ?: ""),
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        if (r.deepSessions.isNotEmpty()) Expander("Deep-work sessions") {
-            r.deepSessions.forEach { Text("${clockRange(it.start, it.end)}  ·  ${fmtDuration(it.seconds)}") }
+        if (r.deepSessions.isNotEmpty()) Expander("Longest focused sessions") {
+            r.deepSessions.sortedByDescending { it.seconds }.take(5).forEach { Text("${clockRange(it.start, it.end)}  ·  ${fmtDuration(it.seconds)}") }
         }
         if (r.topSubjects.isNotEmpty()) Expander("Where the time went") {
             if (app != null) Text("Labeled wrong? Change it here — OnTask remembers and fixes past days too.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

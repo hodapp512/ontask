@@ -63,7 +63,7 @@ function reportCardOf(r: Record<string, any>): HTMLElement {
     bar,
     h("div", { class: "legend" }, LEVELS.map((l) => h("span", {}, h("span", { class: "dot", style: `background:${l.color}` }), `${l.label} ${fmtDuration(totals[l.key] ?? 0)}`))),
     tl,
-    h("p", { class: "muted" }, `${(r.deepSessions ?? []).length} deep-work sessions · ${r.distractionEvents ?? 0} distraction events` + (r.worstHour ? ` · worst hour ${String(r.worstHour.hour).padStart(2, "0")}:00` : "")),
+    h("p", { class: "muted" }, `${(r.deepSessions ?? []).length} focused sessions · ${r.distractionEvents ?? 0} distraction events` + (r.worstHour ? ` · worst hour ${String(r.worstHour.hour).padStart(2, "0")}:00` : "")),
     (r.topSites ?? []).length > 0 && h("div", {}, h("p", { class: "muted" }, "Where the time went"), (r.topSites as any[]).slice(0, 6).map((s) => h("p", {}, `${s.name} — ${fmtDuration(s.seconds)}`))),
   );
 }
