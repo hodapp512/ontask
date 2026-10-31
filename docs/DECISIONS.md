@@ -1,0 +1,175 @@
+# OnTask — Decision log
+
+Why things are the way they are. Each entry records a decision, the reasons, and what was considered and rejected,
+so a later change can start from the original intent instead of guessing. Newest topics last. DESIGN.md describes how
+the system works now; this file explains how it got that way.
+
+Format: **Decision** — why. *Rejected:* alternatives, and why not.
+
+---
+
+## 2026-10-30 · Foundations
+
+- **Successor to BlockMe, not a fork.** BlockMe (a Java hosts-file blocker) proved that blocking with friction works;
+  OnTask keeps that core and adds measurement, daily rhythm and an accountability partner. BlockMe's repo is left
+  untouched.
+- **Blocking via `/etc/hosts`, written by a small root bash daemon.** It's what worked in BlockMe, needs no browser
+  extension, and covers every browser. *Rejected:* a browser extension (path-level rules) until clearly needed;
+  a tamper monitor that restores the file (complexity for little gain against a determined user).
+- **Kotlin + Compose Desktop, Gradle, no Spring; a Swift helper for macOS APIs.** Compose Multiplatform's compiler
+  plugin and native packaging are only supported via Gradle. Window titles, OCR, idle time and battery need Apple
+  APIs, so a long-lived Swift helper speaks JSON lines over stdio.
+- **SQLite on the Mac; raw activity rolls up into hourly summaries.** Resource-light and private. The raw log never
+  leaves the Mac. *Rejected:* a user-facing retention setting (removed later: nobody should need to think about it).
+- **One PWA for phone and partner, on Firebase.** No app store, no fee, works on iPhone and Android with web push.
+  Cloud Functions send every outgoing message (push, text, email) so reminders fire while the Mac sleeps.
+- **No personal data in the public repo.** Contact details live in Firebase, API keys in the macOS Keychain or
+  Firebase Secret Manager. The Firebase *web* config (project ID, web API key) is in the repo on purpose: it's public
+  by design (the website ships it to every browser); data is protected by Auth and Firestore rules.
+- **The partner never approves anything.** Accountability is the user's initiative; the partner gets messages and
+  can react. *Rejected:* partner-approved unblocks, partner-initiated nudging.
+
+## 2026-10-30 · Linking, Home and wording
+
+- **Mac ↔ phone linking with a 5-character code that expires in 5 minutes.** Typing a short code beats pasting a
+  long token. The Mac ships the Firebase project config so the user never sees project IDs or keys.
+- **One-screen phone app** (your day, today's plan, partner, people you support). Tabs felt clumsy on Android.
+- **One Home screen on the Mac** combining report and today; work hours, block list and other setup live in Settings.
+  More actions are buttons (Unblock, Focus) instead of always-visible panels.
+- **Plain words over jargon:** "Deep focus" → "Focused"; "deep-work sessions" → "Longest focused sessions"; evening
+  rating uses Rough / Meh / Okay / Good / Great instead of 1–5; the partner message opens "Here is X's evening
+  review."; Diagnostics explain each number.
+- **Today's plan is one free-form note**, not a list of priorities. Later (2026-10-31) it moved to the top of Home as
+  a one-line box that starts empty: pre-filling from yesterday made people keep stale plans.
+- **Timelines zoom to the data and show what you did on hover (Mac) or tap (phone).** A 24-hour strip was mostly empty.
+- **Focus session lengths 20 / 30 / 45 / 60 / 90 min.**
+
+## 2026-10-30 · macOS integration
+
+- **Menu bar only, no Dock icon** (`LSUIElement`). OnTask runs all day; a Dock icon is clutter. The window is brought
+  forward explicitly since menu-bar apps aren't activated automatically.
+- **Start at login and reopen after quit or crash, both on by default**, via a LaunchAgent with
+  `KeepAlive{SuccessfulExit=false}`; Quit exits with code 75 when "reopen" is on. As in BlockMe: quitting shouldn't
+  be an easy way out. Both can be turned off in Settings.
+- **Builds are signed with a local "OnTask Local Signing" certificate** (scripts/make-signing-cert.sh). macOS ties
+  Accessibility and Screen Recording grants to the signature; ad-hoc signing made every rebuild lose them.
+- **Only macOS's own Accessibility prompt**, not that plus a System Settings window; the banner clears itself once
+  access is granted, and "Fix it" resets a stale entry from an older build.
+
+## 2026-10-30 · Categories
+
+- **Categories are data, not an enum:** rename, change what each counts as, add your own, delete. Deleting removes
+  its rules and re-sorts its history with the remaining rules; what nothing matches becomes Unclassified.
+  *Rejected:* fixed categories (everyone's work is different).
+- **A "Varies" category** for sites that can be work or not (YouTube first): judged per page or video instead of as
+  a whole site.
+- **Reclassify from any dropdown** (Home, phone, Diagnostics); a correction saves a rule and fixes past history.
+
+## 2026-10-31 · Blocking model (grilled)
+
+- **The block list is blocked 24/7, as in BlockMe; work hours only change how hard unblocking is.** Blocking only in
+  work hours meant evenings had no protection at all, unlike BlockMe. *Rejected:* work-hours-only blocking.
+- **During work hours or a Focus session, unblocking asks "for work?"**
+  - *For work:* state a purpose, 15 min–3 h, no delay, partner always told (honest use shouldn't be punished, but is
+    visible).
+  - *Not for work:* growing delay (10 s, 30 s, 2 min, 5 min), 5 / 10 / 15 min, a corner nudge at start and end
+    (OK / I'm struggling), and the partner is told every time, whether or not you agree. The friction is the point.
+- **Outside work hours: instant, 5 min–2 h, ends when work hours start, not counted, nobody told.** Evenings are yours;
+  the block list just stops mindless visits.
+- **Merged BlockMe's active sites; YouTube left off the starter list** and judged per video instead (it's often work).
+- **Ad and malware blocking from StevenBlack's list, refreshed by itself at startup and daily**; a single
+  "Disable ad blocking" switch. *Rejected:* a "Refresh now" menu item (nothing for the user to manage).
+- **Drifting alerts to the partner (binge + work-hours unblocks) are capped at 2 before noon and 2 after, on the
+  server;** extras go into the evening review with their times. Check-ins, missed check-ins, work-hours changes and
+  work-purpose unblocks are never capped. A partner flooded with alerts stops reading them.
+
+## 2026-10-31 · Installing and removing the root helper (grilled)
+
+- **Installing the helper is prompted, not buried in Settings.** At setup and on any launch where it's missing,
+  outdated or not working, one explanation screen, then macOS's password prompt (at most once per launch). A
+  dismissible Home banner returns on the next launch or after 4 hours; a Permissions row offers the same button.
+  When it works, it's invisible (Diagnostics only).
+- **A password is unavoidable.** Writing `/etc/hosts` needs root. *Rejected:* SMAppService (needs an Apple
+  Developer ID, which a self-signed build doesn't have; and it wouldn't clean up hosts entries anyway).
+- **No Off / Test / On switch.** Helper installed means blocking is on; test mode is a developer setting
+  (`ONTASK_BLOCKING_TEST=1`).
+- **"Healthy" means the helper is running the current script, set up for this app, and `/etc/hosts` matches what
+  OnTask staged** — not merely that its files exist.
+- **Uninstall leaves nothing behind:** Settings → Uninstall OnTask (top of Settings) removes the helper, OnTask's
+  sections of `/etc/hosts` and the login item, optionally the data (off by default), then trashes the app. **If the
+  app is just deleted, the helper cleans up by itself after 24 hours** — long enough that "delete the app" isn't a
+  quick way around blocking, short enough that a real uninstall clears by the next day. *Rejected:* a root-owned
+  app bundle (every update would need a password).
+- *Rejected:* telling the partner when blocking is off; detecting or removing BlockMe's daemon.
+
+## 2026-10-31 · Menu bar and Settings polish
+
+- Menu bar: status line only in work hours / Focus; **Show OnTask** replaces Today's report / Settings / Open; Focus
+  durations at the top level; Unblock sits with Add site and Ad blocking; plain "Quit OnTask".
+- Settings subtitles are one short line, like a normal app. Home dropped the "Right now" card (it duplicated the menu
+  bar and the summary).
+- **The timeline covers only time at the computer:** away time doesn't widen it, and a session with under 5 minutes
+  more than an hour from the rest (the Mac waking at night) is ignored.
+
+## 2026-10-31 · Logo
+
+- **A shield (like BlockMe's) bearing a clock's two hands at a right angle**, blue-to-teal with white hands and an
+  orange centre; the menu bar draws the same shield with the hands cut out (template image). Drawn in code
+  (desktop/icons/MakeIcons.java) so every size stays crisp. *Replaced:* a check + chevron mark.
+
+## 2026-10-31 · AI: decision models instead of chat models (tested)
+
+- **Why the change:** YouTube always showed as Mixed. Ollama's `qwen3-vl:4b` tag is a *thinking* model: it spent its
+  whole answer budget reasoning and returned nothing (even with 1,024 tokens), so no video was ever judged. Chat
+  models also give confidence numbers that mean nothing.
+- **Tested on 30 real and realistic titles labelled by the user:**
+
+  | Model | Correct | Confident ≥ 60% → right | Speed | Memory |
+  |---|---|---|---|---|
+  | Kev-4B | 22/30 | 9 of 10 | 0.37 s | 9.5 GB |
+  | Qwen3-VL 8B Instruct | 20/30 | said 80–98% on everything, incl. all 10 misses | 0.85 s | ~6–7 GB |
+  | Kev-0.8B | 20/30 | 14 of 18 | 0.08 s | 2.7 GB |
+
+- **Kev-0.8B on this Mac is the default.** Its probabilities track whether it's right, which is what "ask when unsure"
+  needs; it's nearly as accurate as 4B with a quarter of the memory, and its mistakes are cheap to fix (one dropdown,
+  and source rules learn from it). Kev-4B and TypeSafe's **Jev** (cloud, API key in the Keychain, one-time privacy
+  notice) are options. *Rejected:* Qwen (confidence useless); Jev as default (sends browsing to a third party).
+- **Ask when the top answer is below 60%.** Chosen by the user from the test's threshold table.
+- **Kev runs only when needed:** OnTask installs it (git + `uv`), starts it on demand and stops it after 10 idle
+  minutes to free memory.
+- **Text only; screenshots dropped.** Kev can't see images, and title + address (+ on-screen text) were enough.
+  On-screen text is still read with Apple's own OCR when Screen Recording is allowed.
+- **"Memory" lives in OnTask, not the prompt.** Giving Kev past decisions as examples made it *worse* (22 → 18–19 of
+  30): it's trained to judge the text in front of it. So memory is (1) the same page reuses its verdict, and
+  (2) **two matching answers of yours for the same source** (subreddit, Facebook group, YouTube channel, Medium
+  author, Substack publication) make a rule, listed and removable in Settings → Categories. Fine-tuning Kev on your
+  own labels is possible later, once there are a few hundred.
+- **Look up what the title doesn't say:** a video's channel via YouTube/Vimeo oEmbed, and other pages' own
+  description tags, fetched without your cookies. Facebook, LinkedIn and Instagram need sign-in, so they're skipped.
+- *Removed with chat models:* the AI-written sentence in partner alerts (the plain template stays).
+
+## 2026-10-31 · Pages on Varies sites (grilled)
+
+- **Only sites in the Varies category are judged page by page;** moving a site out of Varies gives the whole site one
+  category. Defaults: YouTube, Vimeo, Reddit, Facebook, LinkedIn, Medium, Substack.
+- **Feeds always count as time-wasting**, with no AI and no question: YouTube home and Shorts, Facebook home / Watch /
+  Reels, Reddit front page / r/popular / r/all, Vimeo home, LinkedIn feed. Groups, marketplace, a subreddit, a thread,
+  a video or an article are judged.
+- **A page gets one of your categories**, not just "work / not work": "YouTube: Learning Java" can be Work while
+  "YouTube: Funny Cat Video" is Entertainment.
+- **Order:** remembered verdict → source rule → Kev on title, address and looked-up facts → Kev with on-screen text →
+  ask you. Judged again only when the title or address changes (no timer).
+- **"I can't tell whether this is work. What is it?"** with your categories as buttons, Not now, and Pause asking
+  (15 min / 30 min / 1 h / 2 h / 1 day; Resume in the menu bar). At most once per page and every 2 minutes, at any
+  time of day. Undecided pages show as **Unsure** (counted as Mixed). Catch-up judging of earlier pages never asks.
+- **Home shows each page as its own row** ("YouTube: Learning Java"), colored by its category; its dropdown changes
+  just that page. (May get cluttered; revisit if so.)
+- **Titles stay private by default:** the partner's report folds them into per-site totals; the titled rows go to a
+  Firestore document only you can read, for your phone. A switch, "Allow partner to see individual website page
+  titles", is off by default and only matters with the full report shared.
+
+## 2026-10-31 · Default categories
+
+- **Work, Work adjacent, Entertainment / News / Social, Personal admin** (plus Varies). Simple is better, and the app
+  is about staying on work. Learning, Communication, Social, News and Shopping were retired; existing history in them
+  is sorted again once on upgrade. Work adjacent counts as Mixed by default.

@@ -63,12 +63,16 @@ To remove the helper by hand right away: `sudo bash daemon/uninstall.sh --target
 
 ## 2. AI classification (optional)
 
-Settings → Smarter classification. Pick a provider and model for text and for images from the dropdowns:
+Settings → AI labeling → **Use AI**, then where it runs:
 
-* **Ollama** (if installed) or the built-in **llama.cpp**: models not yet on your Mac show **Download**.
-  Downloaded models can be deleted under *Advanced: local models*.
-* **Claude / OpenAI / Gemini**: paste an API key; it's stored in the macOS Keychain. On-screen text is then sent to
-  that provider (you'll be told once).
+* **Kev, on this Mac** (default): needs `uv` (`brew install uv`) and git. Press **Install Kev**; the model (0.8B,
+  about 2 GB on disk, ~3 GB of memory while running) downloads the first time it's used. OnTask starts it when there's
+  something to decide and stops it after 10 idle minutes. The 4B size makes fewer mistakes but needs ~10 GB of memory.
+* **Jev, TypeSafe cloud:** paste a TypeSafe API key; it's stored in the macOS Keychain. Page titles and on-screen text
+  are then sent to TypeSafe (you'll be told once).
+
+Reading on-screen text needs the Screen Recording permission; without it, AI works from app names, titles and
+addresses. Why decision models instead of chat models: see [docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## 3. Firebase (phone app, partner messages, reminders)
 

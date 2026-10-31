@@ -18,7 +18,8 @@ Everything you must do by hand (accounts, secrets, cutover): [SETUP.md](SETUP.md
 | Dir | What |
 |---|---|
 | `desktop/` | Kotlin + Compose Desktop app (Gradle). Tray icon, SQLite, all Mac-side logic. |
-| `helper/` | Swift helper: active app/title/URL, idle, lock, media, OCR, screenshots, battery. JSON lines over stdio. |
+| `helper/` | Swift helper: active app/title/URL, idle, lock, media, OCR, battery. JSON lines over stdio. |
+| `docs/` | [DECISIONS.md](docs/DECISIONS.md): why things are the way they are. |
 | `daemon/` | Root hosts daemon + install/uninstall scripts. |
 | `functions/` | Firebase Cloud Functions (TypeScript): message routing, schedules, pairing, model recommendations. |
 | `firebase/` | Firestore rules, indexes, rules tests (config: `firebase.json` at the repo root). |
@@ -37,7 +38,7 @@ cd firebase && npm ci && npm test    # Firestore rules (needs Java for the emula
 cd web && npm ci && npm test && npm run build
 ```
 
-Opt-in integration checks: `ONTASK_OLLAMA_MODEL=<model> ./gradlew test --tests '*OllamaSmoke*'` (real Ollama), and
+Opt-in integration checks: `ONTASK_KEV_URL=http://127.0.0.1:8011 ./gradlew test --tests '*KevSmoke*'` (a running Kev), and
 `firebase/e2e/pair.mjs` + `ONTASK_E2E_FILE=... ./gradlew test --tests '*EmulatorE2E*'` (Mac → Firestore → Cloud
 Function → partner message, against the emulators).
 
