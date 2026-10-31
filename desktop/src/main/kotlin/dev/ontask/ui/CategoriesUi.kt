@@ -71,11 +71,13 @@ private enum class Kind(val label: String, val level: Level, val variable: Boole
 /** Settings → Categories: rename, change what each counts as, add your own, delete. */
 @Composable
 fun CategoriesSettings(app: App) {
-    var cats by remember { mutableStateOf(Category.assignable) }
+    // Bumped on every change: categories compare by name, so a refreshed list would otherwise look unchanged.
+    var version by remember { mutableStateOf(0) }
+    val cats = remember(version) { Category.assignable }
     var newLabel by remember { mutableStateOf("") }
     var newKind by remember { mutableStateOf(Kind.FOCUSED) }
     var deleting by remember { mutableStateOf<Category?>(null) }
-    fun reload() { cats = Category.assignable; app.reloadRules(); app.tracker.invalidate() }
+    fun reload() { version++; app.reloadRules(); app.tracker.invalidate() }
 
     SectionCard(
         "Categories",
@@ -83,7 +85,7 @@ fun CategoriesSettings(app: App) {
             "that can be either, where each video or page is judged on its own.",
     ) {
         cats.forEach { c ->
-            var label by remember(c) { mutableStateOf(c.label) }
+            var label by remember(c, version) { mutableStateOf(c.label) }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(label, { label = it }, singleLine = true, modifier = Modifier.weight(1f),
                     trailingIcon = if (label.trim() != c.label && label.isNotBlank()) ({ TextButton({ app.categories.update(c, label, c.level, c.variable); reload() }) { Text("Save") } }) else null)

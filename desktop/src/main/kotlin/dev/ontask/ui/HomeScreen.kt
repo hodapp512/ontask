@@ -56,7 +56,8 @@ fun HomeScreen(app: App) {
     LaunchedEffect(Unit) { while (true) { delay(5_000); now = App.nowSec() } }
     val today = LocalDate.now()
     var date by remember { mutableStateOf(today) }
-    var report by remember { mutableStateOf<DailyReport?>(null) }
+    // Always redraw on reload: categories compare by name, so a renamed one would otherwise look unchanged.
+    var report by remember { mutableStateOf<DailyReport?>(null, androidx.compose.runtime.neverEqualPolicy()) }
     LaunchedEffect(date, tick, now / 60) {
         report = withContext(Dispatchers.IO) { app.tracker.flush(); app.reports.daily(date) }
     }
