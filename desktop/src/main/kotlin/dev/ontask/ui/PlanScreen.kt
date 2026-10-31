@@ -41,7 +41,7 @@ fun PlanPromptContent(app: App, prompt: Prompt, onDone: () -> Unit, onLater: () 
 @Composable
 private fun PlanBody(app: App, prompt: Prompt, date: LocalDate, onDone: () -> Unit) {
     when (prompt) {
-        Prompt.PLANNING, Prompt.PLANNING_SHORT -> PrioritiesCard(app, date, prompt == Prompt.PLANNING_SHORT, onDone)
+        Prompt.PLANNING, Prompt.PLANNING_SHORT -> PrioritiesCard(app, date, prompt == Prompt.PLANNING_SHORT, onDone = onDone)
         Prompt.MIDDAY -> MiddayCard(app, date, onDone)
         else -> EveningCard(app, date, onDone)
     }

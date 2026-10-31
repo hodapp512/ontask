@@ -92,8 +92,8 @@ fun ApplicationScope.OnTaskTray(app: App, open: (Dest?) -> Unit) {
         app.helperNeeded() -> "Blocking isn't on: the blocking helper ${app.helperHealth.value?.problem}"
         focus != null -> "Focus session: ${fmtDuration(focus.plannedEndTs - now)} left, blocking ${blocked.size} sites"
         svc.strictNow(now) -> "Work hours: blocking ${blocked.size} sites"
-        else -> "Outside work hours: blocking ${blocked.size} sites (unblocking is instant)"
-    } + if (svc.mode == BlockMode.DRY_RUN) " (test mode)" else ""
+        else -> null
+    }?.let { it + if (svc.mode == BlockMode.DRY_RUN) " (test mode)" else "" }
 
     var picking by remember { mutableStateOf(false) }
     var adding by remember { mutableStateOf(false) }
@@ -103,7 +103,7 @@ fun ApplicationScope.OnTaskTray(app: App, open: (Dest?) -> Unit) {
         tooltip = "OnTask — focused ${fmtDuration(deep)}, wasted ${fmtDuration(wasted)}",
         onAction = { open(null) },
         menu = {
-            Item(status, enabled = false, onClick = {})
+            status?.let { Item(it, enabled = false, onClick = {}) }
             Item("Today: focused ${fmtDuration(deep)}, wasted ${fmtDuration(wasted)}", enabled = false, onClick = {})
             if (openCount > 0) Item("$openCount site${if (openCount == 1) "" else "s"} unblocked right now", enabled = false, onClick = {})
             Separator()
@@ -124,8 +124,7 @@ fun ApplicationScope.OnTaskTray(app: App, open: (Dest?) -> Unit) {
             Separator()
             Item("Show OnTask", onClick = { open(null) })
             Separator()
-            val reopens = app.prefs.bool("startup.reopen", false)
-            Item(if (reopens) "Quit OnTask (reopens in a few seconds)" else "Quit OnTask", onClick = { exitApplication() })
+            Item("Quit OnTask", onClick = { exitApplication() })
         },
     )
     if (picking) UnblockPickerWindow(app, blocked) { picking = false; changed() }
