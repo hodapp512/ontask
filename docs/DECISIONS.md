@@ -209,3 +209,17 @@ Format: **Decision** — why. *Rejected:* alternatives, and why not.
 - **Timeline hover shows the category** ("Entertainment / News / Social", "Unsure" for undecided pages) instead of
   Focused/Mixed/Wasted, names videos and pages ("youtube.com – Learning Java"), and puts the time on a smaller line
   below. Stretches are split by category (still colored by level).
+
+## 2026-10-31 · Bedtime (built without a grilling; open to change)
+
+- **A bedtime, 10:30 PM by default** (Settings → Daily rhythm; 8 PM–2 AM in 15-minute steps; on by default). The night
+  runs from bedtime to 5 AM.
+- **At bedtime, if you're at the computer, one reminder** in the center of the screen you're using. It doesn't come
+  if you're already away; it comes when you sit down if you return during the night.
+- **Then every 15 minutes while you're still active and not doing Work** ("clearly still surfing"). Working late
+  isn't screen addiction, so Work (Focused) time doesn't trigger follow-ups. Each is firmer ("You're 45m past
+  bedtime"); from the third, the window can't be closed for 20 seconds.
+- **Buttons:** Going to bed (turns the display off: a nudge to actually stop), 10 more minutes, and from the second
+  reminder on, I'm working (30 minutes). Going to bed doesn't silence the night: if you keep going, the next reminder
+  still comes 15 minutes later.
+- Each reminder is logged as a `bedtime_nudge` event on the Mac. Nothing goes to the partner or the phone yet.

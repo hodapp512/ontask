@@ -47,6 +47,8 @@ fun AppOverlays(app: App) {
     val variable by app.variableAsk.collectAsState()
     iv?.let { InterventionWindow(app, it, mode) }
     variable?.let { VariableAskWindow(app, it, mode) }
+    val bedtime by app.bedtimeNudge.collectAsState()
+    bedtime?.let { BedtimeWindow(app, it, mode) }
     val unblockNudge by app.unblockNudge.collectAsState()
     unblockNudge?.let { UnblockNudgeWindow(app, it, mode) }
     prompt?.let { PromptWindow(app, it, mode) }
@@ -192,3 +194,45 @@ fun UnblockNudgeWindow(app: App, n: App.UnblockNudge, mode: ThemeMode) {
 }
 
 private fun ordinal(n: Int) = "$n" + if (n % 100 in 11..13) "th" else when (n % 10) { 1 -> "st"; 2 -> "nd"; 3 -> "rd"; else -> "th" }
+
+/**
+ * Bedtime: a reminder at bedtime, then firmer ones every 15 minutes while you're still at it. From the third on, it
+ * can't be closed for a few seconds.
+ */
+@Composable
+fun BedtimeWindow(app: App, n: App.BedtimeNudge, mode: ThemeMode) {
+    var left by remember(n) { mutableStateOf(n.lockSec) }
+    LaunchedEffect(n) { while (left > 0) { delay(1000); left-- } }
+    val size = DpSize(480.dp, 300.dp)
+    Window(
+        onCloseRequest = { if (left <= 0) app.bedtimeSnooze(10) }, title = "OnTask", alwaysOnTop = true, resizable = false,
+        state = rememberWindowState(size = size, position = centeredOnActiveScreen(size)),
+    ) {
+        OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) {
+            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    when {
+                        n.level == 1 -> "It's bedtime (${n.bedtime})."
+                        else -> "You're ${fmtDuration(n.minutesPast * 60L)} past bedtime."
+                    },
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+                Text(
+                    when (n.level) {
+                        1 -> "Time to wind down and put the screen away. Whatever's left will still be there tomorrow."
+                        2 -> "Still here? Late-night scrolling borrows from tomorrow. Finish up and go to bed."
+                        else -> "This is reminder number ${n.level} tonight. Close the laptop and get some sleep."
+                    },
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                if (left > 0) Text("Take a breath… ${left}s", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button({ app.bedtimeGoingToBed() }, enabled = left <= 0) { Text("Going to bed") }
+                    OutlinedButton({ app.bedtimeSnooze(10) }, enabled = left <= 0) { Text("10 more minutes") }
+                    if (n.level > 1) TextButton({ app.bedtimeSnooze(30) }, enabled = left <= 0) { Text("I'm working") }
+                }
+                Text("\"Going to bed\" turns the screen off.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        } }
+    }
+}

@@ -88,12 +88,23 @@ private fun RhythmSettings(app: App) {
     var midday by remember { mutableStateOf(app.prefs.bool("rhythm.midday", true)) }
     var evening by remember { mutableStateOf(app.prefs.bool("rhythm.evening_at_end", true)) }
     var lead by remember { mutableStateOf(app.prefs.int("rhythm.evening_lead_min", 30)) }
+    var bedOn by remember { mutableStateOf(app.bedtimeEnabled) }
+    var bed by remember { mutableStateOf(app.bedtimeMin) }
     SectionCard("Daily rhythm") {
         SwitchSetting("Midday check-in", "Halfway through your working time.", midday) { midday = it; app.prefs.set("rhythm.midday", it) }
         SwitchSetting("Evening check-in", "How the day felt, before your daily report goes out.", evening) { evening = it; app.prefs.set("rhythm.evening_at_end", it) }
         if (evening) SettingRow("Evening check-in comes", "Before your work hours end, so you do it while you're still at the desk.") {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(15, 30, 45, 60).forEach { m -> FilterChip(lead == m, { lead = m; app.prefs.set("rhythm.evening_lead_min", m) }, label = { Text("$m min before") }) }
+            }
+        }
+        SwitchSetting("Bedtime reminder", "At bedtime, a reminder to put the screen away; more of them every 15 minutes while you're still at it (not while you're working).", bedOn) { bedOn = it; app.prefs.set("bedtime.enabled", it) }
+        if (bedOn) {
+            // 8:00 PM to 2:00 AM in 15-minute steps (values past midnight wrap).
+            val fmt = java.time.format.DateTimeFormatter.ofLocalizedTime(java.time.format.FormatStyle.SHORT)
+            val steps = (80..104).map { (it * 15) % 1440 }
+            SliderSetting("Bedtime", "", steps.indexOf(bed).coerceAtLeast(0), steps.indices, "", format = { java.time.LocalTime.of(steps[it] / 60, steps[it] % 60).format(fmt) }) {
+                bed = steps[it]; app.prefs.set("bedtime.min", bed)
             }
         }
     }

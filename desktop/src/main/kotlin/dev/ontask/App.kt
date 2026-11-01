@@ -274,6 +274,7 @@ class App(val dir: Path = dataDir()) {
         if (prefs.get("update.repo") != null && now - lastUpdateCheck >= 7 * 86400) { lastUpdateCheck = now; scope.launch(IO) { checkForUpdates() } }
         if (ai.enabled && now - lastBattery >= 60) { lastBattery = now; scope.launch(IO) { batteryCheck() } }
         if (adBlock.refreshDue(now) && !adBlockBusy) { adBlockBusy = true; scope.launch(IO) { try { adBlock.refresh(now) } finally { adBlockBusy = false } } }
+        if (now - lastBedtimeCheck >= 30) { lastBedtimeCheck = now; runCatching { bedtimeCheck(now, live) } }
         if (now - lastHelperCheck >= 60) { lastHelperCheck = now; checkHelper() }
         if (now - lastRhythm >= 30) { lastRhythm = now; runCatching { rhythmCheck(now, live.away) } }
     }
@@ -420,6 +421,48 @@ class App(val dir: Path = dataDir()) {
     fun interventionBack() { ladder.backToWork(nowSec()); _intervention.value = null }
     fun interventionStruggling() { _intervention.value = ladder.struggling() }
     fun interventionDismiss() { _intervention.value = null }
+
+    // ---- Bedtime -----------------------------------------------------------------------------------------------
+
+    /** A bedtime reminder on screen: the [level]th tonight, [minutesPast] bedtime; from the third on it can't be closed at once. */
+    data class BedtimeNudge(val level: Int, val minutesPast: Int, val lockSec: Int, val bedtime: String)
+    private val _bedtime = MutableStateFlow<BedtimeNudge?>(null)
+    val bedtimeNudge: StateFlow<BedtimeNudge?> = _bedtime
+    private var lastBedtimeCheck = 0L
+
+    val bedtimeEnabled get() = prefs.bool("bedtime.enabled", true)
+    val bedtimeMin get() = prefs.int("bedtime.min", dev.ontask.plan.Bedtime.DEFAULT_MIN)
+
+    private fun bedState(): dev.ontask.plan.Bedtime.NightState? = prefs.get("bedtime.state")?.split("|")?.takeIf { it.size == 4 }?.let {
+        runCatching { dev.ontask.plan.Bedtime.NightState(LocalDate.parse(it[0]), it[1].toInt(), it[2].toLong(), it[3].toLong()) }.getOrNull()
+    }
+    private fun saveBedState(s: dev.ontask.plan.Bedtime.NightState) = prefs.set("bedtime.state", "${s.night}|${s.count}|${s.lastTs}|${s.snoozeUntil}")
+
+    /** At bedtime, and every 15 minutes after while you're still at the computer and not working. */
+    private fun bedtimeCheck(now: Long, live: dev.ontask.track.Live) {
+        if (!bedtimeEnabled || _bedtime.value != null) return
+        val b = dev.ontask.plan.Bedtime(bedtimeMin)
+        val st = bedState()
+        val n = b.due(now, active = !live.away, working = live.classification?.level == Level.DEEP, state = st) ?: return
+        val prev = st?.takeIf { it.night == n.night } ?: dev.ontask.plan.Bedtime.NightState(n.night)
+        saveBedState(prev.copy(count = n.level, lastTs = now))
+        events.emit("bedtime_nudge", now, "level" to n.level, "minutes_past" to n.minutesPast)
+        val label = java.time.LocalTime.of(bedtimeMin / 60, bedtimeMin % 60).format(java.time.format.DateTimeFormatter.ofLocalizedTime(java.time.format.FormatStyle.SHORT))
+        _bedtime.value = BedtimeNudge(n.level, n.minutesPast, n.lockSec, label)
+    }
+
+    /** "Going to bed": turns the display off. If you keep going anyway, the next reminder still comes. */
+    fun bedtimeGoingToBed() {
+        _bedtime.value = null
+        runCatching { ProcessBuilder("pmset", "displaysleepnow").start() }
+    }
+
+    /** "10 more minutes" / "I'm working": no reminders until then. */
+    fun bedtimeSnooze(minutes: Int) {
+        val now = nowSec()
+        bedState()?.let { saveBedState(it.copy(snoozeUntil = now + minutes * 60L)) }
+        _bedtime.value = null
+    }
 
     /** Sends the partner message through the daily rate limit; extras are queued into the next check-in. */
     fun sendPartnerAlert(text: String): Boolean {
