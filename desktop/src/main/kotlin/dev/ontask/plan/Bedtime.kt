@@ -38,7 +38,8 @@ class Bedtime(
 
     /** Minutes since bedtime on [night]. */
     fun minutesPast(night: LocalDate, now: Long): Int {
-        val bed = night.plusDays(if (bedtimeMin < wakeMin) 1 else 0).atStartOfDay(zone).toEpochSecond() + bedtimeMin * 60L
+        // The clock time on that date (not midnight + minutes, which is an hour off on daylight-saving days).
+        val bed = night.plusDays(if (bedtimeMin < wakeMin) 1 else 0).atTime(bedtimeMin / 60, bedtimeMin % 60).atZone(zone).toEpochSecond()
         return ((now - bed) / 60).toInt().coerceAtLeast(0)
     }
 

@@ -41,6 +41,13 @@ class BedtimeTest {
         assertNull(b.due(at(26, 23, 2), active = true, state = s2.copy(snoozeUntil = at(26, 23, 10))))
     }
 
+    @Test fun minutesPastBedtimeAreRightOnTheDayClocksFallBack() {
+        val chicago = java.time.ZoneId.of("America/Chicago")
+        val b2 = Bedtime(21 * 60 + 30, chicago)
+        val tenFifteen = ZonedDateTime.of(2026, 11, 1, 22, 15, 0, 0, chicago).toEpochSecond() // DST ended that morning
+        assertEquals(45, b2.minutesPast(LocalDate.of(2026, 11, 1), tenFifteen))
+    }
+
     @Test fun aNewNightStartsOver() {
         val old = Bedtime.NightState(night, count = 5, lastTs = at(27, 1, 0))
         assertEquals(1, b.due(at(27, 22, 35), active = true, state = old)!!.level)

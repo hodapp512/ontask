@@ -282,3 +282,6 @@ when it comes to the front.*
 - **Follow-up bedtime reminders come every 15 minutes whatever you're doing, Work included.** The first version
   skipped Work time ("working late isn't screen addiction"), which left the user working at 10:15 PM with no reminder
   after a 9:41 one. "I'm working" still buys 30 minutes.
+- **Clock times are computed as clock times on that date,** not "midnight + minutes": on the day clocks fall back
+  (Nov 1, 2026) the latter was an hour off, which showed "105 minutes past bedtime" at 10:15 PM for a 9:30 bedtime
+  and would have shifted the evening check-in, the next work start and the timeline's clock labels.

@@ -73,7 +73,7 @@ data class WorkSchedule(val week: WorkWeek = WorkWeek.DEFAULT, val exceptions: M
         for (d in 0..7) {
             val date = t.toLocalDate().plusDays(d.toLong())
             for (r in rangesFor(date).sortedBy { it.startMin }) {
-                val start = date.atStartOfDay(zone).plusMinutes(r.startMin.toLong()).toEpochSecond()
+                val start = date.atTime(r.startMin / 60 % 24, r.startMin % 60).atZone(zone).toEpochSecond()
                 if (start > epochSec) return start
             }
         }

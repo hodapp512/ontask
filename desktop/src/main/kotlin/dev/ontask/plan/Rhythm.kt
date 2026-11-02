@@ -27,8 +27,9 @@ class Rhythm(private val zone: ZoneId = ZoneId.systemDefault(), private val midd
     fun due(schedule: WorkSchedule, s: DayState, now: Long): Prompt? {
         val date = Instant.ofEpochSecond(now).atZone(zone).toLocalDate()
         if (date != s.date || !schedule.isWorkDay(date)) return null
-        val dayStart = date.atStartOfDay(zone).toEpochSecond()
-        val endTs = dayStart + schedule.endMin(date)!! * 60L
+        // Clock times on that date (midnight + minutes is an hour off on daylight-saving days).
+        fun at(min: Int) = date.atTime(min / 60 % 24, min % 60).atZone(zone).toEpochSecond() + (min / 1440) * 86_400L
+        val endTs = at(schedule.endMin(date)!!)
         // While you're still at your desk, so the reflection is part of the day's report.
         val eveningTs = endTs - eveningLeadMin * 60L
         val first = s.firstPresenceTs
@@ -44,7 +45,7 @@ class Rhythm(private val zone: ZoneId = ZoneId.systemDefault(), private val midd
             return if (now >= endTs + 3600) Prompt.EVENING_PHONE else null
         }
         if (!s.planningDone && s.presentNow) {
-            val midday = dayStart + 12 * 3600L
+            val midday = at(12 * 60)
             return if (now >= midday) Prompt.PLANNING_SHORT else Prompt.PLANNING
         }
         if (middayEnabled && !s.middayDone && s.presentNow && s.planningDone) {

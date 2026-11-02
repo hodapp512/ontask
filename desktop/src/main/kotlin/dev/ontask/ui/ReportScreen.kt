@@ -294,7 +294,7 @@ private fun Timeline(r: DailyReport) {
         // Clock ticks placed at their times (5-minute steps when zoomed in, hours when zoomed out).
         androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth().height(16.dp)) {
             val w = maxWidth
-            timelineTicks(from.toLong(), to.toLong()).forEach { (t, label) ->
+            timelineTicks(from.toLong(), to.toLong(), r.dayStart).forEach { (t, label) ->
                 val frac = ((t - from) / span).toFloat()
                 Text(label, Modifier.offset(x = (w * frac - 16.dp).coerceIn(0.dp, w - 40.dp)), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -316,12 +316,14 @@ private const val MIN_SPAN_SEC = 300.0
  * Clock ticks for a window (seconds after midnight): the smallest step from 5 minutes to 6 hours that gives at most
  * six ticks, each at a round time ("10 AM", "10:15").
  */
-fun timelineTicks(from: Long, to: Long): List<Pair<Long, String>> {
+fun timelineTicks(from: Long, to: Long, dayStart: Long? = null): List<Pair<Long, String>> {
     val step = listOf(5, 10, 15, 30, 60, 120, 180, 240, 360).map { it * 60L }.firstOrNull { (to - from) / it <= 6 } ?: 21_600L
     val first = (from + step - 1) / step * step
     return (first..to step step).map { t ->
-        val time = java.time.LocalTime.of(((t / 3600) % 24).toInt(), ((t % 3600) / 60).toInt())
-        t to time.format(java.time.format.DateTimeFormatter.ofPattern(if (t % 3600 == 0L) "h a" else "h:mm", java.util.Locale.US))
+        // With [dayStart], the label is the real clock time (right on daylight-saving days, when the day isn't 24 h).
+        val time = dayStart?.let { Instant.ofEpochSecond(it + t).atZone(ZoneId.systemDefault()).toLocalTime() }
+            ?: java.time.LocalTime.of(((t / 3600) % 24).toInt(), ((t % 3600) / 60).toInt())
+        t to time.format(java.time.format.DateTimeFormatter.ofPattern(if (time.minute == 0) "h a" else "h:mm", java.util.Locale.US))
     }
 }
 
