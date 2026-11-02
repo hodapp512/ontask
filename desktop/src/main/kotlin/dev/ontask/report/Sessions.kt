@@ -6,7 +6,13 @@ import dev.ontask.Level
  * A stretch of time in one category (adjacent segments of the same category merged), with seconds per app, site or
  * video in it ("youtube.com – Learning Java"). Its color comes from [level]; [category] is shown when you hover.
  */
-data class Run(val start: Long, val end: Long, val level: Level, val activity: Map<String, Long> = emptyMap(), val category: dev.ontask.Category? = null) {
+/**
+ * What a row of [Run.activity] is, for changing its category: the app or site a rule would match, and for a page or
+ * video on a Varies site its item key and title.
+ */
+data class ItemRef(val subject: String, val itemKey: String? = null, val title: String? = null)
+
+data class Run(val start: Long, val end: Long, val level: Level, val activity: Map<String, Long> = emptyMap(), val category: dev.ontask.Category? = null, val refs: Map<String, ItemRef> = emptyMap()) {
     val seconds get() = end - start
     /** The [n] apps or sites that took the most time in this stretch. */
     fun top(n: Int = 3): List<Pair<String, Long>> = activity.entries.sortedByDescending { it.value }.take(n).map { it.key to it.value }
@@ -28,7 +34,7 @@ object Sessions {
             val last = out.lastOrNull()
             if (last != null && last.level == r.level && last.category == r.category && r.start - last.end <= maxGap) {
                 val act = HashMap(last.activity); r.activity.forEach { (k, v) -> act.merge(k, v, Long::plus) }
-                out[out.lastIndex] = last.copy(end = maxOf(last.end, r.end), activity = act)
+                out[out.lastIndex] = last.copy(end = maxOf(last.end, r.end), activity = act, refs = last.refs + r.refs)
             }
             else out.add(r)
         }

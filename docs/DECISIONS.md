@@ -324,3 +324,12 @@ when it comes to the front.*
   Pause asking covers both questions.
 - *Rejected:* waiting for the user to fix it on Home (they only noticed after the fact); treating Unclassified as
   Wasted (punishes new work tools).
+
+## 2026-11-02 · Timeline gestures and slice details (Mac)
+- **Two-finger sideways swipe moves along the day; up/down scrolls the page,** as in a browser. Vertical scrolling
+  used to zoom in big 20% steps, so a slightly diagonal swipe zoomed and panned at once ("wonky"). Zoom is the pinch,
+  ⌘/Ctrl-scroll (in small steps), or the buttons.
+- **Clicking a stretch opens its details:** time, length, every app, site, page or video in it with its duration and
+  a category dropdown. A drag of 4 px or more is a pan, not a click. Changing a category there is the same as on
+  Where the time went (a rule, or just that page for Varies sites) and relabels history.
+- *Rejected:* plain scroll-to-zoom kept for mouse wheels (can't tell a wheel from a trackpad, and it caused the bug).

@@ -10,12 +10,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.input.pointer.isMetaPressed
+import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.layout.onSizeChanged
 import dev.ontask.report.Run
 import java.time.LocalTime
@@ -184,7 +188,7 @@ fun SummaryCard(r: DailyReport, title: String, app: App? = null, onRelabel: () -
             },
             delayMillis = 300,
         ) { legend() } else legend()
-        Timeline(r)
+        Timeline(r, app, onRelabel)
         if (r.deepSessions.isNotEmpty()) Expander("Longest focused sessions") {
             r.deepSessions.sortedByDescending { it.seconds }.take(5).forEach { Text("${clockRange(it.start, it.end)}  ·  ${fmtDuration(it.seconds)}") }
         }
@@ -206,13 +210,14 @@ fun SummaryCard(r: DailyReport, title: String, app: App? = null, onRelabel: () -
 }
 
 /**
- * Colored stretches across the active part of the day; hover one to see when it was and what you did. Zoomable for a
- * closer look at busy stretches: scroll over it to zoom around the pointer, drag to move along the day, or use the
- * − / + / Reset buttons.
+ * Colored stretches across the active part of the day; hover one to see when it was and what you did, click it for
+ * everything in it (and to change their categories). Zoomable for a closer look at busy stretches: pinch on the
+ * trackpad (or ⌘-scroll) to zoom around the pointer, swipe sideways with two fingers or drag to move along the day, or
+ * use the − / + / Reset buttons. Scrolling up and down scrolls the page, as in a browser.
  */
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
-private fun Timeline(r: DailyReport) {
+private fun Timeline(r: DailyReport, app: App?, onRelabel: () -> Unit) {
     val track = MaterialTheme.colorScheme.surfaceVariant
     val (from0, to0) = timelineWindow(r.timeline.map { (it.start - r.dayStart) to (it.end - r.dayStart) }, r.timeline.map { it.level == Level.AWAY })
     // The visible window, in seconds after midnight.
@@ -222,6 +227,8 @@ private fun Timeline(r: DailyReport) {
     var width by remember { mutableStateOf(1) }
     var hover by remember(r) { mutableStateOf<Pair<Run, Float>?>(null) }
     var dragX by remember { mutableStateOf<Float?>(null) }
+    var pressX by remember { mutableStateOf<Float?>(null) }
+    var selected by remember(r) { mutableStateOf<Run?>(null) }
     // Both read the current view (not the values from the last redraw): a pinch delivers many steps in a row.
     fun zoom(factor: Double, atFrac: Double = 0.5) {
         val (from, to) = view; val span = to - from
@@ -253,16 +260,23 @@ private fun Timeline(r: DailyReport) {
                         Pinch.target = { f -> zoom(f, (x / width).toDouble().coerceIn(0.0, 1.0)) }
                         dragX?.let { pan(x - it); dragX = x; hover = null } ?: run { hover = runAt(x)?.let { it to x } }
                     }
-                    .onPointerEvent(PointerEventType.Press) { e -> dragX = e.changes.first().position.x }
-                    .onPointerEvent(PointerEventType.Release) { dragX = null }
+                    .onPointerEvent(PointerEventType.Press) { e -> dragX = e.changes.first().position.x; pressX = dragX }
+                    .onPointerEvent(PointerEventType.Release) { e ->
+                        // A click (not a drag) opens the stretch under the pointer.
+                        val x = e.changes.first().position.x
+                        if (pressX?.let { kotlin.math.abs(x - it) < 4f } == true) runAt(x)?.takeIf { it.level != Level.AWAY }?.let { selected = it; hover = null }
+                        dragX = null; pressX = null
+                    }
                     .onPointerEvent(PointerEventType.Enter) { e -> val x = e.changes.first().position.x; Pinch.target = { f -> zoom(f, (x / width).toDouble().coerceIn(0.0, 1.0)) } }
                     .onPointerEvent(PointerEventType.Exit) { hover = null; dragX = null; Pinch.target = null }
                     .onPointerEvent(PointerEventType.Scroll) { e ->
+                        // Like a browser: a sideways swipe moves along the day; up and down scroll the page (left alone here);
+                        // ⌘ or Ctrl with the wheel zooms, in steps as small as the scroll. Zooming is otherwise the pinch.
                         val c = e.changes.first()
                         val d = c.scrollDelta
-                        if (kotlin.math.abs(d.x) > kotlin.math.abs(d.y)) pan(-d.x * 20f)
-                        else zoom(if (d.y > 0) 1.2 else 1 / 1.2, (c.position.x / width).toDouble().coerceIn(0.0, 1.0))
-                        c.consume(); hover = null
+                        val zoomKey = e.keyboardModifiers.isMetaPressed || e.keyboardModifiers.isCtrlPressed
+                        if (zoomKey && d.y != 0f) { zoom(kotlin.math.exp(d.y.toDouble().coerceIn(-3.0, 3.0) * 0.1), (c.position.x / width).toDouble().coerceIn(0.0, 1.0)); c.consume(); hover = null }
+                        else if (kotlin.math.abs(d.x) > kotlin.math.abs(d.y)) { pan(-d.x * 20f); c.consume(); hover = null }
                     },
             ) {
                 drawRoundRect(track, size = size, cornerRadius = CornerRadius(6f))
@@ -291,6 +305,7 @@ private fun Timeline(r: DailyReport) {
                 }
             }
         }
+        selected?.let { run -> RunDetails(run, app, { selected = null }) { selected = null; onRelabel() } }
         // Clock ticks placed at their times (5-minute steps when zoomed in, hours when zoomed out).
         androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth().height(16.dp)) {
             val w = maxWidth
@@ -307,6 +322,40 @@ private fun Timeline(r: DailyReport) {
             TextButton({ zoom(1 / 1.5) }, enabled = span > MIN_SPAN_SEC) { Text("+") }
         }
     }
+}
+
+/** A clicked stretch of the timeline: when, how long, and everything in it, each with its category to change. */
+@Composable
+private fun RunDetails(run: Run, app: App?, onClose: () -> Unit, onRelabel: () -> Unit) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onClose,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Dot(levelColor(run.level), 10); Text(dev.ontask.report.runLabel(run))
+            }
+        },
+        text = {
+            Column(Modifier.widthIn(min = 360.dp, max = 560.dp)) {
+                Text("${clockRange(run.start, run.end)} · ${fmtDuration(run.seconds)}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
+                val items = run.top(Int.MAX_VALUE)
+                if (items.isEmpty()) Text("No app recorded")
+                Column(Modifier.heightIn(max = 380.dp).verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                    items.forEachIndexed { i, (name, sec) ->
+                        if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, maxLines = 2)
+                            Text(fmtDuration(sec), Modifier.padding(horizontal = 8.dp), style = MaterialTheme.typography.bodySmall)
+                            val ref = run.refs[name]; val cat = run.category ?: Category.UNKNOWN
+                            if (app != null && ref != null) CategoryPicker(app, ref.subject, cat, onRelabel, item = ref.itemKey?.let { it to ref.title })
+                            else { Dot(levelColor(run.level), 8); Text("  ${dev.ontask.report.runLabel(run)}", style = MaterialTheme.typography.bodySmall) }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClose) { Text("Close") } },
+    )
 }
 
 /** Zooming stops at a 5-minute window. */

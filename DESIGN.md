@@ -145,7 +145,10 @@ minute away doesn't break the run.
 
 ### Daily report
 Focused / mixed / wasted / away totals; timeline strip colored by level, spanning only the time at the computer (away
-time and stray night-time minutes don't widen it), hover/tap for what you did; focused sessions of 25+ min (count, longest); distraction events; regular vs. work unblocks; check-ins done/missed; priorities vs. where time went; worst hour; weekly heat map by hour.
+time and stray night-time minutes don't widen it), hover/tap for what you did. On the Mac, click a stretch for a
+pop-up with its time and everything in it, each with a category dropdown (same as Where the time went). Zoom with a
+trackpad pinch, ⌘-scroll or − / + / Reset; move along the day with a two-finger sideways swipe or a drag; up/down
+scrolling scrolls the page; focused sessions of 25+ min (count, longest); distraction events; regular vs. work unblocks; check-ins done/missed; priorities vs. where time went; worst hour; weekly heat map by hour.
 
 ### Diagnostics
 Activity log with filters; classification source per tick (rule / metadata / OCR / vision / user label) as %; avg processing time per tick and per model; ticks skipped (idle/unchanged); CPU and memory; classifier-vs-user-label disagreement rate (the key accuracy metric); rules list; cloud API calls and estimated cost; sync and notification delivery status.

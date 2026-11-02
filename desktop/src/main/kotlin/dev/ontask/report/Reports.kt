@@ -55,7 +55,7 @@ class Reports(private val db: Db, private val zone: ZoneId = ZoneId.systemDefaul
             }
 
             val raw = ArrayList<Run>()
-            c.prepareStatement("SELECT start_ts, end_ts, level, COALESCE(domain, app, ''), COALESCE(item_cat, category), item FROM ticks WHERE start_ts >= ? AND start_ts < ? ORDER BY start_ts").use { ps ->
+            c.prepareStatement("SELECT start_ts, end_ts, level, COALESCE(domain, app, ''), COALESCE(item_cat, category), item, app, title, url FROM ticks WHERE start_ts >= ? AND start_ts < ? ORDER BY start_ts").use { ps ->
                 ps.setLong(1, start); ps.setLong(2, end)
                 ps.executeQuery().use { rs ->
                     while (rs.next()) {
@@ -63,7 +63,8 @@ class Reports(private val db: Db, private val zone: ZoneId = ZoneId.systemDefaul
                         // A video or page on a Varies site is named: "youtube.com – Learning Java".
                         val name = rs.getString(6)?.substringAfter(": ", "")?.takeIf { it.isNotBlank() && subject.isNotBlank() }?.let { "$subject – $it" }
                             ?: dev.ontask.track.displayAppName(subject)
-                        raw.add(Run(a, b, Level.valueOf(rs.getString(3)), if (subject.isBlank()) emptyMap() else mapOf(name to b - a), Category.valueOf(rs.getString(5))))
+                        val ref = if (rs.getString(6) != null) ItemRef(subject, dev.ontask.classify.itemKey(rs.getString(7), rs.getString(8), rs.getString(9)), rs.getString(8)) else ItemRef(subject)
+                        raw.add(Run(a, b, Level.valueOf(rs.getString(3)), if (subject.isBlank()) emptyMap() else mapOf(name to b - a), Category.valueOf(rs.getString(5)), if (subject.isBlank()) emptyMap() else mapOf(name to ref)))
                     }
                 }
             }
