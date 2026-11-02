@@ -172,10 +172,10 @@ private fun WeekExpander(app: App, today: LocalDate) {
 @Composable
 private fun ReflectionWindow(app: App, onClose: () -> Unit) {
     androidx.compose.ui.window.Window(
-        onCloseRequest = onClose, title = "Evening reflection",
+        onCloseRequest = onClose, title = "Evening reflection", alwaysOnTop = true,
         state = androidx.compose.ui.window.rememberWindowState(size = androidx.compose.ui.unit.DpSize(760.dp, 820.dp), position = androidx.compose.ui.window.WindowPosition.Aligned(Alignment.Center)),
     ) {
-        OnTaskTheme(remember { themeOf(app) }) { PlanPromptContent(app, Prompt.EVENING, onDone = onClose, onLater = onClose) }
+        OnTaskTheme(remember { themeOf(app) }) { PlanPromptContent(app, Prompt.EVENING, onDone = onClose, onLater = { onClose() }) }
     }
 }
 

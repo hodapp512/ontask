@@ -127,6 +127,15 @@ describe("daily report", () => {
     expect(reportText({ ...partnerParts("Sam"), report, link: "l" })).toContain("No reflection today.");
     expect(reportText({ ...ownParts, link: "l" })).toContain("You didn't use the computer today.");
   });
+  it("includes the morning/afternoon split and the midday answers", () => {
+    const p = { ...partnerParts("Sam"), report: { ...report, halves: { morning: 64, afternoon: 48 } }, checkin: { midday: { done: "Draft; emails", should: "Tests", chips: "Distracted, Low energy" } }, link: "l" };
+    const t = reportText(p);
+    expect(t).toContain("Morning 64% focused · Afternoon 48% focused");
+    expect(t).toContain("Got done by midday: Draft; emails");
+    expect(t).toContain("Should have: Tests");
+    expect(t).toContain("In the way: Distracted, Low energy");
+    expect(reportHtml(p)).toContain("Midday check-in");
+  });
   it("writes dates like Nov 1, 2026", () => expect(fmtDate("2026-11-01")).toBe("Nov 1, 2026"));
   it("escapes what people typed in the email", () => {
     const h = reportHtml({ ...ownParts, report, checkin: { evening: true, note: "<script>x</script>" }, link: "https://x/#/" });

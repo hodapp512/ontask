@@ -97,6 +97,11 @@ class Breaks(
     }
 
     fun lastTaken(): Pair<Long, Long>? = taken.lastOrNull()
+    /** Breaks taken (start, end), plus one running now up to [now]. */
+    fun intervals(now: Long): List<Pair<Long, Long>> = taken + listOfNotNull(active?.takeIf { it.kind == Kind.BREAK }?.let { it.start to minOf(now, it.until) })
+
+    /** "Low energy" at the midday check-in: a break of [sec], whatever has been earned. */
+    fun startBreakFor(now: Long, sec: Long) = begin(Active(Kind.BREAK, now, now + sec))
     /** "5 more minutes" is allowed once per break, soon after it ends. */
     fun canExtend(now: Long) = lastKind == Kind.BREAK && !lastExtended && taken.lastOrNull()?.let { now - it.second < 600 } == true
 

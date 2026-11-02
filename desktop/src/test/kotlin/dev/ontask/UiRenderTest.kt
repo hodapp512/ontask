@@ -29,6 +29,12 @@ class UiRenderTest {
         }
     }
 
+    @Test fun renderMiddayPrompt() {
+        val app = UiShots.newApp()
+        app.priorities.set(java.time.LocalDate.now(), listOf("Finish the proposal\nReview PRs"))
+        UiShots.shot("midday", false, 700, 1500) { dev.ontask.ui.PlanPromptContent(app, dev.ontask.plan.Prompt.MIDDAY, {}, {}, laterLeft = 2) }
+    }
+
     @Test fun renderEveningPrompt() {
         val app = UiShots.newApp()
         UiShots.shot("evening", false, 700, 1300) { dev.ontask.ui.PlanPromptContent(app, dev.ontask.plan.Prompt.EVENING, {}, {}) }

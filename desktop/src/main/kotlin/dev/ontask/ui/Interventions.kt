@@ -272,13 +272,14 @@ fun BreakCardWindow(app: App, c: App.BreakCard, mode: ThemeMode) {
 @Composable
 fun PromptWindow(app: App, prompt: Prompt, mode: ThemeMode) {
     val title = when (prompt) { Prompt.PLANNING, Prompt.PLANNING_SHORT -> "Plan your day"; Prompt.MIDDAY -> "Midday check-in"; else -> "Evening check-in" }
+    // On top of everything; closing counts as "Later" (10 min), and after two of those it stays until answered.
     Window(
-        onCloseRequest = { app.finishPrompt(prompt, snoozeMin = 10) }, title = "OnTask — $title",
+        onCloseRequest = { app.finishPrompt(prompt, snoozeMin = 10) }, title = "OnTask — $title", alwaysOnTop = true,
         state = rememberWindowState(size = DpSize(640.dp, 760.dp), position = centeredOnActiveScreen(DpSize(640.dp, 760.dp))),
     ) {
         OnTaskTheme(mode) {
             Surface(Modifier.fillMaxSize()) {
-                PlanPromptContent(app, prompt, onDone = { app.finishPrompt(prompt) }, onLater = { app.finishPrompt(prompt, snoozeMin = 10) })
+                PlanPromptContent(app, prompt, onDone = { app.finishPrompt(prompt) }, onLater = { m -> app.finishPrompt(prompt, snoozeMin = m) }, laterLeft = app.snoozesLeft(prompt))
             }
         }
     }

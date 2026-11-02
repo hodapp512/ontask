@@ -52,6 +52,8 @@ class CloudSync(
     private val lastActive: () -> Long? = { null },
     /** Today's plan, for the daily report. */
     private val plan: (LocalDate) -> List<String> = { emptyList() },
+    /** Focused % before and after lunch (or noon), for "Morning 64% focused · Afternoon 48%". */
+    private val halves: (LocalDate) -> Pair<Int?, Int?> = { null to null },
 ) {
     @Volatile var lastError: String? = null; private set
     @Volatile var lastSyncTs: Long = 0; private set
@@ -190,7 +192,11 @@ class CloudSync(
      */
     private fun uploadReport(c: CloudClient, uid: String, date: LocalDate) {
         val r = reports.daily(date)
-        c.write("users/$uid/reports", date.toString(), reportPayload(r, System.currentTimeMillis(), titles = partnerSeesTitles))
+        val payload = reportPayload(r, System.currentTimeMillis(), titles = partnerSeesTitles).let { p ->
+            val (am, pm) = halves(date)
+            if (am == null && pm == null) p else JsonObject(p + ("halves" to buildJsonObject { am?.let { put("morning", it) }; pm?.let { put("afternoon", it) } }))
+        }
+        c.write("users/$uid/reports", date.toString(), payload)
         c.write("users/$uid/reportItems", date.toString(), buildJsonObject { put("topSites", sitesJson(r.topSubjects, titles = true)); put("updatedAt", System.currentTimeMillis()) })
     }
 
@@ -222,15 +228,19 @@ class CloudSync(
     }
 
     /**
-     * Today's plan and, once done, the evening check-in (how the day felt, what helped and hurt, the change for
+     * Today's plan, the midday check-in (got done, should have, what's in the way) and, once done, the evening check-in (how the day felt, what helped and hurt, the change for
      * tomorrow, a note for your partner): the server puts them in the daily report. Re-sent only when they change.
      */
     private fun uploadCheckinFlag(c: CloudClient, uid: String) {
         val today = LocalDate.now(zone)
         val ev = checkins.get(today, "evening")?.takeIf { it.sent }
+        val md = checkins.get(today, "midday")
         val payload = buildJsonObject {
             put("evening", ev != null)
             put("plan", plan(today).joinToString("\n"))
+            if (md != null) put("midday", buildJsonObject {
+                md.helped?.let { put("done", it) }; md.hurt?.let { put("should", it) }; md.change?.let { put("chips", it) }
+            })
             if (ev != null) {
                 put("ts", ev.ts * 1000)
                 ev.rating?.let { put("rating", it); put("feeling", dev.ontask.plan.CheckinDraft.feeling(it)) }

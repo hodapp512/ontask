@@ -76,7 +76,7 @@ class App(val dir: Path = dataDir()) {
 
     val cloud by lazy { dev.ontask.cloud.CloudSync(prefs, events, reports, { settings }, habits, checkins, relabel = { name, cat -> reclassify(name, Category.valueOf(cat)) },
         relabelItem = { key, title, cat -> answerVariable(key, title, Category.valueOf(cat)) },
-        lastActive = { lastActiveTs.takeIf { it > 0 } }, plan = { priorities.forDate(it) }) }
+        lastActive = { lastActiveTs.takeIf { it > 0 } }, plan = { priorities.forDate(it) }, halves = { dayHalves(it) }) }
     /** Last moment you were at the Mac (not Away), for the daily report's "you've wrapped up" rule. */
     @Volatile private var lastActiveTs = 0L
     private var wasAway = false
@@ -276,6 +276,9 @@ class App(val dir: Path = dataDir()) {
             breaks.forgetBefore(LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toEpochSecond())
             Triple(breaks.tick(now, settings.tickSec.toLong(), if (live.away) null else live.classification?.level), breaks.earnedSec(), breaks.onBreak())
         }
+        val lunchNow = synchronized(breaks) { breaks.active?.kind == dev.ontask.intervene.Breaks.Kind.LUNCH }
+        if (wasLunch && !lunchNow) lunchSpan()?.let { prefs.set("lunch.span", "${LocalDate.now()}|${it.first}|$now") }
+        wasLunch = lunchNow
         if (due != null) {
             if (due != dev.ontask.intervene.Breaks.Due.LUNCH_CHECK) ladder.breakOver(now)
             if (prefs.bool("ladder.enabled", true)) _breakCard.value = breakCard(due, now)
@@ -457,13 +460,41 @@ class App(val dir: Path = dataDir()) {
         }
     }
 
+    /** Each daily prompt can be put off twice a day ("Later", or closing its window); then it stays up. */
+    private val snoozes = HashMap<Pair<Prompt, LocalDate>, Int>()
+    fun snoozesLeft(p: Prompt): Int = 2 - (snoozes[p to LocalDate.now()] ?: 0)
+
+    // ---- Midday check-in --------------------------------------------------------------------------------------
+
+    /** Today's lunch (start, end), if you took one; the end is a guess (45 min) while it's running. */
+    fun lunchSpan(date: LocalDate = LocalDate.now()): Pair<Long, Long>? = prefs.str("lunch.span", "").split('|').takeIf { it.size == 3 && it[0] == date.toString() }
+        ?.let { it[1].toLong() to it[2].toLong() }
+
+    /** The morning in numbers: until lunch, or until now. Breaks are left out of the "last hour". */
+    fun morningNow(): dev.ontask.report.Morning {
+        val now = nowSec()
+        return dev.ontask.report.morning(reports.daily(LocalDate.now()), lunchSpan()?.first ?: now, synchronized(breaks) { breaks.intervals(now) })
+    }
+
+    /** "Morning 64% focused · Afternoon 48%": split at lunch, or at noon without one. */
+    fun dayHalves(date: LocalDate): Pair<Int?, Int?> {
+        val noon = date.atTime(12, 0).atZone(ZoneId.systemDefault()).toEpochSecond()
+        val l = lunchSpan(date)
+        return dev.ontask.report.halves(reports.daily(date), l?.first ?: noon, l?.second ?: noon)
+    }
+
+    /** "Low energy" → a 10-minute break away from the screen; drift prompts stay quiet meanwhile. */
+    fun startRestBreak() { synchronized(breaks) { breaks.startBreakFor(nowSec(), 600) }; events.emit("break_start", nowSec(), "minutes" to 10); ladder.reset() }
+
     private fun markOnce(key: String, block: () -> Unit) { if (!prefs.bool("once.$key", false)) { block(); prefs.set("once.$key", true) } }
 
     /** The user dealt with (or snoozed) the daily prompt. Snoozed prompts come back with an escalating reminder event. */
     fun finishPrompt(p: Prompt, snoozeMin: Int? = null) {
+        if (snoozeMin != null && snoozesLeft(p) <= 0) return // snoozed twice: it stays until answered
         _duePrompt.value = null
         if (snoozeMin != null) {
             snoozeUntil[p] = nowSec() + snoozeMin * 60L
+            snoozes.merge(p to LocalDate.now(), 1, Int::plus)
             events.emit("checkin_reminder", nowSec(), "kind" to p.name.lowercase())
         }
     }
@@ -512,12 +543,14 @@ class App(val dir: Path = dataDir()) {
     fun interventionLunch() {
         val now = nowSec()
         synchronized(breaks) { breaks.startLunch(now, LocalDate.now().toString()) }
+        prefs.set("lunch.span", "${LocalDate.now()}|$now|${now + 45 * 60}")
         events.emit("lunch_start", now); ladder.reset(); _intervention.value = null; closedIv = null
     }
 
     /** The prompt's own close button: it comes back in 30 seconds while you're still drifting. */
     fun interventionClosed() { _intervention.value?.let { closedIv = it to nowSec() + 30 }; _intervention.value = null }
     private var closedIv: Pair<Intervention, Long>? = null
+    private var wasLunch = false
 
     /** "That's 5 minutes. Back to work?", "Is lunch over?" and "Lunch is over". */
     data class BreakCard(val due: dev.ontask.intervene.Breaks.Due, val minutes: Long, val breaksHourSec: Long, val breaksTodaySec: Long, val canExtend: Boolean)

@@ -5,6 +5,10 @@ import dev.ontask.db.Db
 import dev.ontask.report.DailyReport
 import java.time.LocalDate
 
+/**
+ * A check-in. Evening: [rating], [helped], [hurt], [change] for tomorrow, [message] for the partner. Midday: [helped]
+ * is what got done, [hurt] what should have, [change] the "what's in the way" chips (comma-separated).
+ */
 data class Checkin(val date: LocalDate, val kind: String, val ts: Long, val rating: Int?, val helped: String?, val hurt: String?, val change: String?, val message: String?, val sent: Boolean)
 
 class Checkins(private val db: Db) {

@@ -354,3 +354,19 @@ when it comes to the front.*
 - *Rejected:* a two-step "Is this work? → No → break or drift?" (two clicks for one answer); offering break lengths;
   breaks under 25 min focused, even short ones; showing break time as neutral instead of red; a fixed lunch window
   in the schedule (would allow an hour of YouTube on days without lunch); requiring 2 hours of work before Lunch.
+
+## 2026-11-02 · Midday check-in that helps, and pop-ups that stay (grilled)
+- **Why:** the midday check-in only asked "Anything to adjust for the afternoon?", and its window fell behind other
+  windows as soon as you clicked away; a menu-bar app can then be ignored all day.
+- **Every pop-up is always on top.** Check-ins get Later (10 min / 30 min / 1 h); closing counts as 10 min; after two
+  snoozes the window stays until answered.
+- **Midday asks "What did you get done?" and "What should you have gotten done?"** (the user's wording, instead of
+  "what's going well / not well"), then lets you revise the plan. Done items are ticked in the plan itself.
+- **The morning's numbers come first** (focused %, wasted, longest stretch, top apps, timeline) so the answers rest on
+  facts; the report gets one line, "Morning X% · Afternoon Y%", not the whole card.
+- **"What's in the way?" chips only after a struggling morning** (under 60% focused or 30+ min wasted, not improving
+  in the last hour before lunch with breaks and away left out, so a lunch break doesn't count against you); a link
+  opens them otherwise. Each chip has one suggestion; Other is only recorded. Chips are recorded for patterns.
+- **The card ends with "Done: start 50 min Focus"** so the afternoon starts from the check-in.
+- The partner sees the midday answers in the daily report; no separate message.
+- *Rejected:* an afternoon commitment line checked in the evening (not now); "Lunch first" on the card.

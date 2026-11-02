@@ -26,8 +26,11 @@ export interface ReportDoc {
   deepSessions?: { a: number; b: number }[];
   distractionEvents?: number;
   topSites?: { name: string; category?: string; seconds: number }[];
+  /** Focused % before and after lunch (or noon). */
+  halves?: { morning?: number; afternoon?: number };
 }
-export interface CheckinDoc { evening?: boolean; plan?: string; feeling?: string; helped?: string; hurt?: string; change?: string; note?: string }
+export interface MiddayDoc { done?: string; should?: string; chips?: string }
+export interface CheckinDoc { midday?: MiddayDoc; evening?: boolean; plan?: string; feeling?: string; helped?: string; hurt?: string; change?: string; note?: string }
 
 /** "2026-11-01" → "Nov 1, 2026" (the date style used everywhere). */
 export function fmtDate(isoDate: string): string {
@@ -41,6 +44,20 @@ export function fmtDuration(sec: number): string {
 }
 
 const LEVELS: [string, string, string][] = [["DEEP", "Focused", "#2e9e5b"], ["MIXED", "Mixed", "#e0a526"], ["WASTED", "Wasted", "#d64545"]];
+/** "Morning 64% focused · Afternoon 48%", or null when neither half had enough screen time. */
+export function halvesLine(r?: ReportDoc): string | null {
+  const h = r?.halves;
+  if (h?.morning == null && h?.afternoon == null) return null;
+  return [h.morning != null ? `Morning ${h.morning}% focused` : null, h.afternoon != null ? `Afternoon ${h.afternoon}% focused` : null].filter(Boolean).join(" · ");
+}
+
+/** The midday answers as label/value rows. */
+export function middayRows(m?: MiddayDoc): [string, string][] {
+  if (!m) return [];
+  return ([["Got done by midday", m.done], ["Should have", m.should], ["In the way", m.chips]] as [string, string | undefined][])
+    .filter((r): r is [string, string] => !!r[1]);
+}
+
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 /** [title]: "Here is Dennis's day" or "Your day"; [who]: "Dennis" or "You", for "didn't use the computer today". */
@@ -64,11 +81,14 @@ export function reportText(p: ReportParts): string {
   else {
     const share = Math.round(((t.DEEP ?? 0) / active) * 100);
     lines.push(`${share}% focused · ` + LEVELS.map(([k, l]) => `${l} ${fmtDuration(t[k] ?? 0)}`).join(" · "));
+    const halves = halvesLine(p.report);
+    if (halves) lines.push(halves);
     if (sessions.length) lines.push(`Longest focused session ${fmtDuration(sessions[0].b - sessions[0].a)} (${sessions.length} in all)`);
     if (sites.length) lines.push("Where the time went: " + sites.map((s) => `${s.name} ${fmtDuration(s.seconds)}`).join(", "));
   }
   const c = p.checkin;
   if (c?.plan) lines.push(`Plan: ${c.plan.replace(/\n/g, "; ")}`);
+  middayRows(c?.midday).forEach(([l, v]) => lines.push(`${l}: ${v}`));
   if (c?.evening) {
     lines.push(`Felt: ${c.feeling ?? "—"}`);
     if (c.helped) lines.push(`Helped: ${c.helped}`);
@@ -92,9 +112,11 @@ export function reportHtml(p: ReportParts): string {
     active ? `<p style="margin:0 0 8px;font-size:18px">${Math.round(((t.DEEP ?? 0) / active) * 100)}% focused</p><table style="width:100%;border-collapse:collapse;border-radius:4px;overflow:hidden"><tr>${bar}</tr></table>
       <p style="color:#556">${LEVELS.map(([k, l]) => `${l} ${fmtDuration(t[k] ?? 0)}`).join(" · ")}${p.report?.distractionEvents ? ` · ${p.report.distractionEvents} distractions` : ""}</p>`
       : `<p>${esc(p.who)} didn't use the computer today.</p>`,
+    active && halvesLine(p.report) ? `<p style="margin:0;color:#556">${esc(halvesLine(p.report)!)}</p>` : "",
     sessions.length ? `<h3 style="margin:16px 0 4px">Longest focused sessions</h3><p style="margin:0">${sessions.slice(0, 3).map((s) => fmtDuration(s.b - s.a)).join(" · ")}</p>` : "",
     sites.length ? `<h3 style="margin:16px 0 4px">Where the time went</h3><table>${sites.map((s) => row(fmtDuration(s.seconds), `${esc(s.name)}${s.category ? ` <span style="color:#889">· ${esc(s.category)}</span>` : ""}`)).join("")}</table>` : "",
     c?.plan ? `<h3 style="margin:16px 0 4px">Plan</h3><p style="margin:0;white-space:pre-wrap">${esc(c.plan)}</p>` : "",
+    middayRows(c?.midday).length ? `<h3 style="margin:16px 0 4px">Midday check-in</h3><table>${middayRows(c?.midday).map(([l, v]) => row(l, esc(v))).join("")}</table>` : "",
     `<h3 style="margin:16px 0 4px">Evening check-in</h3>` + (c?.evening
       ? `<table>${row("Felt", esc(c.feeling ?? "—"))}${c.helped ? row("Helped", esc(c.helped)) : ""}${c.hurt ? row("Hurt", esc(c.hurt)) : ""}${c.change ? row("Tomorrow", esc(c.change)) : ""}</table>${c.note ? `<p style="margin:8px 0 0">“${esc(c.note)}”</p>` : ""}`
       : `<p style="margin:0;color:#667">No reflection today.</p>`),
