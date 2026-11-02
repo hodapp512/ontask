@@ -213,6 +213,44 @@ class CloudSync(
         })
     }
 
+    /**
+     * The other devices' (the phone's) day report for [date]: its private copy (titles) for "Where the time went" and
+     * the shared one for totals and timeline. Cached for a minute; empty when signed out or offline.
+     */
+    fun otherDevices(date: LocalDate): List<Pair<JsonObject, JsonObject?>> {
+        val key = date.toString()
+        otherCache[key]?.let { (ts, v) -> if (System.currentTimeMillis() - ts < 60_000) return v }
+        val v = runCatching {
+            val c = client()?.takeIf { it.signedIn } ?: return emptyList()
+            val uid = c.ensureUid()
+            val me = deviceId()
+            val reps = c.queryEqIn("users/$uid", "deviceReports", "date", key).filter { (it["device"] as? JsonObject)?.get("id")?.jsonPrimitive?.contentOrNull != me }
+            val items = c.queryEqIn("users/$uid", "deviceReportItems", "date", key)
+            reps.map { r -> r to items.firstOrNull { (it["device"] as? JsonObject)?.get("id") == (r["device"] as? JsonObject)?.get("id") } }
+        }.getOrDefault(emptyList())
+        otherCache[key] = System.currentTimeMillis() to v
+        return v
+    }
+    private val otherCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<Pair<JsonObject, JsonObject?>>>>()
+
+    /** The other devices' heat numbers per day, to add to this Mac's on the heat map. */
+    fun otherHeat(): Map<LocalDate, dev.ontask.report.DayStat> = runCatching {
+        heatCache?.let { (ts, v) -> if (System.currentTimeMillis() - ts < 300_000) return v }
+        val c = client()?.takeIf { it.signedIn } ?: return emptyMap()
+        val uid = c.ensureUid(); val me = deviceId()
+        val sum = HashMap<LocalDate, dev.ontask.report.DayStat>()
+        c.list("users/$uid/deviceHeat").filter { it.first != me }.forEach { (_, doc) ->
+            (doc["days"] as? JsonObject)?.forEach { (d, v) ->
+                val o = v.jsonObject; fun n(k: String) = o[k]?.jsonPrimitive?.longOrNull ?: 0
+                val day = LocalDate.parse(d); val add = dev.ontask.report.DayStat(n("deep"), n("active"), n("workDeep"), n("workActive"), n("offWasted"), n("offActive"))
+                sum[day] = sum[day]?.let { a -> dev.ontask.report.DayStat(a.deep + add.deep, a.active + add.active, a.workDeep + add.workDeep, a.workActive + add.workActive, a.offWasted + add.offWasted, a.offActive + add.offActive) } ?: add
+            }
+        }
+        heatCache = System.currentTimeMillis() to sum
+        sum
+    }.getOrDefault(emptyMap())
+    @Volatile private var heatCache: Pair<Long, Map<LocalDate, dev.ontask.report.DayStat>>? = null
+
     private fun deviceJson() = buildJsonObject { put("id", deviceId()); put("kind", "mac"); put("name", hostName()) }
     private fun hostName(): String = runCatching { java.net.InetAddress.getLocalHost().hostName.removeSuffix(".local") }.getOrDefault("Mac")
 

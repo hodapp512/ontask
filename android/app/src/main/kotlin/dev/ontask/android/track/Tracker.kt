@@ -143,6 +143,7 @@ class Tracker : AccessibilityService() {
                 val allowed = getSharedPreferences("ontask", MODE_PRIVATE).getBoolean("jev.ok", false)
                 val r = if (allowed) runCatching { Cloud.call("judgeSeen", mapOf("app" to app, "title" to t, "url" to u)) }.getOrNull() else null
                 val cat = (r?.get("category") as? String)?.let { Category.registry[it] }
+                android.util.Log.i("OnTask", "judged $key: ${cat?.name ?: "unsure"} (jev=$allowed, reply=$r)")
                 if (cat != null) file(key, cat, t, Source.AI_PAGE)
                 else ask(key, if (isItem) "${subject}: ${t ?: u ?: ""}" else subject, isItem)
             } finally { synchronized(judging) { judging.remove(key) } }
@@ -164,7 +165,7 @@ class Tracker : AccessibilityService() {
 
     private fun ask(key: String, label: String, isItem: Boolean) {
         val now = System.currentTimeMillis()
-        if (now - lastAsk < 120_000) return
+        if (now - lastAsk < 120_000) { android.util.Log.i("OnTask", "not asking about $key yet (asked < 2 min ago)"); return }
         synchronized(asked) { if (!asked.add(key)) return }
         lastAsk = now
         val open = PendingIntent.getActivity(this, key.hashCode(), Intent(this, MainActivity::class.java)

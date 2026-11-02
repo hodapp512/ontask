@@ -67,7 +67,8 @@ fun HomeScreen(app: App) {
     // Always redraw on reload: categories compare by name, so a renamed one would otherwise look unchanged.
     var report by remember { mutableStateOf<DailyReport?>(null, androidx.compose.runtime.neverEqualPolicy()) }
     LaunchedEffect(date, tick, now / 60) {
-        report = withContext(Dispatchers.IO) { app.tracker.flush(); app.reports.daily(date) }
+        // This Mac's day plus the phone's (from its uploaded report), as on the phone and for your partner.
+        report = withContext(Dispatchers.IO) { app.tracker.flush(); dev.ontask.report.withDevices(app.reports.daily(date), if (app.cloud.signedIn) app.cloud.otherDevices(date) else emptyList()) }
     }
 
     var unblocking by remember { mutableStateOf(false) }

@@ -65,7 +65,17 @@ fun heatColor(level: Int): Color {
 fun HeatMapCard(app: App, today: LocalDate, version: Int, onPick: (LocalDate) -> Unit) {
     val first = remember(today) { Heat.firstDay(today) }
     var days by remember { mutableStateOf<Map<LocalDate, DayStat>>(emptyMap()) }
-    LaunchedEffect(today, version) { days = withContext(Dispatchers.IO) { app.reports.days(first, today) } }
+    // This Mac's days plus the phone's.
+    LaunchedEffect(today, version) {
+        days = withContext(Dispatchers.IO) {
+            val other = if (app.cloud.signedIn) app.cloud.otherHeat() else emptyMap()
+            val mine = app.reports.days(first, today)
+            (mine.keys + other.keys).associateWith { d ->
+                val a = mine[d]; val b = other[d]
+                if (a == null) b!! else if (b == null) a else DayStat(a.deep + b.deep, a.active + b.active, a.workDeep + b.workDeep, a.workActive + b.workActive, a.offWasted + b.offWasted, a.offActive + b.offActive)
+            }
+        }
+    }
     val streak = remember(days) { Heat.streak(days, today, { d -> app.settings.schedule.rangesFor(d).isNotEmpty() }) }
     val total = days.values.sumOf { it.deep }
     var hover by remember { mutableStateOf<Pair<LocalDate, Offset>?>(null) }

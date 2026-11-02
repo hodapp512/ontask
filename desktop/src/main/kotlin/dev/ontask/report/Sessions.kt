@@ -12,7 +12,8 @@ import dev.ontask.Level
  */
 data class ItemRef(val subject: String, val itemKey: String? = null, val title: String? = null)
 
-data class Run(val start: Long, val end: Long, val level: Level, val activity: Map<String, Long> = emptyMap(), val category: dev.ontask.Category? = null, val refs: Map<String, ItemRef> = emptyMap()) {
+/** [phone]: a stretch on the phone (from its uploaded report), drawn shorter on the timeline. */
+data class Run(val start: Long, val end: Long, val level: Level, val activity: Map<String, Long> = emptyMap(), val category: dev.ontask.Category? = null, val refs: Map<String, ItemRef> = emptyMap(), val phone: Boolean = false) {
     val seconds get() = end - start
     /** The [n] apps or sites that took the most time in this stretch. */
     fun top(n: Int = 3): List<Pair<String, Long>> = activity.entries.sortedByDescending { it.value }.take(n).map { it.key to it.value }

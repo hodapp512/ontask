@@ -196,7 +196,7 @@ fun SummaryCard(r: DailyReport, title: String, app: App? = null, onRelabel: () -
             r.topSubjects.forEachIndexed { i, s ->
                 if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(s.name, Modifier.weight(0.5f), maxLines = 1)
+                    Text((if (s.phone) "📱 " else "") + s.name, Modifier.weight(0.5f), maxLines = 1)
                     Row(Modifier.weight(0.3f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         if (app != null) CategoryPicker(app, s.name, s.category, onRelabel, item = s.itemKey?.let { it to s.title })
                         else { Dot(levelColor(s.category.level), 8); Text(s.category.label, style = MaterialTheme.typography.bodySmall) }
@@ -285,7 +285,9 @@ private fun Timeline(r: DailyReport, app: App?, onRelabel: () -> Unit) {
                     val x1 = ((run.end - r.dayStart - from) / span * size.width).toFloat().coerceIn(0f, size.width)
                     if (x1 <= 0f || x0 >= size.width) return@forEach
                     val on = hover?.first == run
-                    drawRect(levelColor(run.level).copy(alpha = if (hover == null || on) 1f else 0.55f), Offset(x0, 0f), Size(maxOf(x1 - x0, 1.5f), size.height))
+                    // Phone stretches are drawn shorter, so the two devices can be told apart.
+                    val top = if (run.phone) size.height * 0.35f else 0f
+                    drawRect(levelColor(run.level).copy(alpha = if (hover == null || on) 1f else 0.55f), Offset(x0, top), Size(maxOf(x1 - x0, 1.5f), size.height - top))
                 }
             }
             hover?.let { (run, x) ->
@@ -294,7 +296,7 @@ private fun Timeline(r: DailyReport, app: App?, onRelabel: () -> Unit) {
                         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp).widthIn(max = 320.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Dot(levelColor(run.level), 8)
-                                Text(dev.ontask.report.runLabel(run), style = MaterialTheme.typography.labelLarge)
+                                Text((if (run.phone) "📱 " else "") + dev.ontask.report.runLabel(run), style = MaterialTheme.typography.labelLarge)
                             }
                             Text("${clockRange(run.start, run.end)} · ${fmtDuration(run.seconds)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             val top = run.top(3)
