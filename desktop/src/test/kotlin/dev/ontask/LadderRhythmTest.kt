@@ -18,11 +18,25 @@ class LadderRhythmTest {
     @Test fun driftEscalatesThroughSteps() {
         val l = Ladder(); var t = 0L
         fun run(until: Long, wasted: Boolean = true, unblocks: Int = 0): Intervention? { var last: Intervention? = null; while (t < until) { l.tick(t, wasted, true, unblocks)?.let { last = it }; t += 10 }; return last }
-        assertNull(run(170))
-        assertEquals(Step.PROMPT, run(190)?.step)            // 3 min
-        assertNull(run(400))                                   // still step 1
-        assertEquals(Step.WINDOW, run(490)?.step)             // +5 min => 8 min
-        assertEquals(Step.PARTNER, run(1100)?.step)           // +10 min => 18 min
+        assertNull(run(110))
+        assertEquals(Step.PROMPT, run(130)?.step)            // 2 min
+        assertNull(run(290))                                   // still step 1
+        assertEquals(Step.WINDOW, run(310)?.step)             // +3 min => 5 min
+        assertEquals(Step.PARTNER, run(610)?.step)            // +5 min => 10 min
+    }
+
+    @Test fun driftingAgainWithinTheHourPicksUpWhereItLeftOff() {
+        val l = Ladder()
+        l.tick(0, true, true, 0); assertEquals(Step.PROMPT, l.tick(125, true, true, 0)?.step)
+        l.backToWork(130)
+        // After the 5-minute grace, a new drift's first prompt is already step 2…
+        l.tick(440, true, true, 0); assertEquals(Step.WINDOW, l.tick(565, true, true, 0)?.step)
+        l.backToWork(570)
+        // …and the next one step 3.
+        l.tick(880, true, true, 0); assertEquals(Step.PARTNER, l.tick(1005, true, true, 0)?.step)
+        l.backToWork(1010)
+        // More than an hour later it starts gently again.
+        l.tick(5000, true, true, 0); assertEquals(Step.PROMPT, l.tick(5125, true, true, 0)?.step)
     }
 
     @Test fun unblocksEscalateAndNotActiveResets() {
@@ -36,19 +50,22 @@ class LadderRhythmTest {
 
     @Test fun backToWorkGivesGraceAndWorkConfirmedResets() {
         val l = Ladder()
-        l.tick(0, true, true, 0); l.tick(200, true, true, 0)
+        l.tick(0, true, true, 0); l.tick(130, true, true, 0)
         assertEquals(Step.PROMPT, l.step)
-        l.backToWork(200)
-        assertNull(l.tick(500, true, true, 0)); assertNull(l.tick(790, true, true, 0)) // within 10 min grace
-        assertNull(l.tick(801, true, true, 0))        // drift restarts after grace
-        assertEquals(Step.PROMPT, l.tick(1000, true, true, 0)?.step)
+        l.workConfirmed() // "it's work" forgets the drift, so the next one starts gently
+        l.tick(140, true, true, 0); l.tick(270, true, true, 0)
+        assertEquals(Step.PROMPT, l.step)
+        l.backToWork(270)
+        assertNull(l.tick(400, true, true, 0)); assertNull(l.tick(560, true, true, 0)) // within 5 min grace
+        assertNull(l.tick(571, true, true, 0))        // drift restarts after grace
+        assertEquals(Step.WINDOW, l.tick(700, true, true, 0)?.step) // within the hour: where it left off
         l.workConfirmed(); assertEquals(Step.NONE, l.step)
     }
 
     @Test fun brieflyNotWastedDoesNotResetDrift() {
         val l = Ladder()
         l.tick(0, true, true, 0); l.tick(30, false, true, 0); l.tick(40, true, true, 0)
-        assertEquals(Step.PROMPT, l.tick(185, true, true, 0)?.step)
+        assertEquals(Step.PROMPT, l.tick(125, true, true, 0)?.step)
     }
 
     @Test fun alertsAreRateLimitedAndExtrasQueued() {

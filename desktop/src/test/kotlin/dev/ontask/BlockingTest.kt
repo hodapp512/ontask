@@ -107,6 +107,13 @@ class BlockingTest {
         assertTrue(e.focus.recent().first().completed)
     }
 
+    @Test fun blockingASiteForAWhileAddsItUntilItExpires() {
+        val e = env(); e.list.add(listOf("reddit.com"), 0)
+        e.svc.blockFor("youtube.com", 15, at(10))
+        assertEquals(listOf("reddit.com", "youtube.com"), e.svc.currentlyBlocked(at(10, 14)).sorted())
+        assertEquals(listOf("reddit.com"), e.svc.currentlyBlocked(at(10, 16)))
+    }
+
     @Test fun dryRunWritesStagedAndSimulatedTargetOnly() {
         val e = env(); e.list.add(listOf("reddit.com"), 0)
         assertEquals(BlockMode.DRY_RUN, e.svc.mode)

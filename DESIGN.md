@@ -89,18 +89,23 @@ This file describes how OnTask works now. **Why** each choice was made, and what
 
 ## Interventions (binge ladder)
 
-Active during work hours and Focus sessions. Thresholds are defaults, configurable.
+Active during work hours and Focus sessions, and on work days **from your first sit-down until work hours start**
+(prompts only then: no partner messages, unblocking stays relaxed). Drifting = time in a Wasted category; under a
+minute away doesn't break the run.
 
 | Step | Trigger | Response |
 |---|---|---|
-| 1 | 3 min continuous "wasted", or 2nd unblock within 60 min | Gentle prompt: *Yes, it's work / Back to work / I'm struggling* |
-| 2 | +5 min drift, or 3rd unblock within 60 min | Normal-sized window, **not dismissable for 30s** (adjustable 30s–3min). Shows drift time, priorities, the user's message, unblock count. Buttons: *Back to work* (10-min grace) / *It's actually work* (labels + creates rule) / *I'm struggling* (→ step 3) |
-| 3 | +10 min drift, or 4th unblock within 60 min | Offer to message partner. User confirms and can edit the template message |
+| 1 | 2 min of drifting, or 2nd unblock within 60 min | A prompt **centered on the screen you're using**, on top, taking focus: *Back to work / Yes, it's work / I'm struggling* |
+| 2 | +3 min, or 3rd unblock within 60 min | Firmer centered window, **can't be closed for 30 s**: drift time, your message, today's plan, unblock count |
+| 3 | +5 min, or 4th unblock within 60 min | Work hours: offer to message the partner (user confirms, can edit). Before work hours: the step-2 window again |
 
-- "Yes, it's work" at any step resets the ladder and creates a rule.
+- Every step offers **"Block <site> for 15 minutes"**: blocks the site you were drifting on (even a Varies site like
+  YouTube), counts as Back to work; the partner isn't told.
+- "Back to work" gives **5 minutes** of grace. Drifting again **within the hour picks up where the last drift left
+  off** (second drift at step 2, third at step 3); an hour clear resets it. "Yes, it's work" resets and creates a rule.
 - Drifting alerts to the partner (binge + work-hours unblocks) are capped **2 before noon and 2 after**, on the server;
-  extras go into the evening review with their times.
-- Messages end with a low-effort prompt (e.g. "No need to reply — but a 👍 helps") and say what the user is doing about it.
+  extras go into the daily report with their times.
+- Messages end with a low-effort prompt (e.g. "No need to reply — but a 👍 helps").
 
 ## Daily rhythm
 

@@ -299,3 +299,18 @@ when it comes to the front.*
 
 - **"Going to bed" just closes the bedtime reminder;** it no longer turns the display off. The reminders are what's
   wanted.
+
+## 2026-11-02 · Firmer drift prompts (grilled)
+
+- **Why:** a morning of YouTube got one small corner prompt the user never noticed, and 54 of the 59 wasted minutes
+  were before 9:00, when prompts didn't run at all.
+- **Prompts run from your first sit-down on a work day**, not only in work hours. Before work hours it's prompts only:
+  no partner messages, relaxed unblocking; step 3 repeats the firmer window instead of offering a partner message.
+- **The first prompt is centered on the screen you're using, larger, on top, and takes the focus;** it stays until
+  answered.
+- **Faster:** 2 min to the first prompt, +3 to the firmer window, +5 to step 3; 5 minutes of grace after Back to work.
+- **Drifting again within an hour picks up where the last drift left off** (step 2, then step 3).
+- **Every prompt offers "Block <site> for 15 minutes"** (the site you were drifting on, even YouTube), counted as Back
+  to work; the partner isn't told; lifting it early goes through the usual unblock.
+- Only Wasted time counts as drifting; Mixed and Unsure don't.
+- *Rejected:* dimming every screen behind the prompt; pausing the video.

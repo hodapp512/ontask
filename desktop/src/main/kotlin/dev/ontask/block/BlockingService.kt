@@ -52,11 +52,28 @@ class BlockingService(
     /** Strict mode — unblocking has friction and the partner is told: work hours, or a running Focus session. */
     fun strictNow(now: Long): Boolean = settings().schedule.isWork(now, zone) || focus.active(now) != null
 
-    /** The block list minus anything unblocked right now; applies around the clock (work hours only change the friction). */
+    /** The block list plus sites blocked for a while ([blockFor]), minus anything unblocked right now; around the clock. */
     fun currentlyBlocked(now: Long): List<String> {
         val open = unblocks.active(now).map { it.domain }.toSet()
-        return blocklist.all().filter { it !in open }
+        return (blocklist.all() + tempBlocks(now).keys).distinct().filter { it !in open }
     }
+
+    /**
+     * Blocks [domain] until [minutes] from now, even if it isn't on the block list (e.g. YouTube, judged per video):
+     * offered by the drift prompts to help get back on track. Lifting it early goes through the usual unblock.
+     */
+    fun blockFor(domain: String, minutes: Int, now: Long) {
+        val all = tempBlocks(now) + (domain to now + minutes * 60L)
+        prefs.set("block.temp", all.entries.joinToString(";") { "${it.key}|${it.value}" })
+        // Any earlier unblock of it ends, so the block takes effect at once.
+        unblocks.active(now).filter { it.domain == domain }.forEach { unblocks.end(it.id, now, "blocked_again") }
+    }
+
+    /** Sites blocked for a while, domain → until (epoch seconds); expired ones drop out. */
+    fun tempBlocks(now: Long): Map<String, Long> = prefs.str("block.temp", "").split(";").mapNotNull { e ->
+        val (d, u) = e.split("|").takeIf { it.size == 2 } ?: return@mapNotNull null
+        u.toLongOrNull()?.takeIf { it > now }?.let { d to it }
+    }.toMap()
 
     /** Idempotent; cheap enough to call every tick. Returns true if a new hosts file was written. */
     @Synchronized

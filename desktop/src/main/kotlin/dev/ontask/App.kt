@@ -261,8 +261,11 @@ class App(val dir: Path = dataDir()) {
         if (live.away && !wasAway && cloud.configured) { lastCloud = now; scope.launch(IO) { cloud.syncOnce(now, force = true) } }
         wasAway = live.away
         val wasted = !live.away && live.classification?.level == Level.WASTED
-        ladder.cfg = ladder.cfg.copy(lockSec = prefs.int("ladder.lock_sec", 30).coerceIn(30, 180), step1WastedSec = prefs.int("ladder.step1_sec", 180))
-        val iv = ladder.tick(now, wasted, blocking.strictNow(now), unblocks.unblocksInLast(now, ladder.cfg.unblockWindowSec.toLong()))
+        if (wasted) driftSite()?.let { lastWastedSite = it }
+        ladder.cfg = ladder.cfg.copy(lockSec = prefs.int("ladder.lock_sec", 30).coerceIn(30, 180), step1WastedSec = prefs.int("ladder.step1_sec", 120))
+        val strict = blocking.strictNow(now)
+        val iv = ladder.tick(now, wasted, strict || beforeWorkAfterSitDown(now), unblocks.unblocksInLast(now, ladder.cfg.unblockWindowSec.toLong()))
+            ?.copy(partnerAllowed = strict, site = lastWastedSite)
         if (iv != null && prefs.bool("ladder.enabled", true)) _intervention.value = iv
         if (_intervention.value != null && ladder.step == Step.NONE) _intervention.value = null
 
@@ -387,6 +390,7 @@ class App(val dir: Path = dataDir()) {
     private fun rhythmCheck(now: Long, away: Boolean) {
         val zone = ZoneId.systemDefault(); val date = java.time.Instant.ofEpochSecond(now).atZone(zone).toLocalDate()
         val (first, last) = reports.presence(date)
+        firstPresence = date to first
         val state = DayState(date, first, !away, priorities.forDate(date).isNotEmpty() || checkins.done(date, "planning"), checkins.done(date, "midday"), checkins.done(date, "evening"), last)
         val due = Rhythm(zone, prefs.bool("rhythm.midday", true), prefs.bool("rhythm.evening_at_end", true), prefs.int("rhythm.evening_lead_min", 30)).due(settings.schedule, state, now)
         when (due) {
@@ -420,8 +424,39 @@ class App(val dir: Path = dataDir()) {
         ladder.workConfirmed(); _intervention.value = null
     }
     fun interventionBack() { ladder.backToWork(nowSec()); _intervention.value = null }
-    fun interventionStruggling() { _intervention.value = ladder.struggling() }
+
+    /** The last site you were drifting on, named by the prompts' block button even after you've switched away. */
+    @Volatile private var lastWastedSite: String? = null
+
+    /** The site you're drifting on, for the prompts' "Block YouTube for 15 minutes" (whole site, e.g. youtube.com). */
+    fun driftSite(): String? = dev.ontask.classify.domainOf(tracker.live.value.sample?.url)?.let { dev.ontask.classify.siteDomain(it) }
+
+    /** "Block <site> for 15 minutes": blocks it now and counts as "Back to work". Your partner isn't told. */
+    fun interventionBlock(domain: String, minutes: Int = 15) {
+        val now = nowSec()
+        blocking.blockFor(domain, minutes, now)
+        events.emit("block_for_a_while", now, "domain" to domain, "minutes" to minutes)
+        scope.launch(IO) { blocking.tick(nowSec()) }
+        interventionBack()
+    }
+    fun interventionStruggling() { _intervention.value = ladder.struggling()?.copy(partnerAllowed = blocking.strictNow(nowSec()), site = lastWastedSite) }
     fun interventionDismiss() { _intervention.value = null }
+
+    /** Today's first moment at the computer (refreshed every 30 s by the rhythm check). */
+    @Volatile private var firstPresence: Pair<LocalDate, Long?>? = null
+
+    /**
+     * On a work day, from when you first sit down until work hours start, drifting gets the same prompts as during work
+     * hours (but no partner messages, and unblocking stays relaxed).
+     */
+    private fun beforeWorkAfterSitDown(now: Long): Boolean {
+        val zone = ZoneId.systemDefault()
+        val t = java.time.Instant.ofEpochSecond(now).atZone(zone)
+        val (date, first) = firstPresence ?: return false
+        if (date != t.toLocalDate() || first == null || first > now) return false
+        val start = settings.schedule.rangesFor(date).minOfOrNull { it.startMin } ?: return false
+        return t.hour * 60 + t.minute < start
+    }
 
     // ---- Bedtime -----------------------------------------------------------------------------------------------
 

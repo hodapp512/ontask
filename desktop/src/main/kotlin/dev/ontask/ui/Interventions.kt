@@ -68,20 +68,28 @@ fun AppOverlays(app: App) {
 @Composable
 fun InterventionWindow(app: App, iv: Intervention, mode: ThemeMode) {
     when (iv.step) {
+        // The first prompt: in the middle of the screen you're using, on top, and it takes the focus so it can't be missed.
         Step.PROMPT -> Window(
-            onCloseRequest = { app.interventionDismiss() }, title = "OnTask", alwaysOnTop = true, resizable = false,
-            state = rememberWindowState(size = DpSize(420.dp, 190.dp), position = WindowPosition.Aligned(Alignment.BottomEnd)),
-        ) { OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) { StepOne(app, iv) } } }
+            onCloseRequest = { app.interventionDismiss() }, title = "OnTask — are you on task?", alwaysOnTop = true, resizable = false,
+            state = rememberWindowState(size = DpSize(520.dp, 280.dp), position = centeredOnActiveScreen(DpSize(520.dp, 280.dp))),
+        ) {
+            LaunchedEffect(Unit) { runCatching { java.awt.Desktop.getDesktop().requestForeground(true) }; window.toFront(); window.requestFocus() }
+            OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) { StepOne(app, iv) } }
+        }
 
-        Step.WINDOW -> {
+        // Before work hours, step 3 is the firmer window again (no partner message then).
+        Step.WINDOW, Step.PARTNER.takeIf { !iv.partnerAllowed } -> {
             val lock = app.ladder.cfg.lockSec
             var left by remember(iv) { mutableStateOf(lock) }
             LaunchedEffect(iv) { while (left > 0) { delay(1000); left-- } }
             Window(
                 // Normal-sized window (not full screen). Closing is ignored until the lock runs out.
                 onCloseRequest = { if (left <= 0) app.interventionDismiss() }, title = "OnTask — are you on task?", alwaysOnTop = true, resizable = true,
-                state = rememberWindowState(size = DpSize(560.dp, 520.dp), position = centeredOnActiveScreen(DpSize(560.dp, 520.dp))),
-            ) { OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) { StepTwo(app, iv, left) } } }
+                state = rememberWindowState(size = DpSize(560.dp, 580.dp), position = centeredOnActiveScreen(DpSize(560.dp, 580.dp))),
+            ) {
+                LaunchedEffect(Unit) { runCatching { java.awt.Desktop.getDesktop().requestForeground(true) }; window.toFront(); window.requestFocus() }
+                OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) { StepTwo(app, iv, left) } }
+            }
         }
 
         Step.PARTNER -> Window(
@@ -93,16 +101,25 @@ fun InterventionWindow(app: App, iv: Intervention, mode: ThemeMode) {
     }
 }
 
+/** "Block YouTube for 15 minutes": the site you were drifting on, blocked now; counts as "Back to work". */
+@Composable
+private fun BlockSiteButton(app: App, iv: Intervention, enabled: Boolean = true) {
+    val site = iv.site ?: return
+    val name = remember(site) { dev.ontask.classify.Pages.siteName(site) ?: site }
+    OutlinedButton({ app.interventionBlock(site) }, enabled = enabled) { Text("Block $name for 15 minutes") }
+}
+
 @Composable
 private fun StepOne(app: App, iv: Intervention) {
-    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("You've drifted for ${iv.driftSec / 60} min.", style = MaterialTheme.typography.titleMedium)
-        Text("Is this work?", style = MaterialTheme.typography.bodyMedium)
+    Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text("You've drifted for ${maxOf(1, iv.driftSec / 60)} min.", style = MaterialTheme.typography.headlineSmall)
+        Text("Is this what you meant to be doing right now?", style = MaterialTheme.typography.bodyLarge)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button({ app.interventionWork() }) { Text("Yes, it's work") }
-            OutlinedButton({ app.interventionBack() }) { Text("Back to work") }
+            Button({ app.interventionBack() }) { Text("Back to work") }
+            OutlinedButton({ app.interventionWork() }) { Text("Yes, it's work") }
             TextButton({ app.interventionStruggling() }) { Text("I'm struggling") }
         }
+        BlockSiteButton(app, iv)
     }
 }
 
@@ -121,8 +138,9 @@ private fun StepTwo(app: App, iv: Intervention, lockLeft: Int) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button({ app.interventionBack() }, enabled = lockLeft <= 0) { Text("Back to work") }
             OutlinedButton({ app.interventionWork() }, enabled = lockLeft <= 0) { Text("It's actually work") }
-            TextButton({ app.interventionStruggling() }, enabled = lockLeft <= 0) { Text("I'm struggling") }
+            if (iv.partnerAllowed) TextButton({ app.interventionStruggling() }, enabled = lockLeft <= 0) { Text("I'm struggling") }
         }
+        BlockSiteButton(app, iv, enabled = lockLeft <= 0)
     }
 }
 
@@ -144,6 +162,7 @@ private fun StepThree(app: App, iv: Intervention) {
             }) { Text("Send to partner") }
             OutlinedButton({ app.interventionBack() }) { Text("Not now, back to work") }
         }
+        BlockSiteButton(app, iv)
     }
 }
 
