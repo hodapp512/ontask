@@ -1,0 +1,4 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <!-- A shield with clock hands, as in the app icon. -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M12,2 L20,5 V11 C20,16 16.5,20 12,22 C7.5,20 4,16 4,11 V5 Z M12,6 V12 H16 V13.6 H10.4 V6 Z" />
+</vector>

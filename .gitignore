@@ -20,3 +20,8 @@ firestore-debug.log
 ui-debug.log
 firebase/public/
 .firebase/
+android/local.properties
+android/.gradle/
+android/build/
+android/app/build/
+android/app/google-services.json

@@ -148,3 +148,18 @@ cd ../web && npm install && npx vite --mode emulator               # http://loca
 ```
 
 In the Mac app: Settings → Accountability partner → project ID `demo-ontask`, switch on **Use local emulators**.
+
+## Android app
+
+Native app for your own phone (sideloaded; see docs/PLATFORMS.md).
+
+1. Android SDK: `brew install --cask android-commandlinetools`, then
+   `sdkmanager --sdk_root=$HOME/Library/Android/sdk --licenses` and
+   `sdkmanager --sdk_root=$HOME/Library/Android/sdk "platform-tools" "platforms;android-37.0" "build-tools;36.0.0"`.
+2. Signing key (once; every update must use the same key), kept outside the repo:
+   `~/.ontask-android/release.jks` with `~/.ontask-android/signing.properties` (`storeFile`, `storePassword`,
+   `keyAlias`, `keyPassword`). Register its SHA-1 and SHA-256 with the Firebase Android app
+   (`firebase apps:android:sha:create <appId> <hash>`) so Google sign-in works.
+3. Firebase config (not in the repo):
+   `firebase apps:sdkconfig ANDROID <appId> --out android/app/google-services.json`.
+4. Build and install over USB (USB debugging on): `cd android && ./gradlew installDebug`.
