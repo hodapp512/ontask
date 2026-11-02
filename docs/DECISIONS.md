@@ -296,3 +296,6 @@ when it comes to the front.*
   the totals.
 - **The phone shows real clock times** for the timeline, its hover text and focused sessions: the report now carries
   the day's start and time zone, so clock-change days and partners in other time zones read right.
+
+- **"Going to bed" just closes the bedtime reminder;** it no longer turns the display off. The reminders are what's
+  wanted.

@@ -461,10 +461,9 @@ class App(val dir: Path = dataDir()) {
         _bedtime.value = BedtimeNudge(n.level, n.minutesPast, n.lockSec, label)
     }
 
-    /** "Going to bed": turns the display off. If you keep going anyway, the next reminder still comes. */
+    /** "Going to bed": closes the reminder. If you keep going anyway, the next one still comes. */
     fun bedtimeGoingToBed() {
         _bedtime.value = null
-        runCatching { ProcessBuilder("pmset", "displaysleepnow").start() }
     }
 
     /** "10 more minutes" / "I'm working": no reminders until then. */

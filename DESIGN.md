@@ -122,9 +122,9 @@ Active during work hours and Focus sessions. Thresholds are defaults, configurab
   and a link to the full day.
   - If the user has already left the computer, wait for return or prompt on the phone in the evening.
 - Check-ins: escalating phone reminders after work ends until done or the report goes. No "missed check-in" message.
-- **Bedtime** (10:30 PM default): a reminder at bedtime if you're at the computer, then every 15 minutes while you're
-  active and not working, firmer each time (the third and later can't be closed for 20 s). Going to bed turns the
-  display off.
+- **Bedtime** (9:30 PM default): a reminder at bedtime if you're at the computer, then every 15 minutes while you're
+  still at it, work included, firmer each time (the third and later can't be closed for 20 s). An unanswered one
+  closes after 10 minutes away or at 5 AM. Your phone gets a push at bedtime.
 - **Habit prompts** (e.g. morning prayer): user-defined (add/edit/remove), clock-scheduled, delivered to phone even when away from the computer.
 - A work day with no computer use is reported as "no computer today", not a missed check-in.
 - Weekly report compares self-rating vs. measured data.

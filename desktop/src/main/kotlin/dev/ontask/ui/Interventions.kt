@@ -231,7 +231,6 @@ fun BedtimeWindow(app: App, n: App.BedtimeNudge, mode: ThemeMode) {
                     OutlinedButton({ app.bedtimeSnooze(10) }, enabled = left <= 0) { Text("10 more minutes") }
                     if (n.level > 1) TextButton({ app.bedtimeSnooze(30) }, enabled = left <= 0) { Text("I'm working") }
                 }
-                Text("\"Going to bed\" turns the screen off.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } }
     }
