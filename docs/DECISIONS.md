@@ -377,3 +377,10 @@ when it comes to the front.*
   1:02 for a 9:05 start and 5 PM end), so it lands before lunch and leaves more afternoon to act on it.
 - *Plan section:* titled "This afternoon's plan", subtitle "Still the same as this morning?"; the "Add to this
   afternoon's plan" button was removed (not wanted).
+
+## 2026-11-02 · No phone push when a check-in is snoozed; no duplicate pushes
+- Snoozing a check-in on the Mac ("Do this later" or closing it) pushed "Don't forget your check-in." to the phone.
+  You're at the Mac and the prompt returns there, so this was noise (and arrived after the check-in was done). Now
+  it's only logged (`checkin_snoozed`). The phone still gets the evening check-in when you've left the Mac.
+- Every push showed twice: Firebase displays notification pushes itself, and the service worker showed them again.
+  The worker now only shows data-only messages.

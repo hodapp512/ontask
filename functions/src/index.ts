@@ -35,9 +35,9 @@ export const onEventCreated = onDocumentCreated({ document: "users/{uid}/events/
   const uid = event.params.uid;
   const now = new Date();
   // Events addressed to the tracked user's own phone.
-  if (ev.type === "checkin_reminder" || ev.type === "evening_checkin_phone") {
-    const tokens = await tokensOf(uid);
-    await senders.push(tokens, "OnTask", ev.type === "evening_checkin_phone" ? "Time for your evening check-in." : "Don't forget your check-in.", { type: String(ev.type) });
+  // (Snoozing a check-in on the Mac used to push "Don't forget your check-in." here; it comes back on the Mac instead.)
+  if (ev.type === "evening_checkin_phone") {
+    await senders.push(await tokensOf(uid), "OnTask", "Time for your evening check-in.", { type: String(ev.type) });
   }
   const n = await routeEvent(db, senders, uid, { type: ev.type, ts: ev.ts, payload: ev.payload }, now);
   await event.data!.ref.update({ processedAt: now.getTime(), delivered: n });

@@ -488,14 +488,15 @@ class App(val dir: Path = dataDir()) {
 
     private fun markOnce(key: String, block: () -> Unit) { if (!prefs.bool("once.$key", false)) { block(); prefs.set("once.$key", true) } }
 
-    /** The user dealt with (or snoozed) the daily prompt. Snoozed prompts come back with an escalating reminder event. */
+    /** The user dealt with (or snoozed) the daily prompt. Snoozed prompts come back on the Mac after [snoozeMin]. */
     fun finishPrompt(p: Prompt, snoozeMin: Int? = null) {
         if (snoozeMin != null && snoozesLeft(p) <= 0) return // snoozed twice: it stays until answered
         _duePrompt.value = null
         if (snoozeMin != null) {
             snoozeUntil[p] = nowSec() + snoozeMin * 60L
             snoozes.merge(p to LocalDate.now(), 1, Int::plus)
-            events.emit("checkin_reminder", nowSec(), "kind" to p.name.lowercase())
+            // Logged only: you're at the Mac and it comes back here, so nothing goes to the phone.
+            events.emit("checkin_snoozed", nowSec(), "kind" to p.name.lowercase(), "minutes" to snoozeMin)
         }
     }
 

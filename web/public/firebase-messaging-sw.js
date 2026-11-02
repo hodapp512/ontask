@@ -7,9 +7,12 @@ firebase.initializeApp({
   apiKey: q.get("apiKey"), projectId: q.get("projectId"), messagingSenderId: q.get("messagingSenderId"), appId: q.get("appId"),
 });
 const messaging = firebase.messaging();
+// Pushes with a notification part are shown by Firebase itself; showing them here too made every push appear twice.
+// Only data-only messages (none are sent today) need showing by hand.
 messaging.onBackgroundMessage((payload) => {
-  const n = payload.notification || {};
-  self.registration.showNotification(n.title || "OnTask", { body: n.body || "", icon: "/icon-192.png?v=3", data: payload.data || {} });
+  if (payload.notification) return;
+  const d = payload.data || {};
+  self.registration.showNotification(d.title || "OnTask", { body: d.body || "", icon: "/icon-192.png?v=3", data: d });
 });
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();
