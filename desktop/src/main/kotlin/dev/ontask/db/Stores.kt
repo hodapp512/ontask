@@ -40,6 +40,17 @@ data class Segment(
 }
 
 class TickStore(private val db: Db) {
+    /** Re-marks ticks from [from] to [to] as work time or not, after work hours change during the day. */
+    fun remarkWorkTime(from: Long, to: Long, isWork: (Long) -> Boolean): Int = db.tx { c ->
+        val rows = c.prepareStatement("SELECT id, start_ts, work_time FROM ticks WHERE start_ts >= ? AND start_ts < ?").use { ps ->
+            ps.setLong(1, from); ps.setLong(2, to)
+            ps.executeQuery().use { rs -> buildList { while (rs.next()) add(Triple(rs.getLong(1), rs.getLong(2), rs.getInt(3) == 1)) } }
+        }
+        c.prepareStatement("UPDATE ticks SET work_time=? WHERE id=?").use { ps ->
+            rows.filter { (_, ts, w) -> isWork(ts) != w }.onEach { (id, ts, _) -> ps.setInt(1, if (isWork(ts)) 1 else 0); ps.setLong(2, id); ps.executeUpdate() }.size
+        }
+    }
+
     /** Inserts new segments and updates existing dirty ones, in one transaction. */
     fun save(segments: List<Segment>) {
         val todo = segments.filter { it.dirty }

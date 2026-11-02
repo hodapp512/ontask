@@ -1,6 +1,10 @@
 package dev.ontask.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -67,14 +71,20 @@ fun HomeScreen(app: App) {
 
     var unblocking by remember { mutableStateOf(false) }
     var reflecting by remember { mutableStateOf(false) }
+    var editingHours by remember { mutableStateOf(false) }
     val name = app.prefs.get("cloud.account_name")?.trim()?.split(Regex("\\s+"))?.firstOrNull()
     val hour = LocalTime.now().hour
     val hello = when { hour in 5..11 -> "Good morning"; hour in 12..17 -> "Good afternoon"; else -> "Good evening" }
 
     Page(
         if (name != null) "$hello, $name" else hello,
-        fmtDate(today, weekday = true),
+        fmtDate(today, weekday = true) + " · ",
         maxWidth = 1500.dp,
+        // Today's work hours; clicking edits them for today.
+        afterSubtitle = {
+            Text(remember(tick, now / 60) { workHoursLabel(app, today) } + " ✎", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.clickable { editingHours = true }.pointerHoverIcon(androidx.compose.ui.input.pointer.PointerIcon.Hand))
+        },
     ) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Button({ unblocking = true }) { Text("Unblock…") }
@@ -92,9 +102,20 @@ fun HomeScreen(app: App) {
             } ?: Text("Loading…")
         }
         summary()
+        HeatMapCard(app, today, tick) { d -> date = d; followToday = d == LocalDate.now() }
     }
     if (unblocking) UnblockPickerWindow(app, app.blocking.currentlyBlocked(App.nowSec())) { unblocking = false; tick++ }
     if (reflecting) ReflectionWindow(app) { reflecting = false; tick++ }
+    if (editingHours) TodayHoursWindow(app, today) { editingHours = false; tick++ }
+}
+
+/** "Work hours 9:00 AM–5:00 PM" (with exceptions applied), or "Day off". */
+private fun workHoursLabel(app: App, date: LocalDate): String {
+    val ranges = app.settings.schedule.rangesFor(date)
+    if (ranges.isEmpty()) return "Day off"
+    val f = DateTimeFormatter.ofPattern("h:mm a", java.util.Locale.US)
+    fun t(m: Int) = LocalTime.of((m / 60) % 24, m % 60).format(f)
+    return "Work hours " + ranges.sortedBy { it.startMin }.joinToString(", ") { "${t(it.startMin)}–${t(it.endMin)}" }
 }
 
 /** One button that turns ad blocking off and back on (the same as the menu bar's Ad blocking switch). */
@@ -164,6 +185,25 @@ private fun WeekExpander(app: App, today: LocalDate) {
                 Text(fmtDate(d), Modifier.weight(1f))
                 Text(dev.ontask.plan.CheckinDraft.feeling(r), Modifier.weight(1f))
                 Text(share?.let { "$it% focused" } ?: "—", Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+/** Today's work hours, from the Home subtitle: change them for today only (or take the day off). */
+@Composable
+private fun TodayHoursWindow(app: App, date: LocalDate, onClose: () -> Unit) {
+    val size = androidx.compose.ui.unit.DpSize(560.dp, 420.dp)
+    androidx.compose.ui.window.Window(
+        onCloseRequest = onClose, title = "Today's work hours", alwaysOnTop = true, resizable = false,
+        state = androidx.compose.ui.window.rememberWindowState(size = size, position = centeredOnActiveScreen(size)),
+    ) {
+        OnTaskTheme(remember { themeOf(app) }) {
+            androidx.compose.material3.Surface(Modifier.fillMaxSize()) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    HoursCheckCard(app, date, startEditing = true, onClose = onClose)
+                    Text("Your usual hours are in Settings → Work hours.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
     }

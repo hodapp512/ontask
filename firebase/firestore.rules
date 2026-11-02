@@ -5,6 +5,7 @@ rules_version = '2';
 //   users/{uid}/contact/{doc}       phone / email for channels    (owner only; functions read it)
 //   users/{uid}/events/{id}         outbox written by the Mac     (owner creates; functions process)
 //   users/{uid}/reports/{date}      daily aggregates              (owner writes; partner reads if share == "report")
+//   users/{uid}/heat/year           year heat map scores          (same as reports)
 //   users/{uid}/reportItems/{date}  page and video titles         (owner only; the partner never reads these)
 //   users/{uid}/schedule/current    work hours, habits, times     (owner)
 //   users/{uid}/devices/{id}        linked Macs and phones        (owner; shown in both apps)
@@ -42,6 +43,11 @@ service cloud.firestore {
         allow read: if isOwner(uid) || partnerSeesReport(uid);
       }
       match /reportItems/{date} { allow read, write: if isOwner(uid); }
+      // The year heat map (per-day scores only): shared like the daily report.
+      match /heat/{doc} {
+        allow write: if isOwner(uid);
+        allow read: if isOwner(uid) || partnerSeesReport(uid);
+      }
       match /schedule/{doc} { allow read, write: if isOwner(uid); }
       match /devices/{id} { allow read, write: if isOwner(uid); }
       match /labelRequests/{id} {

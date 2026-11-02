@@ -5,6 +5,7 @@ import { db, fns } from "../firebase";
 import { h } from "../dom";
 import { REACTIONS, fmtDate, fmtDateTime, todayKey } from "../format";
 import { reportBody } from "./home";
+import { heatmapEl } from "./heat";
 
 export async function joinView(u: User, code: string): Promise<HTMLElement> {
   const out = h("div", { class: "card" }, h("p", {}, "Joining…"));
@@ -51,6 +52,10 @@ export async function personView(u: User, linkId: string): Promise<HTMLElement> 
     show();
     window.addEventListener("hashchange", () => stop?.(), { once: true });
     reportCard = h("div", { class: "card" }, h("div", { class: "row" }, prev, label, next), body);
+    // Their year; tapping a day opens it above.
+    const heatSlot = h("div", {});
+    getDoc(doc(db, "users", tracked, "heat", "year")).then((s) => { if (s.exists()) heatSlot.replaceChildren(heatmapEl(s.data(), (d) => { day = d; show(); reportCard.scrollIntoView({ behavior: "smooth" }); })); }).catch(() => {});
+    reportCard = h("div", { class: "stack" }, reportCard, heatSlot);
   } else reportCard = h("div", { class: "card" }, h("h2", {}, "Today"), h("p", { class: "muted" }, `${link.trackedName} shares messages only.`));
 
   const reply = h("input", { placeholder: "Add a short note (optional)", maxlength: "280" }) as HTMLInputElement;

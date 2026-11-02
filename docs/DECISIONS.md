@@ -384,3 +384,20 @@ when it comes to the front.*
   it's only logged (`checkin_snoozed`). The phone still gets the evening check-in when you've left the Mac.
 - Every push showed twice: Firebase displays notification pushes itself, and the service worker showed them again.
   The worker now only shows data-only messages.
+
+## 2026-11-02 · Focus over the year (grilled)
+- **A GitHub-style year of squares at the bottom of Home** (and on the phone and in the partner's view), like
+  BlockMe's unblock calendar but for focus.
+- **Score = focused time × (0.5 + 0.5 × work-hours focused %) × (0.8 + 0.2 × off-hours not-wasted %).** Time
+  dominates (the user's wish); work-hours focus can halve it; evenings can take off up to 20%, but only for wasted
+  time, so bills and email at night cost nothing. Focused time is the whole day's, so long days of real work count.
+  A side with no time counts as 1 (not using the computer never costs).
+- **Fixed shades** (under 1h, then 1.5-hour steps to 5.5h+) so the graph darkens as you improve; 7h and 12h look
+  the same on purpose (no reward for overwork).
+- Streak = consecutive days at 2.5h+, skipping days off.
+- *Rejected:* shades relative to your own best days (hides progress); a plain focused % for evenings (would trim
+  almost every day by ~20%); starting the grid at the first tracked day (the empty year is the year to fill).
+
+## 2026-11-02 · Work hours on Home, editable
+- Today's work hours sit in the Home subtitle and open today's editor on click; changes apply everywhere at once and
+  re-mark today's earlier activity, so prompts, totals and reports agree with the new hours.

@@ -54,6 +54,8 @@ class CloudSync(
     private val plan: (LocalDate) -> List<String> = { emptyList() },
     /** Focused % before and after lunch (or noon), for "Morning 64% focused · Afternoon 48%". */
     private val halves: (LocalDate) -> Pair<Int?, Int?> = { null to null },
+    /** The heat map's year: each day's numbers, and the current streak. */
+    private val heat: () -> Pair<Map<LocalDate, dev.ontask.report.DayStat>, Int>? = { null },
 ) {
     @Volatile var lastError: String? = null; private set
     @Volatile var lastSyncTs: Long = 0; private set
@@ -103,7 +105,7 @@ class CloudSync(
             val uid = c.ensureUid()
             drainEvents(c, uid)
             val corrected = applyPhoneCorrections(c, uid)
-            if (force || corrected || nowSec - lastReportTs >= 600) { uploadReport(c, uid, LocalDate.now(zone)); lastReportTs = nowSec }
+            if (force || corrected || nowSec - lastReportTs >= 600) { uploadReport(c, uid, LocalDate.now(zone)); uploadHeat(c, uid); lastReportTs = nowSec }
             uploadScheduleIfChanged(c, uid)
             uploadCheckinFlag(c, uid)
             pullReactions(c, uid)
@@ -254,6 +256,29 @@ class CloudSync(
         if (prefs.get("cloud.checkin_hash") == hash) return
         c.write("users/$uid/checkins", today.toString(), payload)
         prefs.set("cloud.checkin_hash", hash)
+    }
+
+    /**
+     * The year heat map for the phone and your partner, as one small document: per day with screen time, effective
+     * focus ("e"), focused seconds ("f") and focus % ("p"); plus the year's focused total and the streak.
+     */
+    private fun uploadHeat(c: CloudClient, uid: String) {
+        val (days, streak) = heat() ?: return
+        val payload = heatPayload(days, streak)
+        val hash = payload.toString().hashCode().toString()
+        if (prefs.get("cloud.heat_hash") == hash) return
+        c.write("users/$uid/heat", "year", JsonObject(payload + ("updatedAt" to kotlinx.serialization.json.JsonPrimitive(System.currentTimeMillis()))))
+        prefs.set("cloud.heat_hash", hash)
+    }
+
+    fun heatPayload(days: Map<LocalDate, dev.ontask.report.DayStat>, streak: Int): JsonObject = buildJsonObject {
+        put("days", buildJsonObject {
+            days.filterValues { it.active > 0 }.toSortedMap().forEach { (d, s) ->
+                put(d.toString(), buildJsonObject { put("e", s.effectiveSec); put("f", s.deep); put("p", s.pct) })
+            }
+        })
+        put("totalSec", days.values.sumOf { it.deep })
+        put("streak", streak)
     }
 
     private fun pullReactions(c: CloudClient, uid: String) {

@@ -4,6 +4,7 @@ import { httpsCallable } from "firebase/functions";
 import QRCode from "qrcode";
 import { db, fns } from "../firebase";
 import { h } from "../dom";
+import { heatmapEl } from "./heat";
 import { LEVELS, REACTIONS, ago, clock, clockAt, fmtDate, type DayClock, deepShare, firstName, fmtDuration, greeting, segAt, segDetail, timelineSvg, timelineWindow, todayKey, type LevelKey, type Seg } from "../format";
 import { enablePush, pushState } from "../session";
 
@@ -27,9 +28,17 @@ export async function homeView(u: User, onLeave: (fn: Cleanup) => void): Promise
     ),
     await pushBanner(u),
     yourDay(u, sched.data(), checkin.get("evening") === true, onLeave),
+    heatCard(u.uid, onLeave),
     await partnerSection(u, myLinks.docs),
     await supportSection(u, supportLinks.docs),
   );
+}
+
+/** The year heat map, live from the Mac's upload; shown once there's something in it. */
+function heatCard(uid: string, onLeave: (fn: Cleanup) => void): HTMLElement {
+  const slot = h("div", {});
+  onLeave(onSnapshot(doc(db, "users", uid, "heat", "year"), (s) => slot.replaceChildren(...(s.exists() ? [heatmapEl(s.data())] : [])), () => {}));
+  return slot;
 }
 
 // ---- Notifications ------------------------------------------------------------------------------------------

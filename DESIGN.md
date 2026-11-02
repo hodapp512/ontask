@@ -169,6 +169,20 @@ nothing under 25 min focused, then 5 min per 25 (at most 10 under an hour, 15 af
 
 ## Reports & diagnostics
 
+### Focus over the year (heat map)
+At the bottom of Home (Mac and phone) and in the partner's view: 52 weeks of squares, weeks as columns starting
+Sunday, shaded by **effective focus** = focused time (whole day, so evening work counts) × (0.5 + 0.5 × work-hours
+focused %) × (0.8 + 0.2 × off-hours not-wasted %); a side with no time counts as 1. Shades: empty (no computer),
+under 1h, 1–2.5h, 2.5–4h, 4–5.5h, 5.5h+. Hover/tap: "Nov 2, 2026 · 3h 10m focused (68%)"; click opens that day (Mac,
+partner). Summary: "212h focused in the last year · 5-day streak" (streak = days with 2.5h+; days off never break
+it; today doesn't until it's over). The Mac uploads one small `heat/year` document (shared like reports).
+
+### Work hours on Home
+The Home subtitle shows today's work hours ("Work hours 9:00 AM–5:00 PM", or "Day off"); clicking it changes them
+for today (or takes the day off; shorter hours need a reason, and the partner is told). Everything reads the current
+schedule, so prompts, blocking, check-in times and the server follow at once, and today's earlier activity is
+re-marked as in or out of work hours.
+
 ### Daily report
 Focused / mixed / wasted / away totals; timeline strip colored by level, spanning only the time at the computer (away
 time and stray night-time minutes don't widen it), hover/tap for what you did. On the Mac, click a stretch for a

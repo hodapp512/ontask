@@ -59,7 +59,20 @@ class App(val dir: Path = dataDir()) {
     val focus = Focus(db, events)
     val adBlock = AdBlock(dir, prefs)
     val blocking = BlockingService(dir, prefs, blocklist, unblocks, focus, adBlock = adBlock, settings = { settings })
-    val workHours = WorkHoursEditor(settingsStore, events, { settings }) { settings = it }
+    /**
+     * Changing work hours takes effect everywhere at once (drift prompts, blocking, check-in times and the server all
+     * read the current schedule), and today's earlier activity is re-marked as in or out of work hours to match.
+     */
+    val workHours = WorkHoursEditor(settingsStore, events, { settings }) { settings = it; runCatching { remarkToday() } }
+
+    private fun remarkToday() {
+        val zone = ZoneId.systemDefault(); val today = LocalDate.now()
+        val lunch = lunchSpan(today)
+        tracker.flush()
+        TickStore(db).remarkWorkTime(today.atStartOfDay(zone).toEpochSecond(), nowSec() + 1) { ts ->
+            settings.schedule.isWork(ts, zone) && (lunch == null || ts !in lunch.first until lunch.second)
+        }
+    }
 
     val priorities = Priorities(db)
     val habits = dev.ontask.plan.Habits(prefs)
@@ -76,7 +89,7 @@ class App(val dir: Path = dataDir()) {
 
     val cloud by lazy { dev.ontask.cloud.CloudSync(prefs, events, reports, { settings }, habits, checkins, relabel = { name, cat -> reclassify(name, Category.valueOf(cat)) },
         relabelItem = { key, title, cat -> answerVariable(key, title, Category.valueOf(cat)) },
-        lastActive = { lastActiveTs.takeIf { it > 0 } }, plan = { priorities.forDate(it) }, halves = { dayHalves(it) }) }
+        lastActive = { lastActiveTs.takeIf { it > 0 } }, plan = { priorities.forDate(it) }, halves = { dayHalves(it) }, heat = { heatYear() }) }
     /** Last moment you were at the Mac (not Away), for the daily report's "you've wrapped up" rule. */
     @Volatile private var lastActiveTs = 0L
     private var wasAway = false
@@ -481,6 +494,12 @@ class App(val dir: Path = dataDir()) {
         val noon = date.atTime(12, 0).atZone(ZoneId.systemDefault()).toEpochSecond()
         val l = lunchSpan(date)
         return dev.ontask.report.halves(reports.daily(date), l?.first ?: noon, l?.second ?: noon)
+    }
+
+    /** The heat map's 52 weeks and the current streak (days off don't break it). */
+    fun heatYear(today: LocalDate = LocalDate.now()): Pair<Map<LocalDate, dev.ontask.report.DayStat>, Int> {
+        val days = reports.days(dev.ontask.report.Heat.firstDay(today), today)
+        return days to dev.ontask.report.Heat.streak(days, today, { d -> settings.schedule.rangesFor(d).isNotEmpty() })
     }
 
     /** "Low energy" → a 10-minute break away from the screen; drift prompts stay quiet meanwhile. */

@@ -45,3 +45,8 @@ select.cat { width:auto; max-width:100%; padding:4px 8px; font-size:14px; }
 .site-name { flex:1 1 auto; min-width:0; overflow-wrap:anywhere; } .site-line > .muted { flex:0 0 auto; white-space:nowrap; }
 
 .screen-time { display:flex; flex-direction:column; align-items:flex-end; margin:0; } .screen-time strong { font-size:20px; }
+.hm-scroll { overflow-x:auto; } .hm-scroll svg { display:block; }
+.hm-label { font-size:9px; fill:var(--muted); }
+.hm-on { fill:#2e9e5b; cursor:pointer; } .hm-off { fill:var(--line); cursor:pointer; }
+.hm-legend { display:flex; align-items:center; gap:3px; } .hm-sw { display:inline-block; width:11px; height:11px; border-radius:2px; background:var(--line); } .hm-sw.hm-on-bg { background:#2e9e5b; }
+.hm-detail:empty { display:none; }

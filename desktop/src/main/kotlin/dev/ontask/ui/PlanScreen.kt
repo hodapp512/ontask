@@ -202,20 +202,21 @@ internal fun EveningCard(app: App, date: LocalDate, onDone: () -> Unit) {
  * Shortening asks for a reason and tells your partner, like any other change to work hours.
  */
 @Composable
-internal fun HoursCheckCard(app: App, date: LocalDate) {
+internal fun HoursCheckCard(app: App, date: LocalDate, startEditing: Boolean = false, onClose: (() -> Unit)? = null) {
     val fmt = java.time.format.DateTimeFormatter.ofLocalizedTime(java.time.format.FormatStyle.SHORT)
     fun clock(m: Int) = java.time.LocalTime.of((m / 60) % 24, m % 60).format(fmt)
     var ranges by remember { mutableStateOf(app.settings.schedule.rangesFor(date)) }
-    var mode by remember { mutableStateOf("ask") } // ask, edit, off, done
+    var mode by remember { mutableStateOf(if (startEditing) "edit" else "ask") } // ask, edit, off, done
     var start by remember { mutableStateOf(ranges.minOfOrNull { it.startMin } ?: 540) }
     var end by remember { mutableStateOf(ranges.maxOfOrNull { it.endMin } ?: 1020) }
     var reason by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
-    if (ranges.isEmpty() && mode != "done") return
+    if (ranges.isEmpty() && mode != "done" && !startEditing) return
     fun save(newRanges: List<dev.ontask.classify.TimeRange>) {
         try {
             app.workHours.saveException(date, newRanges, reason.ifBlank { null }, App.nowSec())
             ranges = newRanges; mode = "done"; error = null
+            onClose?.invoke()
         } catch (e: dev.ontask.block.ReasonRequired) { error = "Say why: your partner is told when work hours get shorter." }
     }
     SectionCard("Today's hours") {
@@ -236,14 +237,15 @@ internal fun HoursCheckCard(app: App, date: LocalDate) {
                 OutlinedTextField(reason, { reason = it; error = null }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Why? (needed if it's shorter; your partner sees it)") })
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button({ save(listOf(dev.ontask.classify.TimeRange(start, end))) }) { Text("Save today's hours") }
-                    TextButton({ mode = "ask" }) { Text("Cancel") }
+                    if (startEditing && ranges.isNotEmpty()) OutlinedButton({ mode = "off" }) { Text("Day off") }
+                    TextButton({ onClose?.invoke() ?: run { mode = "ask" } }) { Text("Cancel") }
                 }
             }
             "off" -> {
                 OutlinedTextField(reason, { reason = it; error = null }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Why? Your partner sees it") })
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button({ save(emptyList()) }, enabled = reason.isNotBlank()) { Text("Take the day off") }
-                    TextButton({ mode = "ask" }) { Text("Cancel") }
+                    TextButton({ mode = if (startEditing) "edit" else "ask" }) { Text("Cancel") }
                 }
             }
         }

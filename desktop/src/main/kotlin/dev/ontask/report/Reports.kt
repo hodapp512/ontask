@@ -105,6 +105,27 @@ class Reports(private val db: Db, private val zone: ZoneId = ZoneId.systemDefaul
         }
     }
 
+    /** Per-day numbers for the heat map, from [from] through [to] (ticks and hourly summaries alike). */
+    fun days(from: LocalDate, to: LocalDate): Map<LocalDate, DayStat> {
+        val a = from.atStartOfDay(zone).toEpochSecond(); val b = to.plusDays(1).atStartOfDay(zone).toEpochSecond()
+        val acc = HashMap<LocalDate, LongArray>()
+        db.use { c ->
+            c.prepareStatement("SELECT ts, level, work_time, seconds FROM ($unionSql) WHERE ts >= ? AND ts < ? AND level != 'AWAY'").use { ps ->
+                ps.setLong(1, a); ps.setLong(2, b)
+                ps.executeQuery().use { rs ->
+                    while (rs.next()) {
+                        val d = java.time.Instant.ofEpochSecond(rs.getLong(1)).atZone(zone).toLocalDate()
+                        val v = acc.getOrPut(d) { LongArray(6) }
+                        val lvl = rs.getString(2); val work = rs.getInt(3) == 1; val s = rs.getLong(4)
+                        v[1] += s; if (lvl == "DEEP") v[0] += s
+                        if (work) { v[3] += s; if (lvl == "DEEP") v[2] += s } else { v[5] += s; if (lvl == "WASTED") v[4] += s }
+                    }
+                }
+            }
+        }
+        return acc.mapValues { (_, v) -> DayStat(v[0], v[1], v[2], v[3], v[4], v[5]) }
+    }
+
     /** First non-away moment of [date] (the anchor of the daily rhythm), and the most recent one. */
     fun presence(date: LocalDate): Pair<Long?, Long?> {
         val start = date.atStartOfDay(zone).toEpochSecond(); val end = date.plusDays(1).atStartOfDay(zone).toEpochSecond()
