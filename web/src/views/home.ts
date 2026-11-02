@@ -343,8 +343,9 @@ export function timelineEl(segs: Seg[]): HTMLElement {
   return h("div", {}, box,
     h("div", { class: "row between" }, h("span", {}),
       h("div", { class: "row tl-zoom" },
+        reset, // on the left, so it never lands under a second quick tap on +
         h("button", { class: "small", "aria-label": "Zoom out", onclick: () => zoom(1.5) }, "−"),
-        h("button", { class: "small", "aria-label": "Zoom in", onclick: () => zoom(1 / 1.5) }, "+"), reset)),
+        h("button", { class: "small", "aria-label": "Zoom in", onclick: () => zoom(1 / 1.5) }, "+"))),
     detail);
 }
 

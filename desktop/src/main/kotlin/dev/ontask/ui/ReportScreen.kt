@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
@@ -67,7 +68,8 @@ fun DateBar(date: LocalDate, onDate: (LocalDate) -> Unit, onRefresh: () -> Unit)
     // Compact: ◀ [Today ▾] ▶ — the middle opens a calendar.
     Row(verticalAlignment = Alignment.CenterVertically) {
         TextButton({ onDate(date.minusDays(1)) }) { Text("◀") }
-        TextButton({ picking = true }) { Text(if (date == LocalDate.now()) "📅 Today" else "📅 " + fmtDate(date)) }
+        // A fixed width, so the arrows stay put whatever the date ("Today" or "Nov 30, 2026").
+        TextButton({ picking = true }, Modifier.width(150.dp)) { Text(if (date == LocalDate.now()) "📅 Today" else "📅 " + fmtDate(date), maxLines = 1) }
         TextButton({ onDate(date.plusDays(1)) }, enabled = date < LocalDate.now()) { Text("▶") }
     }
     if (picking) {
@@ -286,9 +288,10 @@ private fun Timeline(r: DailyReport) {
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+            // Reset appears to the left, so it never lands under a second quick click on +.
+            if (from != from0.toDouble() || to != to0.toDouble()) TextButton({ view = from0.toDouble() to to0.toDouble() }) { Text("Reset") }
             TextButton({ zoom(1.5) }, enabled = span < 86_400.0) { Text("−") }
             TextButton({ zoom(1 / 1.5) }, enabled = span > MIN_SPAN_SEC) { Text("+") }
-            if (from != from0.toDouble() || to != to0.toDouble()) TextButton({ view = from0.toDouble() to to0.toDouble() }) { Text("Reset") }
         }
     }
 }
