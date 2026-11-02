@@ -47,6 +47,8 @@ fun AppOverlays(app: App) {
     val variable by app.variableAsk.collectAsState()
     iv?.let { InterventionWindow(app, it, mode) }
     variable?.let { VariableAskWindow(app, it, mode) }
+    val unknown by app.unknownAsk.collectAsState()
+    unknown?.let { UnknownAskWindow(app, it, mode) }
     val bedtime by app.bedtimeNudge.collectAsState()
     bedtime?.let { BedtimeWindow(app, it, mode) }
     val unblockNudge by app.unblockNudge.collectAsState()

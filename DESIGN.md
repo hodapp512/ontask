@@ -72,6 +72,13 @@ This file describes how OnTask works now. **Why** each choice was made, and what
 - Signals: input idle time, screen locked/asleep, media playing (watching a video with no input ≠ away).
 - On return after >10 min away during work hours: one-tap prompt — *Meeting / Break / Off-computer work / On my phone*. Off-computer work counts as work; On my phone counts as distracted.
 
+### Unclassified sites and apps
+- A site or app no rule covers is **Unclassified**, so OnTask can't tell whether you're on task. AI gets the first
+  try; if it can't place it (or AI is off), after 15 s there **"Which category is this?"** pops up, centered, naming
+  the site (e.g. griswoldpflugerville.clearcareonline.com) or app, with every category including Varies.
+- The answer becomes a rule for that site or app and fixes its past activity. Not now asks again in 15 minutes;
+  Pause asking (shared with the Varies question) holds it.
+
 ### Rules & learning
 - Corrections from any dropdown (Mac or phone) become **local rules** (app / domain → category) and fix past history.
 - Rules run **before** AI; AI only sees what no rule covers. Learned source rules for Varies sites are listed and

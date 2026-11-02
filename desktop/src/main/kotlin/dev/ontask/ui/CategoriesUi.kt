@@ -60,18 +60,53 @@ fun VariableAskWindow(app: App, ask: App.VariableAsk, mode: ThemeMode) {
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     TextButton({ app.answerVariable(ask.item, ask.title, null) }) { Text("Not now") }
-                    var pause by remember { mutableStateOf(false) }
-                    Box {
-                        TextButton({ pause = true }) { Text("Pause asking ▾") }
-                        DropdownMenu(pause, { pause = false }) {
-                            listOf(15 to "15 minutes", 30 to "30 minutes", 60 to "1 hour", 120 to "2 hours", 1440 to "1 day").forEach { (m, l) ->
-                                DropdownMenuItem({ Text(l) }, { pause = false; app.pauseAsking(m) })
-                            }
-                        }
-                    }
+                    PauseAskingButton(app)
                 }
             }
         } }
+    }
+}
+
+/** "Which category is this?" for a site or app no rule covers: the answer becomes a rule for it. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun UnknownAskWindow(app: App, ask: App.UnknownAsk, mode: ThemeMode) {
+    val cats = remember { Category.assignable }
+    val size = DpSize(480.dp, 250.dp)
+    Window(
+        onCloseRequest = { app.answerUnknown(ask.name, null) }, title = "OnTask", alwaysOnTop = true, resizable = false, focusable = false,
+        state = rememberWindowState(size = size, position = centeredOnActiveScreen(size)),
+    ) {
+        OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) {
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Which category is this?", style = MaterialTheme.typography.titleMedium)
+                Text(ask.name, style = MaterialTheme.typography.bodyMedium, maxLines = 2)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    cats.forEach { c ->
+                        OutlinedButton({ app.answerUnknown(ask.name, c) }) {
+                            Box(Modifier.size(8.dp).background(levelColor(c.level), CircleShape)); Text("  ${c.label}")
+                        }
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton({ app.answerUnknown(ask.name, null) }) { Text("Not now") }
+                    PauseAskingButton(app)
+                }
+            }
+        } }
+    }
+}
+
+@Composable
+private fun PauseAskingButton(app: App) {
+    var pause by remember { mutableStateOf(false) }
+    Box {
+        TextButton({ pause = true }) { Text("Pause asking ▾") }
+        DropdownMenu(pause, { pause = false }) {
+            listOf(15 to "15 minutes", 30 to "30 minutes", 60 to "1 hour", 120 to "2 hours", 1440 to "1 day").forEach { (m, l) ->
+                DropdownMenuItem({ Text(l) }, { pause = false; app.pauseAsking(m) })
+            }
+        }
     }
 }
 

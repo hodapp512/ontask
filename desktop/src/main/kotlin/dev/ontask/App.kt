@@ -209,6 +209,14 @@ class App(val dir: Path = dataDir()) {
     private val pageLookup = dev.ontask.classify.PageLookup()
     private var lastAskTs = 0L
 
+    /** "Which category is this?" for a site or app no rule covers and AI couldn't place. [name] is what the rule will match. */
+    data class UnknownAsk(val name: String)
+    private val _unknownAsk = MutableStateFlow<UnknownAsk?>(null)
+    val unknownAsk: StateFlow<UnknownAsk?> = _unknownAsk
+    /** Where you've been on something unclassified since, and when "Not now" lets each be asked about again. */
+    private var unknownSince: Pair<String, Long>? = null
+    private val unknownNotNow = HashMap<String, Long>()
+
     private val _duePrompt = MutableStateFlow<Prompt?>(null)
     val duePrompt: StateFlow<Prompt?> = _duePrompt
     private val _batteryPrompt = MutableStateFlow(false)
@@ -271,6 +279,7 @@ class App(val dir: Path = dataDir()) {
 
         if (ai.enabled && !ai.metadataOnly && !live.away && now - lastAi >= prefs.int("ai.interval_sec", 30) && tracker.needsAi() && !aiBusy) { lastAi = now; scope.launch(IO) { aiCycle(live.sample) } }
         variableCheck(now, live)
+        unknownCheck(now, live)
         if (ai.enabled && !ai.metadataOnly && now - lastBackfill >= 120 && !backfillBusy) { lastBackfill = now; backfillBusy = true; scope.launch(IO) { try { judgeEarlier(now) } finally { backfillBusy = false } } }
         checkRegularEnded(now)
         if (ai.kev.running) ai.kev.stopIfIdle()
@@ -324,7 +333,7 @@ class App(val dir: Path = dataDir()) {
 
     /** Until when the "I can't tell" question is paused (0 = not paused). */
     val askPausedUntil: Long get() = prefs.long("ask.paused_until", 0L).takeIf { it > nowSec() } ?: 0L
-    fun pauseAsking(minutes: Int) { prefs.set("ask.paused_until", nowSec() + minutes * 60L); _variableAsk.value = null }
+    fun pauseAsking(minutes: Int) { prefs.set("ask.paused_until", nowSec() + minutes * 60L); _variableAsk.value = null; _unknownAsk.value = null }
     fun resumeAsking() { prefs.set("ask.paused_until", 0L) }
 
     /** Asks about the page you're on: at most once per page, at most every 2 minutes, and not while paused. */
@@ -333,6 +342,29 @@ class App(val dir: Path = dataDir()) {
         synchronized(variableAsked) { if (!variableAsked.add(ask.item)) return }
         lastAskTs = now
         _variableAsk.value = ask
+    }
+
+    /**
+     * Unclassified means OnTask can't tell whether you're on task, so after 15 seconds on a site or app no rule covers
+     * (and once AI has had its try) it asks you which category it is. The answer becomes a rule and fixes its past
+     * activity. "Not now" asks again in 15 minutes; Pause asking holds this question too.
+     */
+    private fun unknownCheck(now: Long, live: dev.ontask.track.Live) {
+        val seg = tracker.currentSegment()
+        val name = seg?.takeIf { !live.away && tracker.needsAi() }?.let { s -> s.domain?.let { d -> dev.ontask.classify.siteDomain(d) } ?: s.app }
+        if (name == null) { unknownSince = null; return }
+        if (unknownSince?.first != name) unknownSince = name to now
+        val aiPending = ai.enabled && !ai.metadataOnly && lastAi < unknownSince!!.second
+        if (now - unknownSince!!.second < 15 || aiPending || aiBusy || _unknownAsk.value != null || _variableAsk.value != null || askPausedUntil > 0) return
+        if (now < (unknownNotNow[name] ?: 0)) return
+        _unknownAsk.value = UnknownAsk(name)
+    }
+
+    /** Your answer to "Which category is this?": files the site or app under [cat], or (null, "Not now") asks again later. */
+    fun answerUnknown(name: String, cat: Category?) {
+        _unknownAsk.value = null
+        if (cat == null) { unknownNotNow[name] = nowSec() + 15 * 60; return }
+        reclassify(name, cat)
     }
 
     private var lastBackfill = 0L

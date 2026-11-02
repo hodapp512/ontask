@@ -314,3 +314,13 @@ when it comes to the front.*
   to work; the partner isn't told; lifting it early goes through the usual unblock.
 - Only Wasted time counts as drifting; Mixed and Unsure don't.
 - *Rejected:* dimming every screen behind the prompt; pausing the video.
+
+## 2026-11-02 · Ask about unclassified sites
+- **Why:** a long stretch on griswoldpflugerville.clearcareonline.com stayed Unclassified, so OnTask couldn't tell
+  whether the user was on task. Unclassified has to be resolved quickly, not left for a dropdown on Home.
+- **After 15 s on a site or app no rule covers, once AI has had its try, OnTask asks "Which category is this?"**
+  (centered, every category including Varies). The answer is saved as a rule and relabels past activity.
+- Not now asks again in 15 minutes (not once per run, as for Varies pages, because Unclassified must not linger);
+  Pause asking covers both questions.
+- *Rejected:* waiting for the user to fix it on Home (they only noticed after the fact); treating Unclassified as
+  Wasted (punishes new work tools).
