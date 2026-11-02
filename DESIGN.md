@@ -200,6 +200,18 @@ it; today doesn't until it's over). The Mac uploads one small `heat/year` docume
 - **Unknown apps and undecided pages** go to the `judgeSeen` Cloud Function (Jev, key in Secret Manager; one-time
   notice on the phone). Sure (60%+) → a rule or verdict for every device; otherwise a notification asks.
 - The Mac's Home and heat map add the phone's day (phone stretches drawn shorter, rows marked 📱).
+- **Prompts on the phone** (work hours only; the work day still starts at the Mac): the same ladder (`shared/`).
+  Step 1 is a heads-up notification you can't swipe away ("Is this a break?" after 25+ min focus, else "It looks like
+  you're drifting"), with Yes break / I'm working / Back to work (goes to the home screen) / Lunch. Steps 2–3 are a
+  full-screen OnTask screen (buttons after 30 s; Back hides it for 30 s; Help me get started; message your partner
+  in step 3). Started from the Accessibility service, so no "Display over other apps" permission is needed.
+- **One break count:** the Mac publishes focus since the last break, any running break or lunch and break totals in
+  `state/breaks`; a break or lunch started on the phone is written there and taken over by the Mac.
+- **Check-ins on the device in use:** the Mac publishes the one that's due (`state/rhythm`); when you're on the
+  phone and haven't used the Mac for 5 minutes, a notification opens it on the phone (every 20 minutes until done).
+  The phone's answers go to `phoneCheckins/{date}` and the Mac saves them as if done there.
+- **Bedtime on the phone:** while you're using it past bedtime, the Mac's reminder schedule (every 15 minutes,
+  firmer; from the third a full screen that waits 20 s). "Going to bed" just closes it.
 
 ### Work hours on Home
 The Home subtitle shows today's work hours ("Work hours 9:00 AM–5:00 PM", or "Day off"); clicking it changes them

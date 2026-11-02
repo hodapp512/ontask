@@ -42,6 +42,9 @@ import kotlinx.coroutines.launch
 class Tracker : AccessibilityService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private lateinit var log: DayLog
+    lateinit var prompts: Prompts; private set
+    /** What's in front now, for "I'm working": a rule key (APP|…, DOMAIN|…) or a page's item key. */
+    @Volatile private var currentKey: String? = null
     @Volatile private var pkg: String? = null
     @Volatile private var url: String? = null
     @Volatile private var title: String? = null
@@ -56,13 +59,14 @@ class Tracker : AccessibilityService() {
 
     override fun onServiceConnected() {
         log = DayLog(this)
+        prompts = Prompts(this)
         running = this
         Cloud.uid?.let { PhoneRules.start(it) }
         registerReceiver(screenOff, IntentFilter(Intent.ACTION_SCREEN_OFF))
         scope.launch { while (isActive) { runCatching { tick() }; delay(TICK_MS) } }
     }
 
-    override fun onDestroy() { running = null; runCatching { unregisterReceiver(screenOff) }; runCatching { log.save() }; scope.cancel(); super.onDestroy() }
+    override fun onDestroy() { running = null; prompts.stop(); runCatching { unregisterReceiver(screenOff) }; runCatching { log.save() }; scope.cancel(); super.onDestroy() }
     override fun onInterrupt() {}
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
@@ -101,7 +105,7 @@ class Tracker : AccessibilityService() {
 
     private suspend fun tick() {
         val now = System.currentTimeMillis() / 1000
-        Cloud.uid?.let { PhoneRules.start(it) }
+        Cloud.uid?.let { PhoneRules.start(it); prompts.start(it) }
         val power = getSystemService(PowerManager::class.java); val keyguard = getSystemService(KeyguardManager::class.java)
         val p = pkg
         if (power.isInteractive && !keyguard.isKeyguardLocked && p != null && p !in LAUNCHERS) {
@@ -127,8 +131,13 @@ class Tracker : AccessibilityService() {
                     else -> cat
                 }
             } else if (cat == Category.UNKNOWN) judgeLater(if (domain != null) "DOMAIN|$domain" else "APP|$p", app, null, u, subject, isItem = false)
-            log.add(now, TICK_MS / 1000, p, app, subject, t, item, cat, PhoneRules.isWork(now))
-        }
+            val work = PhoneRules.isWork(now)
+            log.add(now, TICK_MS / 1000, p, app, subject, t, item, cat, work)
+            currentKey = item ?: if (domain != null) "DOMAIN|$domain" else "APP|$p"
+            prompts.tick(now, cat.level, work)
+        } else prompts.tick(now, null, PhoneRules.isWork(now))
+        prompts.bedtimeTick(now, power.isInteractive && !keyguard.isKeyguardLocked)
+        prompts.checkinTick(power.isInteractive && !keyguard.isKeyguardLocked)
         if (now - lastUpload >= 120) { lastUpload = now; log.save(); runCatching { Uploader.upload(log, Cloud.deviceId(this)) } }
     }
 
@@ -162,6 +171,9 @@ class Tracker : AccessibilityService() {
             log.recategorize({ it.item == key }, cat)
         }
     }
+
+    /** "I'm working" from a prompt: what's in front is filed as Work. */
+    fun markWork() { val k = currentKey ?: return; Category.registry["CORE_WORK"]?.let { file(k, it, title, Source.USER_LABEL) } }
 
     private fun ask(key: String, label: String, isItem: Boolean) {
         val now = System.currentTimeMillis()

@@ -30,6 +30,13 @@
             </intent-filter>
             <meta-data android:name="android.accessibilityservice" android:resource="@xml/tracker" />
         </service>
+        <activity
+            android:name=".track.PromptActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:taskAffinity="dev.ontask.android.prompt" />
+        <receiver android:name=".track.PromptActions" android:exported="false" />
         <service android:name=".Push" android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />

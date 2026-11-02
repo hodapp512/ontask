@@ -55,6 +55,10 @@ service cloud.firestore {
       // Settings, categories, rules and learned answers, synced between your devices.
       match /sync/{doc} { allow read, write: if isOwner(uid); }
       match /verdicts/{id} { allow read, write: if isOwner(uid); }
+      // Shared between your devices: break count and running break (state/breaks), the check-in that's due
+      // (state/rhythm), and check-ins done on the phone (phoneCheckins/{date}).
+      match /state/{doc} { allow read, write: if isOwner(uid); }
+      match /phoneCheckins/{date} { allow read, write: if isOwner(uid); }
       // The year heat map (per-day scores only): shared like the daily report.
       match /heat/{doc} {
         allow write: if false; // merged by the server from deviceHeat

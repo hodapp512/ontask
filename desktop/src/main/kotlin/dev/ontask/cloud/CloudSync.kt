@@ -58,6 +58,8 @@ class CloudSync(
     private val heat: () -> Pair<Map<LocalDate, dev.ontask.report.DayStat>, Int>? = { null },
     /** Settings, categories, rules and learned answers, kept in Firestore and synced both ways. */
     private val settingsSync: SettingsSync? = null,
+    /** More two-way state kept with the other devices each pass (breaks, check-ins). */
+    private val hooks: List<(CloudClient, String) -> Unit> = emptyList(),
 ) {
     @Volatile var lastError: String? = null; private set
     @Volatile var lastSyncTs: Long = 0; private set
@@ -112,6 +114,7 @@ class CloudSync(
             if (force || corrected || nowSec - lastReportTs >= 120) { uploadReport(c, uid, LocalDate.now(zone)); lastReportTs = nowSec }
             if (force || nowSec - lastHeatTs >= 600) { uploadHeat(c, uid); lastHeatTs = nowSec }
             settingsSync?.run(c, uid)
+            hooks.forEach { h -> runCatching { h(c, uid) } }
             uploadScheduleIfChanged(c, uid)
             uploadCheckinFlag(c, uid)
             pullReactions(c, uid)

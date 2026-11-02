@@ -55,7 +55,12 @@ class MainActivity : ComponentActivity() {
     private var ask by mutableStateOf<Triple<String, String, Boolean>?>(null)
 
     override fun onNewIntent(intent: android.content.Intent) { super.onNewIntent(intent); takeAsk(intent) }
+    /** A check-in opened from a notification (PLANNING, MIDDAY, EVENING). */
+    private var checkin by mutableStateOf<String?>(null)
+
     private fun takeAsk(i: android.content.Intent?) {
+        i?.getStringExtra(CHECKIN)?.let { checkin = it }
+        if (i?.getStringExtra("type") == "evening_checkin_phone") checkin = "EVENING"
         val key = i?.getStringExtra(ASK_KEY) ?: return
         ask = Triple(key, i.getStringExtra(ASK_LABEL) ?: key, i.getBooleanExtra(ASK_ITEM, false))
     }
@@ -71,6 +76,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val ASK_KEY = "ask.key"; const val ASK_LABEL = "ask.label"; const val ASK_ITEM = "ask.item"
+        const val CHECKIN = "checkin"
     }
 
     @Composable
@@ -155,6 +161,7 @@ class MainActivity : ComponentActivity() {
         ) { pad ->
             Column(Modifier.padding(pad).verticalScroll(rememberScrollState()).padding(16.dp)) {
                 when {
+                    checkin != null -> dev.ontask.android.ui.CheckinScreen(checkin!!) { checkin = null }
                     person != null -> PersonScreen(u.uid, person!!) { person = null }
                     tab == 0 -> HomeScreen(u.uid, u.displayName ?: "")
                     tab == 1 -> PeopleScreen(u.uid) { person = it }

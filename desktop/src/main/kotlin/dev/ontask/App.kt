@@ -89,7 +89,7 @@ class App(val dir: Path = dataDir()) {
 
     val cloud by lazy { dev.ontask.cloud.CloudSync(prefs, events, reports, { settings }, habits, checkins, relabel = { name, cat -> reclassify(name, Category.valueOf(cat)) },
         relabelItem = { key, title, cat -> answerVariable(key, title, Category.valueOf(cat)) },
-        lastActive = { lastActiveTs.takeIf { it > 0 } }, plan = { priorities.forDate(it) }, halves = { dayHalves(it) }, heat = { heatYear() }, settingsSync = settingsSync) }
+        lastActive = { lastActiveTs.takeIf { it > 0 } }, plan = { priorities.forDate(it) }, halves = { dayHalves(it) }, heat = { heatYear() }, settingsSync = settingsSync, hooks = listOf(::syncBreaks, ::syncCheckins)) }
     /** Last moment you were at the Mac (not Away), for the daily report's "you've wrapped up" rule. */
     @Volatile private var lastActiveTs = 0L
     private var wasAway = false
@@ -465,6 +465,9 @@ class App(val dir: Path = dataDir()) {
         firstPresence = date to first
         val state = DayState(date, first, !away, priorities.forDate(date).isNotEmpty() || checkins.done(date, "planning"), checkins.done(date, "midday"), checkins.done(date, "evening"), last)
         val due = Rhythm(zone, prefs.bool("rhythm.midday", true), prefs.bool("rhythm.evening_at_end", true), prefs.int("rhythm.evening_lead_min", 30)).due(settings.schedule, state, now)
+        // What's due whether or not you're at the Mac, so the phone can offer it when you're on the phone instead.
+        rhythmDue = Rhythm(zone, prefs.bool("rhythm.midday", true), prefs.bool("rhythm.evening_at_end", true), prefs.int("rhythm.evening_lead_min", 30))
+            .due(settings.schedule, state.copy(presentNow = true), now)?.takeIf { it in listOf(Prompt.PLANNING, Prompt.PLANNING_SHORT, Prompt.MIDDAY, Prompt.EVENING) }
         when (due) {
             null -> {}
             Prompt.NO_COMPUTER -> markOnce("no_computer:$date") { checkins.save(Checkin(date, "evening", now, null, null, null, null, "No computer today", false)); events.emit("no_computer_day", now, "date" to date.toString()) }
@@ -472,6 +475,40 @@ class App(val dir: Path = dataDir()) {
             else -> if (_duePrompt.value == null && now >= (snoozeUntil[due] ?: 0)) _duePrompt.value = due
         }
     }
+
+    @Volatile private var rhythmDue: Prompt? = null
+
+    /**
+     * Check-ins on whichever device you're using: this Mac publishes the one that's due (users/{uid}/state/rhythm);
+     * one done on the phone (phoneCheckins/{date}, its own document so nothing here overwrites it) is saved here as if
+     * done here, and its prompt closes.
+     */
+    private fun syncCheckins(c: dev.ontask.cloud.CloudClient, uid: String) {
+        val today = LocalDate.now(); val now = nowSec()
+        val fromPhone = c.get("users/$uid/phoneCheckins/$today")
+        fun str(o: kotlinx.serialization.json.JsonObject?, k: String) = (o?.get(k) as? kotlinx.serialization.json.JsonPrimitive)?.content?.takeIf { it.isNotBlank() && it != "null" }
+        fromPhone?.let { f ->
+            (f["planning"] as? kotlinx.serialization.json.JsonObject)?.let { o ->
+                if (!checkins.done(today, "planning")) { str(o, "plan")?.let { priorities.set(today, listOf(it)) }; checkins.save(Checkin(today, "planning", now, null, null, null, null, null, false)); finishPromptIf(Prompt.PLANNING, Prompt.PLANNING_SHORT) }
+            }
+            (f["midday"] as? kotlinx.serialization.json.JsonObject)?.let { o ->
+                if (!checkins.done(today, "midday")) { checkins.save(Checkin(today, "midday", now, null, str(o, "done"), str(o, "should"), str(o, "chips"), null, false)); str(o, "plan")?.let { priorities.set(today, listOf(it)) }; finishPromptIf(Prompt.MIDDAY) }
+            }
+            (f["evening"] as? kotlinx.serialization.json.JsonObject)?.let { o ->
+                if (checkins.get(today, "evening")?.sent != true) { checkins.save(Checkin(today, "evening", now, str(o, "rating")?.toIntOrNull(), str(o, "helped"), str(o, "hurt"), str(o, "change"), str(o, "note"), true)); finishPromptIf(Prompt.EVENING) }
+            }
+        }
+        val due = rhythmDue?.name ?: ""
+        val hash = "$today:$due"
+        if (prefs.get("rhythm.pushed") != hash) {
+            c.write("users/$uid/state", "rhythm", kotlinx.serialization.json.buildJsonObject {
+                put("date", kotlinx.serialization.json.JsonPrimitive(today.toString())); put("due", kotlinx.serialization.json.JsonPrimitive(due)); put("updatedAt", kotlinx.serialization.json.JsonPrimitive(System.currentTimeMillis()))
+            })
+            prefs.set("rhythm.pushed", hash)
+        }
+    }
+
+    private fun finishPromptIf(vararg p: Prompt) { if (_duePrompt.value in p) _duePrompt.value = null }
 
     /** Each daily prompt can be put off twice a day ("Later", or closing its window); then it stays up. */
     private val snoozes = HashMap<Pair<Prompt, LocalDate>, Int>()
@@ -547,6 +584,40 @@ class App(val dir: Path = dataDir()) {
                 Category.registry[cat]?.let { verdicts.set(item, title, it, runCatching { Source.valueOf(source) }.getOrDefault(Source.USER_LABEL), key, ts) }
             },
         ) { prefs.get("cloud.device_id") ?: "mac" }
+    }
+
+    /**
+     * One break count for all devices: this Mac publishes focus since the last break and any running break or lunch
+     * (users/{uid}/state/breaks); a break or lunch the phone started is taken over here.
+     */
+    private fun syncBreaks(c: dev.ontask.cloud.CloudClient, uid: String) {
+        val me = prefs.get("cloud.device_id") ?: "mac"
+        val remote = c.get("users/$uid/state/breaks")
+        val by = remote?.get("by")?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
+        val at = (remote?.get("updatedAt") as? kotlinx.serialization.json.JsonPrimitive)?.content?.toLongOrNull() ?: 0
+        if (remote != null && by != me && at > prefs.long("breaks.remote_seen", 0)) {
+            prefs.set("breaks.remote_seen", at.toString())
+            (remote["active"] as? kotlinx.serialization.json.JsonObject)?.let { a ->
+                fun n(k: String) = (a[k] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toLongOrNull() ?: 0
+                val kind = runCatching { dev.ontask.intervene.Breaks.Kind.valueOf((a["kind"] as kotlinx.serialization.json.JsonPrimitive).content) }.getOrNull()
+                if (kind != null && n("until") > nowSec()) synchronized(breaks) { breaks.adopt(kind, n("start"), n("until"), (remote["lunchDay"] as? kotlinx.serialization.json.JsonPrimitive)?.content) }
+                ladder.reset(); _intervention.value = null
+            }
+        }
+        val payload = synchronized(breaks) {
+            kotlinx.serialization.json.buildJsonObject {
+                put("focusedSec", kotlinx.serialization.json.JsonPrimitive(breaks.focusedSec))
+                breaks.active?.let { a -> put("active", kotlinx.serialization.json.buildJsonObject { put("kind", kotlinx.serialization.json.JsonPrimitive(a.kind.name)); put("start", kotlinx.serialization.json.JsonPrimitive(a.start)); put("until", kotlinx.serialization.json.JsonPrimitive(a.until)) }) }
+                breaks.lunchDay?.let { put("lunchDay", kotlinx.serialization.json.JsonPrimitive(it)) }
+                put("breaksHourSec", kotlinx.serialization.json.JsonPrimitive(breaks.breakSec(nowSec(), nowSec() - 3600)))
+                put("breaksTodaySec", kotlinx.serialization.json.JsonPrimitive(breaks.breakSec(nowSec(), LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toEpochSecond())))
+            }
+        }
+        // Focus changes every tick: publish when the break state changes, or the earned break would (each minute).
+        val hash = (payload.filterKeys { it != "focusedSec" }.toString() + (synchronized(breaks) { breaks.focusedSec } / 60)).hashCode().toString()
+        if (prefs.get("breaks.pushed") == hash) return
+        c.write("users/$uid/state", "breaks", kotlinx.serialization.json.JsonObject(payload + mapOf("by" to kotlinx.serialization.json.JsonPrimitive(me), "updatedAt" to kotlinx.serialization.json.JsonPrimitive(System.currentTimeMillis()))))
+        prefs.set("breaks.pushed", hash)
     }
 
     /** The heat map's 52 weeks and the current streak (days off don't break it). */

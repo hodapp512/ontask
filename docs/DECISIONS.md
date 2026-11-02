@@ -415,3 +415,7 @@ when it comes to the front.*
 - Uploads every 2 minutes in use and at once on lock/away, so the merged day is current all day.
 - Breaks and check-ins are shared across devices; the work day still starts at the first sit-down on the Mac.
 - iPhone and Windows explored only (docs/PLATFORMS.md).
+- *Step 4 details:* phone steps 2–3 are an activity started by the Accessibility service (allowed without the
+  "Display over other apps" permission). "Back to work" on the phone goes to the home screen (no phone blocking
+  until v2). Focus since the last break is counted by the Mac only (phone focus is rare); phone breaks are shared.
+  Phone check-in answers live in their own document so the Mac's check-in upload can never overwrite one.

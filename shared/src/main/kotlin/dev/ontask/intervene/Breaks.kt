@@ -32,12 +32,7 @@ class Breaks(
     /** Breaks taken (not lunch), for "14 min of breaks in the last hour (35 today)". */
     private val taken = ArrayList<Pair<Long, Long>>()
 
-    fun earnedSec(): Long {
-        val m = focusedSec / 60
-        if (m < 25) return 0
-        val cap = if (m < 60) 10 else 15
-        return minOf(cap.toLong(), (m / 25) * 5) * 60
-    }
+    fun earnedSec(): Long = earnedFor(focusedSec)
 
     /** Focused minutes still needed for the first 5-minute break. */
     fun toEarnSec(): Long = (25 * 60L - focusedSec).coerceAtLeast(0)
@@ -117,6 +112,23 @@ class Breaks(
 
     private fun begin(a: Active) { active = a; focusedInBreak = 0 }
 
+    /** A break or lunch started on another device (the phone): taken over here as if started here. */
+    fun adopt(kind: Kind, start: Long, until: Long, lunchDay: String?) {
+        if (active != null) return
+        if (kind == Kind.LUNCH) this.lunchDay = lunchDay
+        begin(Active(kind, start, until))
+    }
+
     /** A new day: yesterday's breaks don't count toward today's totals. */
     fun forgetBefore(ts: Long) { taken.removeAll { it.second < ts } }
+
+    companion object {
+        /** Nothing under 25 minutes focused; then 5 minutes per 25, at most 10 under an hour and 15 after. */
+        fun earnedFor(focusedSec: Long): Long {
+            val m = focusedSec / 60
+            if (m < 25) return 0
+            val cap = if (m < 60) 10 else 15
+            return minOf(cap.toLong(), (m / 25) * 5) * 60
+        }
+    }
 }
