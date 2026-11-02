@@ -56,6 +56,9 @@ fun HomeScreen(app: App) {
     LaunchedEffect(Unit) { while (true) { delay(5_000); now = App.nowSec() } }
     val today = LocalDate.now()
     var date by remember { mutableStateOf(today) }
+    // OnTask runs for days: after midnight Home moves on to the new day, unless you picked another one to look at.
+    var followToday by remember { mutableStateOf(true) }
+    LaunchedEffect(today) { if (followToday) date = today }
     // Always redraw on reload: categories compare by name, so a renamed one would otherwise look unchanged.
     var report by remember { mutableStateOf<DailyReport?>(null, androidx.compose.runtime.neverEqualPolicy()) }
     LaunchedEffect(date, tick, now / 60) {
@@ -70,7 +73,7 @@ fun HomeScreen(app: App) {
 
     Page(
         if (name != null) "$hello, $name" else hello,
-        today.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL)),
+        fmtDate(today, weekday = true),
         maxWidth = 1500.dp,
     ) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -83,7 +86,7 @@ fun HomeScreen(app: App) {
         TodayCard(app, today) { reflecting = true }
         val summary: @Composable () -> Unit = {
             report?.let { r ->
-                SummaryCard(r, if (date == today) "Today so far" else "Your day", app, onRelabel = { tick++ }, header = { DateBar(date, { date = it }) { tick++ } }) {
+                SummaryCard(r, if (date == today) "Today so far" else "Your day", app, onRelabel = { tick++ }, header = { DateBar(date, { date = it; followToday = it == LocalDate.now() }) { tick++ } }) {
                     WeekExpander(app, today)
                 }
             } ?: Text("Loading…")
@@ -158,7 +161,7 @@ private fun WeekExpander(app: App, today: LocalDate) {
         ratings.forEach { (d, r) ->
             val share = dev.ontask.plan.CheckinDraft.deepShare(app.reports.daily(d))
             Row(Modifier.fillMaxWidth()) {
-                Text(d.format(DateTimeFormatter.ofPattern("EEE, MMM d")), Modifier.weight(1f))
+                Text(fmtDate(d), Modifier.weight(1f))
                 Text(dev.ontask.plan.CheckinDraft.feeling(r), Modifier.weight(1f))
                 Text(share?.let { "$it% focused" } ?: "—", Modifier.weight(1f))
             }

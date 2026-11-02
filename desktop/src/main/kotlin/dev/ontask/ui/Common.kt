@@ -259,3 +259,7 @@ fun centeredOnActiveScreen(size: androidx.compose.ui.unit.DpSize): androidx.comp
         (bounds.y + (bounds.height - size.height.value) / 2).dp,
     )
 }
+
+/** Dates everywhere read like "Nov 1, 2026" ([weekday]: "Sunday, Nov 1, 2026"). */
+fun fmtDate(d: java.time.LocalDate, weekday: Boolean = false): String =
+    d.format(java.time.format.DateTimeFormatter.ofPattern(if (weekday) "EEEE, MMM d, yyyy" else "MMM d, yyyy", java.util.Locale.US))

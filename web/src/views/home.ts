@@ -4,7 +4,7 @@ import { httpsCallable } from "firebase/functions";
 import QRCode from "qrcode";
 import { db, fns } from "../firebase";
 import { h } from "../dom";
-import { LEVELS, REACTIONS, ago, clock, deepShare, firstName, fmtDuration, greeting, segAt, segDetail, timelineSvg, todayKey, type LevelKey, type Seg } from "../format";
+import { LEVELS, REACTIONS, ago, clock, fmtDate, deepShare, firstName, fmtDuration, greeting, segAt, segDetail, timelineSvg, timelineWindow, todayKey, type LevelKey, type Seg } from "../format";
 import { enablePush, pushState } from "../session";
 
 type Cleanup = () => void;
@@ -22,7 +22,7 @@ export async function homeView(u: User, onLeave: (fn: Cleanup) => void): Promise
 
   return h("main", {},
     h("header", { class: "top" },
-      h("div", {}, h("h1", {}, `${greeting()}, ${name}`), h("p", { class: "muted" }, new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" }))),
+      h("div", {}, h("h1", {}, `${greeting()}, ${name}`), h("p", { class: "muted" }, fmtDate(new Date(), true))),
       h("a", { href: "#/settings", class: "icon-btn", "aria-label": "Settings" }, "⚙︎"),
     ),
     await pushBanner(u),
@@ -273,20 +273,70 @@ async function personCard(u: User, linkId: string, l: DocumentData): Promise<HTM
   );
 }
 
-/** Timeline whose stretches show what you did when tapped (or hovered with a mouse). */
+/**
+ * Timeline whose stretches show what you did when tapped (or hovered with a mouse). Zoomable for busy stretches:
+ * pinch or − / + to zoom, drag to move along the day.
+ */
 export function timelineEl(segs: Seg[]): HTMLElement {
-  const detail = h("p", { class: "muted small tl-detail" }, segs.length ? "Tap the timeline to see what you did." : "");
-  const box = h("div", { class: "tl" }); box.innerHTML = timelineSvg(segs);
-  const svg = box.querySelector("svg")!;
+  const detail = h("p", { class: "muted small tl-detail" }, segs.length ? "Tap the timeline to see what you did. Pinch or use − + to zoom." : "");
+  const base = timelineWindow(segs);
+  let win: [number, number] = [...base];
+  const box = h("div", { class: "tl" });
+  const reset = h("button", { class: "small", hidden: true }, "Reset") as HTMLButtonElement;
+  const draw = () => {
+    box.innerHTML = timelineSvg(segs, 320, 22, win);
+    reset.hidden = win[0] === base[0] && win[1] === base[1];
+    const svg = box.querySelector("svg")!;
+    svg.addEventListener("pointerdown", down); svg.addEventListener("pointermove", move);
+    svg.addEventListener("pointerup", up); svg.addEventListener("pointercancel", up);
+  };
+  const zoom = (factor: number, frac = 0.5) => {
+    const span = win[1] - win[0], next = Math.min(86400, Math.max(300, span * factor));
+    let a = win[0] + span * frac - next * frac;
+    a = Math.max(0, Math.min(86400 - next, a));
+    win = [a, a + next]; draw();
+  };
+  const fracOf = (e: PointerEvent) => { const r = box.querySelector("svg")!.getBoundingClientRect(); return Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)); };
   const show = (e: PointerEvent) => {
-    const rect = svg.getBoundingClientRect();
-    const seg = segAt(segs, (e.clientX - rect.left) / rect.width);
-    svg.querySelectorAll("rect[data-i]").forEach((el) => el.classList.toggle("dim", !!seg && el.getAttribute("data-i") !== String(segs.indexOf(seg))));
+    const seg = segAt(segs, fracOf(e), win);
+    box.querySelectorAll("rect[data-i]").forEach((el) => el.classList.toggle("dim", !!seg && el.getAttribute("data-i") !== String(segs.indexOf(seg))));
     if (seg) detail.textContent = segDetail(seg);
   };
-  svg.addEventListener("pointerdown", show);
-  svg.addEventListener("pointermove", (e) => { if (e.pointerType === "mouse") show(e); });
-  return h("div", {}, box, detail);
+  // One finger: tap shows, drag moves. Two fingers: pinch zooms.
+  const pts = new Map<number, number>();
+  let dragFrom: { x: number; win: [number, number] } | null = null, pinch: { d: number; win: [number, number] } | null = null, moved = false;
+  function down(e: PointerEvent) {
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+    pts.set(e.pointerId, e.clientX); moved = false;
+    if (pts.size === 2) { const [p, q] = [...pts.values()]; pinch = { d: Math.abs(p - q) || 1, win: [...win] }; dragFrom = null; }
+    else dragFrom = { x: e.clientX, win: [...win] };
+  }
+  function move(e: PointerEvent) {
+    if (!pts.has(e.pointerId)) { if (e.pointerType === "mouse") show(e); return; }
+    pts.set(e.pointerId, e.clientX);
+    const width = box.querySelector("svg")!.getBoundingClientRect().width || 1;
+    if (pinch && pts.size === 2) {
+      const [p, q] = [...pts.values()], span = pinch.win[1] - pinch.win[0];
+      const next = Math.min(86400, Math.max(300, span * pinch.d / (Math.abs(p - q) || 1)));
+      const mid = pinch.win[0] + span * 0.5;
+      const a = Math.max(0, Math.min(86400 - next, mid - next / 2));
+      win = [a, a + next]; moved = true; draw();
+    } else if (dragFrom && Math.abs(e.clientX - dragFrom.x) > 4) {
+      const span = dragFrom.win[1] - dragFrom.win[0];
+      const a = Math.max(0, Math.min(86400 - span, dragFrom.win[0] - ((e.clientX - dragFrom.x) / width) * span));
+      win = [a, a + span]; moved = true; draw();
+    }
+  }
+  function up(e: PointerEvent) {
+    if (!moved && pts.size === 1) show(e);
+    pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (!pts.size) dragFrom = null;
+  }
+  reset.onclick = () => { win = [...base]; draw(); };
+  draw();
+  const controls = h("div", { class: "row tl-zoom" },
+    h("button", { class: "small", "aria-label": "Zoom out", onclick: () => zoom(1.5) }, "−"),
+    h("button", { class: "small", "aria-label": "Zoom in", onclick: () => zoom(1 / 1.5) }, "+"), reset);
+  return h("div", {}, box, h("div", { class: "row between" }, detail, controls));
 }
 
 const initial = (name?: string) => (name ?? "?").trim().charAt(0).toUpperCase() || "?";

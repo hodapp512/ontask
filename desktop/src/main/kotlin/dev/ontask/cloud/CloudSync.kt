@@ -288,6 +288,8 @@ class CloudSync(
             put("tz", zone.id)
             // Email yourself the daily report too (to your sign-in address).
             put("reportEmail", reportEmail)
+            // Bedtime, so your phone gets a push then too (null = off).
+            if (prefs.bool("bedtime.enabled", true)) put("bedtimeMin", prefs.int("bedtime.min", dev.ontask.plan.Bedtime.DEFAULT_MIN))
             put("workWeek", buildJsonObject {
                 s.schedule.week.days.forEach { (d, ranges) -> put(d.toString(), buildJsonArray { ranges.forEach { add(buildJsonObject { put("startMin", it.startMin); put("endMin", it.endMin) }) } }) }
             })

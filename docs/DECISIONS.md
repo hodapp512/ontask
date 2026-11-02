@@ -223,3 +223,17 @@ Format: **Decision** — why. *Rejected:* alternatives, and why not.
   reminder on, I'm working (30 minutes). Going to bed doesn't silence the night: if you keep going, the next reminder
   still comes 15 minutes later.
 - Each reminder is logged as a `bedtime_nudge` event on the Mac. Nothing goes to the partner or the phone yet.
+
+## 2026-11-01 · Bedtime tweaks, dates, zoomable timeline
+
+- **Default bedtime 9:30 PM.**
+- **An unanswered bedtime reminder closes by itself** once you've been away for 10 minutes (you went to bed) or when
+  the night ends at 5 AM, so the morning doesn't start with last night's pop-up.
+- **Your phone gets a push at bedtime** too ("Time to put the screens away"), sent by the server from the bedtime in
+  your synced schedule, once per night.
+- **Dates read "Nov 1, 2026" everywhere** (with the weekday where it reads naturally: "Sunday, Nov 1, 2026"),
+  including the report email's subject. Stored and synced dates stay ISO (yyyy-MM-dd).
+- **Home follows the new day** after midnight unless you picked another date; it used to stay on the day OnTask was
+  opened.
+- **The timeline zooms:** on the Mac, scroll over it to zoom around the pointer, drag to move, − / + / Reset; on the
+  phone, pinch or − / +, drag to move. Down to a 5-minute window; clock ticks go down to 5-minute steps.

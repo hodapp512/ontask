@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { partnerMessage, textBeltSafe, withClose } from "../src/logic/messages";
 import { decide, driftAllowed, halfDayStart, inQuietHours, localParts } from "../src/logic/routing";
-import { checkinState, habitsDue } from "../src/logic/schedule";
-import { ownParts, partnerParts, reportDue, reportHtml, reportText } from "../src/logic/report";
+import { bedtimeDue, checkinState, habitsDue } from "../src/logic/schedule";
+import { fmtDate, ownParts, partnerParts, reportDue, reportHtml, reportText } from "../src/logic/report";
 import { buildPrompt, ollamaLibraryUrl, parseCandidates, validateCandidates } from "../src/logic/modelrec";
 import { DEFAULT_PARTNER_PREFS, type PartnerPrefs, type ScheduleDoc } from "../src/logic/types";
 
@@ -79,6 +79,16 @@ describe("schedule", () => {
   });
 });
 
+describe("bedtime push", () => {
+  const s: ScheduleDoc = { tz: "America/Chicago", workWeek: {}, habits: [], bedtimeMin: 21 * 60 + 30 };
+  it("fires once, in the 5-minute window that contains bedtime", () => {
+    expect(bedtimeDue(s, at("2026-11-02T03:29:00Z"))).toBe(false);  // 9:29 PM CST
+    expect(bedtimeDue(s, at("2026-11-02T03:31:00Z"))).toBe(true);
+    expect(bedtimeDue(s, at("2026-11-02T03:36:00Z"))).toBe(false);
+    expect(bedtimeDue({ ...s, bedtimeMin: undefined }, at("2026-11-02T03:31:00Z"))).toBe(false);
+  });
+});
+
 describe("daily report", () => {
   // Fridays 9:00-17:00 in Chicago (UTC-5 on these dates).
   const s: ScheduleDoc = { tz: "America/Chicago", workWeek: { "5": [{ startMin: 540, endMin: 1020 }] }, habits: [] };
@@ -110,6 +120,7 @@ describe("daily report", () => {
     expect(reportText({ ...partnerParts("Sam"), report, link: "l" })).toContain("No reflection today.");
     expect(reportText({ ...ownParts, link: "l" })).toContain("You didn't use the computer today.");
   });
+  it("writes dates like Nov 1, 2026", () => expect(fmtDate("2026-11-01")).toBe("Nov 1, 2026"));
   it("escapes what people typed in the email", () => {
     const h = reportHtml({ ...ownParts, report, checkin: { evening: true, note: "<script>x</script>" }, link: "https://x/#/" });
     expect(h).toContain("&lt;script&gt;");

@@ -25,6 +25,8 @@ export interface ScheduleDoc {
   /** yyyy-MM-dd -> ranges (empty = day off) */
   exceptions?: Record<string, { startMin: number; endMin: number }[]>;
   habits: HabitDef[];
+  /** Bedtime, minutes after midnight; absent = no bedtime reminder. */
+  bedtimeMin?: number;
   /** Email the daily report to yourself too (default true). */
   reportEmail?: boolean;
 }

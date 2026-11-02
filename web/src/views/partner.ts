@@ -3,7 +3,7 @@ import { addDoc, collection, doc, getDoc, getDocs, limit, onSnapshot, orderBy, q
 import { httpsCallable } from "firebase/functions";
 import { db, fns } from "../firebase";
 import { h } from "../dom";
-import { REACTIONS, todayKey } from "../format";
+import { REACTIONS, fmtDate, fmtDateTime, todayKey } from "../format";
 import { reportBody } from "./home";
 
 export async function joinView(u: User, code: string): Promise<HTMLElement> {
@@ -26,7 +26,7 @@ export async function personView(u: User, linkId: string): Promise<HTMLElement> 
   const msgs = await getDocs(query(collection(db, "links", linkId, "messages"), orderBy("ts", "desc"), limit(30)));
   const feed = msgs.docs.length ? msgs.docs.map((m) => {
     const d = m.data();
-    return h("div", { class: "msg" }, h("small", {}, new Date(d.ts).toLocaleString() + " · " + String(d.type).replace(/_/g, " ")), d.text);
+    return h("div", { class: "msg" }, h("small", {}, fmtDateTime(d.ts) + " · " + String(d.type).replace(/_/g, " ")), d.text);
   }) : [h("p", { class: "muted" }, "No messages yet. You'll see check-ins and alerts here.")];
 
   // The same "Today so far" view they see, live, with earlier days a tap away.
@@ -39,7 +39,7 @@ export async function personView(u: User, linkId: string): Promise<HTMLElement> 
     const show = () => {
       stop?.();
       const key = todayKey(day), today = key === todayKey();
-      label.textContent = today ? "Today" : day.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+      label.textContent = today ? "Today" : fmtDate(day, true);
       next.disabled = today;
       body.replaceChildren(h("p", { class: "muted" }, "Loading…"));
       stop = onSnapshot(doc(db, "users", tracked, "reports", key), (s) => {

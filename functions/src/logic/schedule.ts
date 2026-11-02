@@ -15,6 +15,14 @@ export function habitsDue(habits: HabitDef[], tz: string, now: Date, windowMin =
   });
 }
 
+/** True in the 5-minute sweep window that contains bedtime, so the phone gets one push at bedtime. */
+export function bedtimeDue(s: ScheduleDoc, now: Date, windowMin = 5): boolean {
+  if (s.bedtimeMin === undefined || s.bedtimeMin === null) return false;
+  const { hour, minute } = localParts(now, s.tz);
+  const diff = (hour * 60 + minute - s.bedtimeMin + 1440) % 1440;
+  return diff < windowMin;
+}
+
 export function rangesFor(s: ScheduleDoc, now: Date): { startMin: number; endMin: number }[] {
   const { date, isoWeekday } = localParts(now, s.tz);
   return s.exceptions?.[date] ?? s.workWeek[String(isoWeekday)] ?? [];

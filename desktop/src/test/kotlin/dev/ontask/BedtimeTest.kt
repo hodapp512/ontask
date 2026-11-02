@@ -11,7 +11,7 @@ import kotlin.test.assertNull
 class BedtimeTest {
     private val utc = ZoneOffset.UTC
     private fun at(day: Int, h: Int, m: Int = 0) = ZonedDateTime.of(2026, 10, day, h, m, 0, 0, utc).toEpochSecond()
-    private val b = Bedtime(22 * 60 + 30, utc)
+    private val b = Bedtime(22 * 60 + 30, utc) // tests use 10:30 PM; the default is 9:30 PM
     private val night = LocalDate.of(2026, 10, 26)
 
     @Test fun theNightRunsFromBedtimeToFiveAm() {

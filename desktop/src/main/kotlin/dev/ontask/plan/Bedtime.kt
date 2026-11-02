@@ -56,6 +56,6 @@ class Bedtime(
     }
 
     companion object {
-        const val DEFAULT_MIN = 22 * 60 + 30
+        const val DEFAULT_MIN = 21 * 60 + 30
     }
 }

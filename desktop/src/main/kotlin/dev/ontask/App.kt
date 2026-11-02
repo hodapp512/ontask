@@ -439,8 +439,17 @@ class App(val dir: Path = dataDir()) {
     private fun saveBedState(s: dev.ontask.plan.Bedtime.NightState) = prefs.set("bedtime.state", "${s.night}|${s.count}|${s.lastTs}|${s.snoozeUntil}")
 
     /** At bedtime, and every 15 minutes after while you're still at the computer and not working. */
+    private var bedAwaySince = 0L
+
     private fun bedtimeCheck(now: Long, live: dev.ontask.track.Live) {
-        if (!bedtimeEnabled || _bedtime.value != null) return
+        // A reminder nobody answered doesn't wait until morning: it closes once you've been away 10 minutes (you went
+        // to bed) or when the night ends at 5 AM.
+        if (_bedtime.value != null) {
+            bedAwaySince = if (live.away) bedAwaySince.takeIf { it > 0 } ?: now else 0L
+            if (!bedtimeEnabled || dev.ontask.plan.Bedtime(bedtimeMin).nightOf(now) == null || (bedAwaySince > 0 && now - bedAwaySince >= 600)) { _bedtime.value = null; bedAwaySince = 0L }
+            return
+        }
+        if (!bedtimeEnabled) return
         val b = dev.ontask.plan.Bedtime(bedtimeMin)
         val st = bedState()
         val n = b.due(now, active = !live.away, working = live.classification?.level == Level.DEEP, state = st) ?: return

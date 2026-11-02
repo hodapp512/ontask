@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -66,7 +67,7 @@ fun DateBar(date: LocalDate, onDate: (LocalDate) -> Unit, onRefresh: () -> Unit)
     // Compact: ◀ [Today ▾] ▶ — the middle opens a calendar.
     Row(verticalAlignment = Alignment.CenterVertically) {
         TextButton({ onDate(date.minusDays(1)) }) { Text("◀") }
-        TextButton({ picking = true }) { Text(if (date == LocalDate.now()) "📅 Today" else "📅 " + DateTimeFormatter.ofPattern("EEE, MMM d").format(date)) }
+        TextButton({ picking = true }) { Text(if (date == LocalDate.now()) "📅 Today" else "📅 " + fmtDate(date)) }
         TextButton({ onDate(date.plusDays(1)) }, enabled = date < LocalDate.now()) { Text("▶") }
     }
     if (picking) {
@@ -190,17 +191,37 @@ fun SummaryCard(r: DailyReport, title: String, app: App? = null, onRelabel: () -
     }
 }
 
-/** Colored stretches across the active part of the day; hover one to see when it was and what you did. */
+/**
+ * Colored stretches across the active part of the day; hover one to see when it was and what you did. Zoomable for a
+ * closer look at busy stretches: scroll over it to zoom around the pointer, drag to move along the day, or use the
+ * − / + / Reset buttons.
+ */
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 private fun Timeline(r: DailyReport) {
     val track = MaterialTheme.colorScheme.surfaceVariant
-    val (from, to) = timelineWindow(r.timeline.map { (it.start - r.dayStart) to (it.end - r.dayStart) }, r.timeline.map { it.level == Level.AWAY })
-    val span = (to - from).toFloat()
+    val (from0, to0) = timelineWindow(r.timeline.map { (it.start - r.dayStart) to (it.end - r.dayStart) }, r.timeline.map { it.level == Level.AWAY })
+    // The visible window, in seconds after midnight.
+    var view by remember(r.date, from0, to0) { mutableStateOf(from0.toDouble() to to0.toDouble()) }
+    val (from, to) = view
+    val span = (to - from)
     var width by remember { mutableStateOf(1) }
     var hover by remember(r) { mutableStateOf<Pair<Run, Float>?>(null) }
+    var dragX by remember { mutableStateOf<Float?>(null) }
+    fun zoom(factor: Double, atFrac: Double = 0.5) {
+        val newSpan = (span * factor).coerceIn(MIN_SPAN_SEC, 86_400.0)
+        val anchor = from + span * atFrac
+        var a = anchor - newSpan * atFrac
+        a = a.coerceIn(0.0, 86_400.0 - newSpan)
+        view = a to a + newSpan
+    }
+    fun pan(dx: Float) {
+        val shift = -dx / width * span
+        val a = (from + shift).coerceIn(0.0, 86_400.0 - span)
+        view = a to a + span
+    }
     fun runAt(x: Float): Run? {
-        val t = r.dayStart + from + (x / width * span).toLong()
+        val t = r.dayStart + (from + x / width * span).toLong()
         val slack = (4f / width * span).toLong() // a few pixels, so thin stretches can be hovered too
         return r.timeline.firstOrNull { t >= it.start && t < it.end } ?: r.timeline.filter { t >= it.start - slack && t < it.end + slack }.minByOrNull { minOf(kotlin.math.abs(t - it.start), kotlin.math.abs(t - it.end)) }
     }
@@ -209,13 +230,26 @@ private fun Timeline(r: DailyReport) {
             Canvas(
                 Modifier.fillMaxWidth().height(32.dp)
                     .onSizeChanged { width = it.width.coerceAtLeast(1) }
-                    .onPointerEvent(PointerEventType.Move) { e -> val x = e.changes.first().position.x; hover = runAt(x)?.let { it to x } }
-                    .onPointerEvent(PointerEventType.Exit) { hover = null },
+                    .onPointerEvent(PointerEventType.Move) { e ->
+                        val x = e.changes.first().position.x
+                        dragX?.let { pan(x - it); dragX = x; hover = null } ?: run { hover = runAt(x)?.let { it to x } }
+                    }
+                    .onPointerEvent(PointerEventType.Press) { e -> dragX = e.changes.first().position.x }
+                    .onPointerEvent(PointerEventType.Release) { dragX = null }
+                    .onPointerEvent(PointerEventType.Exit) { hover = null; dragX = null }
+                    .onPointerEvent(PointerEventType.Scroll) { e ->
+                        val c = e.changes.first()
+                        val d = c.scrollDelta
+                        if (kotlin.math.abs(d.x) > kotlin.math.abs(d.y)) pan(-d.x * 20f)
+                        else zoom(if (d.y > 0) 1.2 else 1 / 1.2, (c.position.x / width).toDouble().coerceIn(0.0, 1.0))
+                        c.consume(); hover = null
+                    },
             ) {
                 drawRoundRect(track, size = size, cornerRadius = CornerRadius(6f))
                 r.timeline.forEach { run ->
-                    val x0 = ((run.start - r.dayStart - from) / span * size.width).coerceIn(0f, size.width)
-                    val x1 = ((run.end - r.dayStart - from) / span * size.width).coerceIn(0f, size.width)
+                    val x0 = ((run.start - r.dayStart - from) / span * size.width).toFloat().coerceIn(0f, size.width)
+                    val x1 = ((run.end - r.dayStart - from) / span * size.width).toFloat().coerceIn(0f, size.width)
+                    if (x1 <= 0f || x0 >= size.width) return@forEach
                     val on = hover?.first == run
                     drawRect(levelColor(run.level).copy(alpha = if (hover == null || on) 1f else 0.55f), Offset(x0, 0f), Size(maxOf(x1 - x0, 1.5f), size.height))
                 }
@@ -237,10 +271,36 @@ private fun Timeline(r: DailyReport) {
                 }
             }
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            timelineLabels(from, to).forEach { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        // Clock ticks placed at their times (5-minute steps when zoomed in, hours when zoomed out).
+        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth().height(16.dp)) {
+            val w = maxWidth
+            timelineTicks(from.toLong(), to.toLong()).forEach { (t, label) ->
+                val frac = ((t - from) / span).toFloat()
+                Text(label, Modifier.offset(x = (w * frac - 16.dp).coerceIn(0.dp, w - 40.dp)), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
-        Text("Hover over the timeline to see what you did.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Hover to see what you did · scroll to zoom, drag to move", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton({ zoom(1.5) }, enabled = span < 86_400.0) { Text("−") }
+            TextButton({ zoom(1 / 1.5) }, enabled = span > MIN_SPAN_SEC) { Text("+") }
+            if (from != from0.toDouble() || to != to0.toDouble()) TextButton({ view = from0.toDouble() to to0.toDouble() }) { Text("Reset") }
+        }
+    }
+}
+
+/** Zooming stops at a 5-minute window. */
+private const val MIN_SPAN_SEC = 300.0
+
+/**
+ * Clock ticks for a window (seconds after midnight): the smallest step from 5 minutes to 6 hours that gives at most
+ * six ticks, each at a round time ("10 AM", "10:15").
+ */
+fun timelineTicks(from: Long, to: Long): List<Pair<Long, String>> {
+    val step = listOf(5, 10, 15, 30, 60, 120, 180, 240, 360).map { it * 60L }.firstOrNull { (to - from) / it <= 6 } ?: 21_600L
+    val first = (from + step - 1) / step * step
+    return (first..to step step).map { t ->
+        val time = java.time.LocalTime.of(((t / 3600) % 24).toInt(), ((t % 3600) / 60).toInt())
+        t to time.format(java.time.format.DateTimeFormatter.ofPattern(if (t % 3600 == 0L) "h a" else "h:mm", java.util.Locale.US))
     }
 }
 

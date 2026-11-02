@@ -6,8 +6,8 @@ import { defineSecret } from "firebase-functions/params";
 import { randomBytes } from "node:crypto";
 import { deliverToPartner, releaseDeferred, routeEvent, takeQueuedAlerts, type Link } from "./deliver";
 import { firstName } from "./logic/messages";
-import { ownParts, partnerParts, reportDue, reportHtml, reportText, type CheckinDoc, type ReportDoc } from "./logic/report";
-import { checkinState, habitsDue } from "./logic/schedule";
+import { fmtDate, ownParts, partnerParts, reportDue, reportHtml, reportText, type CheckinDoc, type ReportDoc } from "./logic/report";
+import { bedtimeDue, checkinState, habitsDue } from "./logic/schedule";
 import { localParts } from "./logic/routing";
 import { buildPrompt, ollamaLibraryUrl, parseCandidates, validateCandidates, type Recommendation } from "./logic/modelrec";
 import type { ScheduleDoc } from "./logic/types";
@@ -152,6 +152,13 @@ export const sweep = onSchedule({ schedule: "every 5 minutes", secrets: MSG_SECR
     const tokens = await tokensOf(uid);
     for (const h of habitsDue(s.habits ?? [], s.tz, now)) await senders.push(tokens, "OnTask", h.name, { type: "habit", habitId: h.id });
     await checkinSweep(uid, s, now, tokens);
+    if (bedtimeDue(s, now)) {
+      const flag = db.doc(`users/${uid}/sweepState/${localParts(now, s.tz).date}`);
+      if (!(await flag.get()).get("bedtimePushed")) {
+        await senders.push(tokens, "Bedtime", "Time to put the screens away and get some sleep.", { type: "bedtime" });
+        await flag.set({ bedtimePushed: true }, { merge: true });
+      }
+    }
   }
   await releaseDeferred(db, senders, now);
 });
@@ -203,7 +210,7 @@ async function dailyReportSweep(uid: string, s: ScheduleDoc, now: Date, date: st
     if (email) {
       // Yours has the titled rows (only you can read them).
       const mine = { ...ownParts, report: { ...report, topSites: (items.get("topSites") as ReportDoc["topSites"]) ?? report?.topSites }, checkin, alsoToday, link };
-      const r = await senders.email(email, `Your day: ${date}`, reportText(mine), reportHtml(mine));
+      const r = await senders.email(email, `Your day: ${fmtDate(date)}`, reportText(mine), reportHtml(mine));
       if (!r.ok) console.warn(`report email to ${uid} failed: ${r.detail}`);
     }
   }

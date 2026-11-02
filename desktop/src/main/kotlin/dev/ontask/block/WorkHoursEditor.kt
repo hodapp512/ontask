@@ -43,7 +43,7 @@ class WorkHoursEditor(private val store: SettingsStore, private val events: Even
         apply(cur.copy(schedule = after))
         if (removed > 0) events.emit(
             "work_hours_change", now, "scope" to "exception", "date" to date.toString(), "removed_minutes" to removed, "reason" to reason!!.trim(),
-            "meaning" to "Work hours on ${date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.US)} $date were reduced by ${fmt(removed)}. Blocking and monitoring will be off during that time.",
+            "meaning" to "Work hours on ${date.format(java.time.format.DateTimeFormatter.ofPattern("EEEE, MMM d, yyyy", Locale.US))} were reduced by ${fmt(removed)}. Blocking and monitoring will be off during that time.",
         )
     }
 

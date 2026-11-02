@@ -46,15 +46,29 @@ export function timelineWindow(segs: Seg[]): [number, number] {
   return [from, to];
 }
 
-export function timelineSvg(segs: Seg[], width = 320, height = 22): string {
+/**
+ * Clock ticks for a window (seconds after midnight): the smallest step from 5 minutes to 6 hours that gives at most
+ * five ticks, each at a round time ("10 AM", "10:15").
+ */
+export function timelineTicks(from: number, to: number): { t: number; label: string }[] {
+  const step = [5, 10, 15, 30, 60, 120, 180, 240, 360].map((m) => m * 60).find((s) => (to - from) / s <= 5) ?? 21600;
+  const out: { t: number; label: string }[] = [];
+  for (let t = Math.ceil(from / step) * step; t <= to; t += step) {
+    const c = clock(Math.floor(t / 60));
+    out.push({ t, label: t % 3600 === 0 ? c.replace(":00", "") : c.replace(/ [AP]M$/, "") });
+  }
+  return out;
+}
+
+/** The timeline as SVG plus clock ticks; [win] zooms to part of the day (default: the active part). */
+export function timelineSvg(segs: Seg[], width = 320, height = 22, win: [number, number] = timelineWindow(segs)): string {
   const color = (k: string) => LEVELS.find((l) => l.short === k)?.color ?? "#ccc";
-  const [from, to] = timelineWindow(segs);
+  const [from, to] = win;
   const x = (t: number) => ((t - from) / (to - from)) * width;
-  const rects = segs.map(({ a, b, k }, i) => `<rect data-i="${i}" x="${x(a)}" y="0" width="${Math.max(x(b) - x(a), 1)}" height="${height}" fill="${color(k)}"/>`).join("");
-  const hours = (to - from) / 3600, step = [1, 2, 3, 4, 6].find((n) => hours / n <= 5) ?? 6;
-  const labels: string[] = [];
-  for (let hr = 0; hr <= hours; hr += step) labels.push(`<span>${clock(from / 60 + hr * 60).replace(":00", "")}</span>`);
-  return `<svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" preserveAspectRatio="none" role="img" aria-label="Timeline"><rect width="${width}" height="${height}" fill="#e6ebe6" rx="4"/>${rects}</svg><div class="axis">${labels.join("")}</div>`;
+  const rects = segs.filter((s) => s.b > from && s.a < to)
+    .map((s) => `<rect data-i="${segs.indexOf(s)}" x="${Math.max(0, x(s.a))}" y="0" width="${Math.max(Math.min(width, x(s.b)) - Math.max(0, x(s.a)), 1)}" height="${height}" fill="${color(s.k)}"/>`).join("");
+  const ticks = timelineTicks(from, to).map(({ t, label }) => `<span style="left:${((t - from) / (to - from)) * 100}%">${label}</span>`).join("");
+  return `<svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" preserveAspectRatio="none" role="img" aria-label="Timeline"><rect width="${width}" height="${height}" fill="#e6ebe6" rx="4"/>${rects}</svg><div class="axis">${ticks}</div>`;
 }
 
 export const REACTIONS = [
@@ -97,8 +111,8 @@ export function ago(ms: number, now = Date.now()): string {
 }
 
 /** The stretch at [frac] (0..1 across the drawn window), or the nearest one within a few percent. */
-export function segAt(segs: Seg[], frac: number): Seg | undefined {
-  const [from, to] = timelineWindow(segs);
+export function segAt(segs: Seg[], frac: number, win: [number, number] = timelineWindow(segs)): Seg | undefined {
+  const [from, to] = win;
   const t = from + frac * (to - from), slack = (to - from) * 0.015;
   return segs.find((s) => t >= s.a && t < s.b)
     ?? segs.filter((s) => t >= s.a - slack && t < s.b + slack).sort((p, q) => Math.min(Math.abs(t - p.a), Math.abs(t - p.b)) - Math.min(Math.abs(t - q.a), Math.abs(t - q.b)))[0];
@@ -109,4 +123,14 @@ export function segDetail(s: Seg): string {
   const level = s.c ?? LEVELS.find((l) => l.short === s.k)?.label ?? "";
   const what = (s.t ?? []).map((x) => `${x.n} ${fmtDuration(x.s)}`).join(", ") || (s.k === "A" ? "away from the computer" : "no app recorded");
   return `${level} · ${clock(Math.floor(s.a / 60))}–${clock(Math.floor(s.b / 60))} · ${fmtDuration(s.b - s.a)} — ${what}`;
+}
+
+/** Dates everywhere read like "Nov 1, 2026" ([weekday]: "Sunday, Nov 1, 2026"). */
+export function fmtDate(d: Date, weekday = false): string {
+  return d.toLocaleDateString("en-US", { ...(weekday ? { weekday: "long" as const } : {}), month: "short", day: "numeric", year: "numeric" });
+}
+
+/** "Nov 1, 2026, 6:50 PM" */
+export function fmtDateTime(ms: number): string {
+  return `${fmtDate(new Date(ms))}, ${new Date(ms).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
 }

@@ -29,6 +29,12 @@ export interface ReportDoc {
 }
 export interface CheckinDoc { evening?: boolean; plan?: string; feeling?: string; helped?: string; hurt?: string; change?: string; note?: string }
 
+/** "2026-11-01" → "Nov 1, 2026" (the date style used everywhere). */
+export function fmtDate(isoDate: string): string {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" });
+}
+
 export function fmtDuration(sec: number): string {
   const m = Math.round(sec / 60);
   return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ""}`;

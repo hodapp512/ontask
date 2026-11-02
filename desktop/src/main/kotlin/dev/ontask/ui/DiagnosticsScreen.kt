@@ -155,7 +155,7 @@ private fun ColumnScope.StatsSection(s: DiagStats, tickSec: Int) {
         KV("Skipped: you were away", "%,d".format(s.skippedIdle))
         KV("Skipped: screen hadn't changed", "%,d".format(s.skippedUnchanged))
         KV("Time per check", "%.1f ms".format(s.avgProcMs))
-        KV("Detailed history since", s.oldestRaw?.let { java.time.Instant.ofEpochSecond(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate().toString() } ?: "—")
+        KV("Detailed history since", s.oldestRaw?.let { java.time.Instant.ofEpochSecond(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate().let(::fmtDate) } ?: "—")
         KV("Storage used", s.dbBytes?.let { "%.1f MB".format(it / 1048576.0) } ?: "in memory")
     }
 }
