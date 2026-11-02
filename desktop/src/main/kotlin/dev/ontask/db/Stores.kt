@@ -110,15 +110,36 @@ class RuleStore(private val db: Db) {
     fun relabelHistory(kind: RuleKind, pattern: String, category: Category): Int = db.use { c ->
         val names = if (kind == RuleKind.APP && pattern == "OnTask") listOf("OnTask", "MainKt", "java") else listOf(pattern.trim())
         val where = when (kind) {
-            RuleKind.DOMAIN -> "domain IN (${names.joinToString(",") { "?" }})"
+            RuleKind.DOMAIN -> "(domain = ? OR domain LIKE ?)"
             RuleKind.APP -> "domain IS NULL AND app IN (${names.joinToString(",") { "?" }})"
             RuleKind.TITLE -> "title LIKE ?"
         }
-        c.prepareStatement("UPDATE ticks SET category=?, level=?, source=? WHERE level != 'AWAY' AND $where").use { ps ->
+        fun bind(ps: java.sql.PreparedStatement, at: Int) = when (kind) {
+            RuleKind.TITLE -> ps.setString(at, "%${pattern.trim()}%")
+            RuleKind.DOMAIN -> { ps.setString(at, pattern.trim()); ps.setString(at + 1, "%." + pattern.trim()) }
+            RuleKind.APP -> names.forEachIndexed { i, n -> ps.setString(at + i, n) }
+        }
+        val n = c.prepareStatement("UPDATE ticks SET category=?, level=?, source=? WHERE level != 'AWAY' AND $where").use { ps ->
             ps.setString(1, category.name); ps.setString(2, category.level.name); ps.setString(3, dev.ontask.Source.USER_LABEL.name)
-            if (kind == RuleKind.TITLE) ps.setString(4, "%${pattern.trim()}%") else names.forEachIndexed { i, n -> ps.setString(4 + i, n) }
+            bind(ps, 4)
             ps.executeUpdate()
         }
+        // Moved into a Varies category: each page becomes its own item, to be judged; moved out: back to the whole site.
+        val rows = c.prepareStatement("SELECT id, domain, title, url FROM ticks WHERE level != 'AWAY' AND $where").use { ps ->
+            bind(ps, 1); ps.executeQuery().use { rs -> buildList { while (rs.next()) add(listOf(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4))) } }
+        }
+        c.prepareStatement("UPDATE ticks SET item=?, item_cat=?, level=? WHERE id=?").use { ps ->
+            rows.forEach { r ->
+                val url = r[3] as String?
+                val feed = category.variable && dev.ontask.classify.Pages.isFeed(url)
+                ps.setString(1, if (category.variable) dev.ontask.classify.Pages.label(r[1] as String?, r[2] as String?, url) else null)
+                ps.setString(2, if (feed) Category.feed.name else null)
+                ps.setString(3, if (feed) Category.feed.level.name else category.level.name)
+                ps.setLong(4, r[0] as Long); ps.addBatch()
+            }
+            ps.executeBatch()
+        }
+        n
     }
 
     fun delete(id: Long) = db.use { c ->

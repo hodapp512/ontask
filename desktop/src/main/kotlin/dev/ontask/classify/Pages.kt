@@ -64,7 +64,8 @@ object Pages {
 
     fun siteName(domain: String?): String? {
         val d = domain?.removePrefix("www.") ?: return null
-        return SITE_NAMES[d] ?: SITE_NAMES.entries.firstOrNull { d.endsWith("." + it.key) }?.value ?: d
+        return SITE_NAMES[d] ?: SITE_NAMES.entries.firstOrNull { d.endsWith("." + it.key) }?.value
+            ?: siteDomain(d).substringBefore('.').replaceFirstChar { it.uppercase() } // en.wikipedia.org → Wikipedia
     }
 
     /** "YouTube: Learning Java": the site and the page's own title, without the site's name repeated in it. */

@@ -40,6 +40,21 @@ class TimelineActivityTest {
 }
 
 class RelabelTest {
+    @Test fun movingASiteToVariesCoversItsSubdomainsAndJudgesEachPage() {
+        val db = dev.ontask.db.Db.memory()
+        val rules = dev.ontask.db.RuleStore(db)
+        db.use { c ->
+            c.createStatement().executeUpdate("""INSERT INTO ticks(start_ts,end_ts,n,seconds,app,domain,title,url,category,level,source,work_time,proc_ms)
+                VALUES (0,60,12,60,'Chrome','en.wikipedia.org','Eric Gill - Wikipedia','https://en.wikipedia.org/wiki/Eric_Gill','WORK_SUPPORT','DEEP','RULE',1,1)""")
+        }
+        assertEquals(1, rules.relabelHistory(dev.ontask.classify.RuleKind.DOMAIN, "wikipedia.org", dev.ontask.Category.VARIABLE))
+        val row = db.use { c -> c.createStatement().executeQuery("SELECT category, level, item, item_cat FROM ticks").use { rs -> rs.next(); listOf(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4)) } }
+        assertEquals(listOf("VARIABLE", "MIXED", "Wikipedia: Eric Gill", null), row) // Unsure until judged
+        // A user rule for the whole site beats the built-in Work adjacent rule for every subdomain.
+        val cls = dev.ontask.classify.Classifier(listOf(dev.ontask.classify.Rule(1, dev.ontask.classify.RuleKind.DOMAIN, "wikipedia.org", dev.ontask.Category.VARIABLE, user = true)))
+        assertEquals(dev.ontask.Category.VARIABLE, cls.classify(Sample(app = "Chrome", url = "https://en.wikipedia.org/wiki/X")).category)
+    }
+
     @Test fun correctingALabelFixesHistory() {
         val db = dev.ontask.db.Db.memory()
         val rules = dev.ontask.db.RuleStore(db)

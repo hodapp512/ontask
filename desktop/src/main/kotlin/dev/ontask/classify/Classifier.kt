@@ -19,6 +19,17 @@ data class Rule(
 /** [level] differs from the category's only for a Variable category with a verdict for this page or video. */
 data class Classification(val category: Category, val source: Source, val ruleId: Long? = null, val level: Level = category.level)
 
+/**
+ * The site a rule should cover: the address without language, mobile or www prefixes, so "en.m.wikipedia.org" and
+ * "de.wikipedia.org" both mean wikipedia.org. Meaningful subdomains stay ("mail.google.com").
+ */
+fun siteDomain(host: String): String {
+    val labels = host.lowercase().removePrefix("www.").split('.').toMutableList()
+    val prefix = Regex("^(www|m|mobile|[a-z]{2}|[a-z]{2}-[a-z]{2,4})$")
+    while (labels.size > 2 && prefix.matches(labels.first())) labels.removeAt(0)
+    return labels.joinToString(".")
+}
+
 fun domainOf(url: String?): String? {
     if (url.isNullOrBlank()) return null
     val host = runCatching { URI(url.trim()).host }.getOrNull() ?: return null

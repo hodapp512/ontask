@@ -231,6 +231,7 @@ class App(val dir: Path = dataDir()) {
 
     fun start() {
         runCatching { migrateCategories() }
+        runCatching { migrateSiteRules() }
         Retention.rollup(db, nowSec(), settings.retentionDays)
         if (!prefs.bool("blocklist.seeded", false)) { blocklist.seedDefault(nowSec()); prefs.set("blocklist.seeded", true) }
         tracker.seedTotals(LocalDate.now(), reports.totals(LocalDate.now()))
@@ -489,8 +490,10 @@ class App(val dir: Path = dataDir()) {
      */
     fun reclassify(name: String, to: Category, from: Category = Category.UNKNOWN) {
         val kind = if ('.' in name && ' ' !in name) dev.ontask.classify.RuleKind.DOMAIN else dev.ontask.classify.RuleKind.APP
-        ruleStore.label(kind, name, to, from, nowSec())
-        ruleStore.relabelHistory(kind, name, to)
+        // A site rule covers the whole site: moving "en.m.wikipedia.org" means all of wikipedia.org.
+        val pattern = if (kind == dev.ontask.classify.RuleKind.DOMAIN) dev.ontask.classify.siteDomain(name) else name
+        ruleStore.label(kind, pattern, to, from, nowSec())
+        ruleStore.relabelHistory(kind, pattern, to)
         reloadRules(); tracker.invalidate()
     }
 
@@ -504,6 +507,16 @@ class App(val dir: Path = dataDir()) {
         categories.renameOldDefaults()
         categories.retiredInUse().forEach { deleteCategory(Category(it, it.lowercase().replaceFirstChar { c -> c.uppercase() }, Level.MIXED)) }
         prefs.set("categories.v2", true)
+    }
+
+    /** Once: site rules saved for a language or mobile address ("en.m.wikipedia.org") are widened to the whole site. */
+    private fun migrateSiteRules() {
+        if (prefs.bool("rules.site_wide", false)) return
+        ruleStore.userRules().filter { it.kind == dev.ontask.classify.RuleKind.DOMAIN && dev.ontask.classify.siteDomain(it.pattern) != it.pattern }.forEach { r ->
+            ruleStore.delete(r.id)
+            if (r.category != Category.UNKNOWN) reclassify(r.pattern, r.category)
+        }
+        prefs.set("rules.site_wide", true)
     }
 
     fun deleteCategory(c: Category) {

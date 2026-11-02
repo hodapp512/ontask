@@ -237,3 +237,13 @@ Format: **Decision** — why. *Rejected:* alternatives, and why not.
   opened.
 - **The timeline zooms:** on the Mac, scroll over it to zoom around the pointer, drag to move, − / + / Reset; on the
   phone, pinch or − / +, drag to move. Down to a 5-minute window; clock ticks go down to 5-minute steps.
+
+## 2026-11-01 · Site rules cover the whole site
+
+- **Moving a site to a category covers the whole site,** not the exact address of the page you had open: language,
+  mobile and www prefixes are dropped ("en.m.wikipedia.org" → wikipedia.org), meaningful subdomains stay
+  ("mail.google.com"). A mobile-page rule had left normal Wikipedia pages on the built-in Work adjacent rule. Existing
+  rules were widened once.
+- **Moving a site into Varies re-sorts its history page by page:** past pages become their own rows (Unsure until
+  judged, feeds straight to time-wasting); moving it out folds them back into the site.
+- **Any site gets a readable name** ("Wikipedia: Eric Gill"), not just the ones OnTask knows.

@@ -84,6 +84,14 @@ class PagesTest {
         assertEquals("substack pragmatic", Pages.sourceKey("https://pragmatic.substack.com/p/on-call"))
     }
 
+    @Test fun siteRulesCoverTheWholeSite() {
+        assertEquals("wikipedia.org", dev.ontask.classify.siteDomain("en.m.wikipedia.org"))
+        assertEquals("wikipedia.org", dev.ontask.classify.siteDomain("de.wikipedia.org"))
+        assertEquals("mail.google.com", dev.ontask.classify.siteDomain("mail.google.com"))
+        assertEquals("bbc.co.uk", dev.ontask.classify.siteDomain("www.bbc.co.uk"))
+        assertEquals("Wikipedia: Eric Gill", Pages.label("en.wikipedia.org", "Eric Gill - Wikipedia", "https://en.wikipedia.org/wiki/Eric_Gill"))
+    }
+
     @Test fun labelsNameTheSiteOnce() {
         assertEquals("YouTube: Learning Java", Pages.label("youtube.com", "Learning Java - YouTube", "https://www.youtube.com/watch?v=x"))
         assertEquals("YouTube: feed", Pages.label("youtube.com", "YouTube", "https://www.youtube.com/"))
