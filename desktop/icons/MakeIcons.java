@@ -7,12 +7,12 @@ import java.io.File;
 
 /**
  * Draws the OnTask logo — a shield (like BlockMe's) bearing a clock's two hands at a right angle, blue to teal with
- * white hands — and writes every icon the apps need. Run from the repo root: java desktop/icons/MakeIcons.java
+ * white hands and hub — and writes every icon the apps need. Run from the repo root: java desktop/icons/MakeIcons.java
  * Then: iconutil -c icns desktop/icons/OnTask.iconset -o desktop/icons/OnTask.icns
  * The menu bar draws the same shapes in TrayGlyph (TrayMenu.kt); keep the two in step.
  */
 public class MakeIcons {
-    static final Color BLUE = new Color(0x2563EB), TEAL = new Color(0x14B8A6), ORANGE = new Color(0xF97316);
+    static final Color BLUE = new Color(0x2563EB), TEAL = new Color(0x14B8A6);
 
     /** The shield outline in a 100×100 box: flat shoulders, straight sides, curving to a point. */
     static Path2D shield(double x, double y, double u) {
@@ -41,7 +41,7 @@ public class MakeIcons {
         hands.moveTo(cx, y + 31 * u); hands.lineTo(cx, cy); hands.lineTo(x + 70 * u, cy);
         g.draw(hands);
         double r = 4.5 * u;
-        g.setColor(ORANGE);
+        g.setColor(Color.WHITE); // the hands' hub, in the hands' color
         g.fill(new java.awt.geom.Ellipse2D.Double(cx - r, cy - r, 2 * r, 2 * r));
     }
 
