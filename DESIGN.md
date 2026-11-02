@@ -136,9 +136,8 @@ nothing under 25 min focused, then 5 min per 25 (at most 10 under an hour, 15 af
 - **Midday check-in** 30 minutes before the midpoint of actual working time (first sit-down → end of work hours); skipped if the day started < ~2h before end of work hours.
   - **Do this later ▾** at the top (10 min / 30 min / 1 h).
   1. **This morning:** one line: focused time, wasted time, longest focused stretch.
-  2. **How's the day going?** *What did you get done?* and *What should you have gotten done?* (free text; the second
-     has *Add to this afternoon's plan*).
-  3. **Today's plan**, editable: "Still the right plan for the afternoon?"
+  2. **How's the day going?** *What did you get done?* and *What should you have gotten done?* (free text).
+  3. **This afternoon's plan** (today's plan, editable): "Still the same as this morning?"
   4. **What's in the way?** Chips (Distracted / low energy, Interruptions/meetings, Unclear what to do, Stuck on a
      problem, Overwhelmed, Other), each with one suggestion (Distracted / low energy: *Start break*, 10 min). Shown
      only after a struggling morning: under 60% focused or 30+ min wasted, and the last hour before lunch (breaks and

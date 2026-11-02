@@ -375,3 +375,5 @@ when it comes to the front.*
   much on my plate" → Overwhelmed; Focus from the card is 30 min, not 50; "Do this later" moved to the top.
 - *Timing:* the midday check-in comes **30 minutes before** the midpoint of the working day (e.g. 12:32 instead of
   1:02 for a 9:05 start and 5 PM end), so it lands before lunch and leaves more afternoon to act on it.
+- *Plan section:* titled "This afternoon's plan", subtitle "Still the same as this morning?"; the "Add to this
+  afternoon's plan" button was removed (not wanted).
