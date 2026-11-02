@@ -89,7 +89,7 @@ class App(val dir: Path = dataDir()) {
 
     val cloud by lazy { dev.ontask.cloud.CloudSync(prefs, events, reports, { settings }, habits, checkins, relabel = { name, cat -> reclassify(name, Category.valueOf(cat)) },
         relabelItem = { key, title, cat -> answerVariable(key, title, Category.valueOf(cat)) },
-        lastActive = { lastActiveTs.takeIf { it > 0 } }, plan = { priorities.forDate(it) }, halves = { dayHalves(it) }, heat = { heatYear() }) }
+        lastActive = { lastActiveTs.takeIf { it > 0 } }, plan = { priorities.forDate(it) }, halves = { dayHalves(it) }, heat = { heatYear() }, settingsSync = settingsSync) }
     /** Last moment you were at the Mac (not Away), for the daily report's "you've wrapped up" rule. */
     @Volatile private var lastActiveTs = 0L
     private var wasAway = false
@@ -494,6 +494,59 @@ class App(val dir: Path = dataDir()) {
         val noon = date.atTime(12, 0).atZone(ZoneId.systemDefault()).toEpochSecond()
         val l = lunchSpan(date)
         return dev.ontask.report.halves(reports.daily(date), l?.first ?: noon, l?.second ?: noon)
+    }
+
+    /**
+     * Settings kept in Firestore and synced both ways: work hours and today's changes, bedtime, the daily-report email,
+     * check-in timing; categories; rules; learned source rules; verdicts. A change from another device is applied
+     * here as if made on this Mac (rules relabel past activity; work hours re-mark today).
+     */
+    private val settingsSync by lazy {
+        val schedule = object : dev.ontask.cloud.SyncedSet {
+            override val name = "schedule"
+            private val js = kotlinx.serialization.json.Json
+            override fun local(): Map<String, kotlinx.serialization.json.JsonElement> = buildMap {
+                put("workWeek", js.encodeToJsonElement(dev.ontask.classify.WorkWeek.serializer(), settings.schedule.week))
+                settings.schedule.exceptions.forEach { (d, r) -> put("exception:$d", js.encodeToJsonElement(kotlinx.serialization.builtins.ListSerializer(dev.ontask.classify.TimeRange.serializer()), r)) }
+                put("bedtimeMin", kotlinx.serialization.json.JsonPrimitive(if (prefs.bool("bedtime.enabled", true)) prefs.int("bedtime.min", dev.ontask.plan.Bedtime.DEFAULT_MIN) else -1))
+                put("reportEmail", kotlinx.serialization.json.JsonPrimitive(prefs.bool("cloud.report_email", true)))
+                put("eveningLeadMin", kotlinx.serialization.json.JsonPrimitive(prefs.int("rhythm.evening_lead_min", 30)))
+                put("midday", kotlinx.serialization.json.JsonPrimitive(prefs.bool("rhythm.midday", true)))
+            }
+            override fun apply(changes: Map<String, kotlinx.serialization.json.JsonElement?>) {
+                changes.forEach { (k, v) ->
+                    when {
+                        k == "workWeek" && v != null -> updateSettings(settings.copy(schedule = settings.schedule.copy(week = js.decodeFromJsonElement(dev.ontask.classify.WorkWeek.serializer(), v))))
+                        k.startsWith("exception:") -> {
+                            val d = LocalDate.parse(k.removePrefix("exception:"))
+                            val r = v?.let { js.decodeFromJsonElement(kotlinx.serialization.builtins.ListSerializer(dev.ontask.classify.TimeRange.serializer()), it) }
+                            settingsStore.saveException(d, r)
+                            settings = settings.copy(schedule = settings.schedule.copy(exceptions = if (r == null) settings.schedule.exceptions - d else settings.schedule.exceptions + (d to r)))
+                        }
+                        k == "bedtimeMin" && v != null -> { val m = v.toString().toInt(); prefs.set("bedtime.enabled", m >= 0); if (m >= 0) prefs.set("bedtime.min", m) }
+                        k == "reportEmail" && v != null -> prefs.set("cloud.report_email", v.toString() == "true")
+                        k == "eveningLeadMin" && v != null -> prefs.set("rhythm.evening_lead_min", v.toString().toInt())
+                        k == "midday" && v != null -> prefs.set("rhythm.midday", v.toString() == "true")
+                    }
+                }
+                runCatching { remarkToday() }
+            }
+        }
+        dev.ontask.cloud.SettingsSync(
+            prefs,
+            listOf(
+                schedule,
+                dev.ontask.cloud.TableSets.categories(db) { categories.load(); tracker.invalidate() },
+                dev.ontask.cloud.TableSets.rules(db) { changed ->
+                    changed.forEach { (kind, pattern, cat) -> cat?.let { Category.registry[it] }?.let { ruleStore.relabelHistory(dev.ontask.classify.RuleKind.valueOf(kind), pattern, it) } }
+                    reloadRules(); tracker.invalidate()
+                },
+                dev.ontask.cloud.TableSets.sourceRules(db),
+            ),
+            dev.ontask.cloud.VerdictSync(db, prefs) { item, title, cat, source, key, ts ->
+                Category.registry[cat]?.let { verdicts.set(item, title, it, runCatching { Source.valueOf(source) }.getOrDefault(Source.USER_LABEL), key, ts) }
+            },
+        ) { prefs.get("cloud.device_id") ?: "mac" }
     }
 
     /** The heat map's 52 weeks and the current streak (days off don't break it). */

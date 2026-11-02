@@ -177,6 +177,18 @@ under 1h, 1–2.5h, 2.5–4h, 4–5.5h, 5.5h+. Hover/tap: "Nov 2, 2026 · 3h 10m
 partner). Summary: "212h focused in the last year · 5-day streak" (streak = days with 2.5h+; days off never break
 it; today doesn't until it's over). The Mac uploads one small `heat/year` document (shared like reports).
 
+### Devices and sync
+- **Each device uploads its own day report** (`deviceReports/{date}_{device}`, titled rows in `deviceReportItems`,
+  heat numbers in `deviceHeat/{device}`) every 2 minutes while in use and at once on stepping away. Cloud Functions
+  merge them into `reports/{date}`, `reportItems/{date}` and `heat/year`, which every view reads (devices can no
+  longer write those directly). Phone stretches carry `d: "phone"` on the timeline.
+- **Settings live in Firestore** and every device keeps a local copy: `sync/schedule` (work week, each day's
+  exception, bedtime, report email, check-in timing), `sync/categories`, `sync/rules`, `sync/sourceRules`, and one
+  document per verdict in `verdicts/`. Each pass does a three-way merge per item (last synced copy vs. here vs. there;
+  each side keeps its own changes, deletions included); changes from elsewhere are applied as if made here (rules
+  relabel history, work-hour changes re-mark today). `schedule/current` is still written by the Mac for the server.
+- Platform notes for Android, iPhone and Windows: `docs/PLATFORMS.md`.
+
 ### Work hours on Home
 The Home subtitle shows today's work hours ("Work hours 9:00 AM–5:00 PM", or "Day off"); clicking it changes them
 for today (or takes the day off; shorter hours need a reason, and the partner is told). Everything reads the current

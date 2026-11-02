@@ -56,6 +56,8 @@ class CloudSync(
     private val halves: (LocalDate) -> Pair<Int?, Int?> = { null to null },
     /** The heat map's year: each day's numbers, and the current streak. */
     private val heat: () -> Pair<Map<LocalDate, dev.ontask.report.DayStat>, Int>? = { null },
+    /** Settings, categories, rules and learned answers, kept in Firestore and synced both ways. */
+    private val settingsSync: SettingsSync? = null,
 ) {
     @Volatile var lastError: String? = null; private set
     @Volatile var lastSyncTs: Long = 0; private set
@@ -109,6 +111,7 @@ class CloudSync(
             // Every 2 minutes (and at once on stepping away), so the merged day stays current everywhere.
             if (force || corrected || nowSec - lastReportTs >= 120) { uploadReport(c, uid, LocalDate.now(zone)); lastReportTs = nowSec }
             if (force || nowSec - lastHeatTs >= 600) { uploadHeat(c, uid); lastHeatTs = nowSec }
+            settingsSync?.run(c, uid)
             uploadScheduleIfChanged(c, uid)
             uploadCheckinFlag(c, uid)
             pullReactions(c, uid)

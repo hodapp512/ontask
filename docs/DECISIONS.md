@@ -401,3 +401,17 @@ when it comes to the front.*
 ## 2026-11-02 · Work hours on Home, editable
 - Today's work hours sit in the Home subtitle and open today's editor on click; changes apply everywhere at once and
   re-mark today's earlier activity, so prompts, totals and reports agree with the new hours.
+
+## 2026-11-02 · Android app, and the cloud as the hub (grilled)
+- **A native Android app** (sideloaded APK, Android 10+) replaces the web app on the user's phone and adds tracking
+  (usage access + an Accessibility service), then prompts; blocking comes in v2 (Accessibility overlay + local DNS
+  VPN, since `/etc/hosts` needs root). Stay Focused keeps blocking meanwhile. The web app stays for partners.
+- **Each device uploads its own day report; the server merges them.** Merging reports (totals, timelines, sites,
+  heat numbers are all additive) is small and needs no device to be on, so a phone-only weekend is reported the same
+  day. *Rejected:* the Mac as the hub (phone days wait for the Mac); merging raw activity on the server (would
+  duplicate the report logic and move raw data off devices).
+- **Settings in Firestore, local copies everywhere, three-way merge per item.** *Rejected:* the Mac owning settings.
+- **Phone judging goes through a Cloud Function to Jev; the Mac keeps Kev** (local, free, works well).
+- Uploads every 2 minutes in use and at once on lock/away, so the merged day is current all day.
+- Breaks and check-ins are shared across devices; the work day still starts at the first sit-down on the Mac.
+- iPhone and Windows explored only (docs/PLATFORMS.md).

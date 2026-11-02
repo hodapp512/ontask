@@ -8,6 +8,8 @@ rules_version = '2';
 //   users/{uid}/heat/year           year heat map scores          (same as reports; written by the server)
 //   users/{uid}/deviceReports/{date_device}, deviceReportItems/{date_device}, deviceHeat/{device}
 //                                   each device's own uploads     (owner; the server merges them)
+//   users/{uid}/sync/{schedule|categories|rules|sourceRules}, verdicts/{hash}
+//                                   settings shared by your devices (owner)
 //   users/{uid}/reportItems/{date}  page and video titles         (owner only; the partner never reads these)
 //   users/{uid}/schedule/current    work hours, habits, times     (owner)
 //   users/{uid}/devices/{id}        linked Macs and phones        (owner; shown in both apps)
@@ -50,6 +52,9 @@ service cloud.firestore {
       match /deviceReports/{id} { allow read, write: if isOwner(uid); }
       match /deviceReportItems/{id} { allow read, write: if isOwner(uid); }
       match /deviceHeat/{id} { allow read, write: if isOwner(uid); }
+      // Settings, categories, rules and learned answers, synced between your devices.
+      match /sync/{doc} { allow read, write: if isOwner(uid); }
+      match /verdicts/{id} { allow read, write: if isOwner(uid); }
       // The year heat map (per-day scores only): shared like the daily report.
       match /heat/{doc} {
         allow write: if false; // merged by the server from deviceHeat
