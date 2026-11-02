@@ -132,16 +132,16 @@ export function reportBody(r: DocumentData, edit?: { uid: string; categories: Ca
   const tl = timelineEl((r.timeline ?? []) as Seg[]);
   const sessions = (r.deepSessions ?? []).length;
   return h("div", { class: "stack" },
-    h("p", { class: "big" }, share !== null ? `${share}% focused` : `${fmtDuration(totals.DEEP ?? 0)} focused`),
+    h("div", { class: "row between" },
+      h("p", { class: "big" }, share !== null ? `${share}% focused` : `${fmtDuration(totals.DEEP ?? 0)} focused`),
+      h("p", { class: "screen-time" }, h("span", { class: "muted small" }, "Screen time"), h("strong", {}, fmtDuration((totals.DEEP ?? 0) + (totals.MIXED ?? 0) + (totals.WASTED ?? 0))))),
     bar,
     h("div", { class: "legend" }, LEVELS.map((l) => h("span", {}, h("span", { class: "dot", style: `background:${l.color}` }), `${l.label} ${fmtDuration(totals[l.key] ?? 0)}`))),
     tl,
-    h("p", { class: "muted small" }, `${sessions} focused session${sessions === 1 ? "" : "s"} · ${r.distractionEvents ?? 0} distraction${r.distractionEvents === 1 ? "" : "s"}`),
     sessions > 0 && h("details", {}, h("summary", {}, "Longest focused sessions"),
       ([...(r.deepSessions ?? [])] as { a: number; b: number }[]).sort((x, y) => (y.b - y.a) - (x.b - x.a)).slice(0, 5)
         .map((s) => h("p", { class: "row between" }, h("span", {}, `${clock(Math.floor(s.a / 60))}–${clock(Math.floor(s.b / 60))}`), h("span", { class: "muted" }, fmtDuration(s.b - s.a))))),
     (r.topSites ?? []).length > 0 && h("details", {}, h("summary", {}, "Where the time went"),
-      edit?.categories.length ? h("p", { class: "muted small" }, "Labeled wrong? Pick the right category — your Mac updates within a minute.") : null,
       (r.topSites as any[]).slice(0, 8).map((s) => siteRow(s, edit))),
   );
 }
@@ -279,7 +279,7 @@ async function personCard(u: User, linkId: string, l: DocumentData): Promise<HTM
  * drag keeps working while the bar inside is redrawn.
  */
 export function timelineEl(segs: Seg[]): HTMLElement {
-  const detail = h("p", { class: "muted small tl-detail" }, segs.length ? "Tap to see what you did · pinch to zoom" : "");
+  const detail = h("p", { class: "muted small tl-detail" });
   const base = timelineWindow(segs);
   let win: [number, number] = [base[0], base[1]];
   let selected: Seg | undefined;

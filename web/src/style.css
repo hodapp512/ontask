@@ -40,3 +40,5 @@ a { color:var(--primary); }
 .tl { touch-action:pan-y; user-select:none; -webkit-user-select:none; cursor:pointer; } .tl svg { display:block; border-radius:6px; } .tl rect.dim { opacity:.45; } .tl-detail { min-height:2.6em; overflow-wrap:anywhere; margin-top:4px; }
 .site { display:flex; flex-direction:column; gap:4px; padding:6px 0; border-top:1px solid var(--line); }
 select.cat { width:auto; padding:4px 8px; font-size:14px; }
+
+.screen-time { display:flex; flex-direction:column; align-items:flex-end; margin:0; } .screen-time strong { font-size:20px; }

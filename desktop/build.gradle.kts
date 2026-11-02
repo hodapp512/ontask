@@ -92,6 +92,8 @@ compose.desktop {
         // Resource budget: keep the heap small.
         jvmArgs += listOf(
             "-Xmx192m", "--enable-native-access=ALL-UNNAMED", "-Xss512k", "-XX:+UseSerialGC", "-XX:TieredStopAtLevel=1", "-XX:MaxMetaspaceSize=128m",
+            // Trackpad pinch (Apple's gesture events) for zooming the timeline; see ui/Pinch.kt.
+            "--add-exports=java.desktop/com.apple.eawt.event=ALL-UNNAMED",
         )
         nativeDistributions {
             targetFormats(TargetFormat.Dmg)

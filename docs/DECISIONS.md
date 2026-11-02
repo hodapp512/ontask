@@ -264,3 +264,12 @@ when it comes to the front.*
   did · pinch to zoom".
 - **Icon links carry a version (`?v=3`), and the manifest isn't cached,** so phones fetch a new logo instead of
   showing a cached one after it changes. Bump the version whenever the icons change.
+
+## 2026-11-01 · Home trims
+
+- **Screen time on Home** (Mac and phone): focused + mixed + wasted, i.e. everything but Away, next to "% focused".
+- **Removed:** the "N focused sessions · N distractions · most wasted around…" line (not useful; Longest focused
+  sessions stays), the timeline hints ("Tap to see…", "Hover to see…"), and "Labeled wrong? Change it here" above
+  Where the time went: the dropdowns show it's editable.
+- **Trackpad pinch zooms the Mac timeline,** through Apple's gesture events (com.apple.eawt.event, opened with
+  --add-exports; Compose doesn't deliver pinches). Pinches go to the timeline under the pointer; elsewhere nothing.

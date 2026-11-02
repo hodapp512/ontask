@@ -147,10 +147,17 @@ fun SummaryCard(r: DailyReport, title: String, app: App? = null, onRelabel: () -
             Text("Nothing tracked for this day. OnTask records automatically while it's running.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             return@PlainCard
         }
-        Text(
-            if (denom >= 600) "${(r.totalsAll[Level.DEEP] ?: 0) * 100 / denom}% focused" else "${fmtDuration(r.totalsAll[Level.DEEP] ?: 0)} focused",
-            style = MaterialTheme.typography.headlineMedium,
-        )
+        // Screen time = everything but Away (focused + mixed + wasted).
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+            Text(
+                if (denom >= 600) "${(r.totalsAll[Level.DEEP] ?: 0) * 100 / denom}% focused" else "${fmtDuration(r.totalsAll[Level.DEEP] ?: 0)} focused",
+                Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium,
+            )
+            Column(horizontalAlignment = Alignment.End) {
+                Text("Screen time", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(fmtDuration(denom), style = MaterialTheme.typography.titleLarge)
+            }
+        }
         Row(Modifier.fillMaxWidth().height(12.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))) {
             Level.entries.forEach { l -> val v = r.totalsAll[l] ?: 0; if (v > 0) androidx.compose.foundation.layout.Box(Modifier.weight(v.toFloat()).fillMaxHeight().background(levelColor(l))) }
         }
@@ -163,18 +170,10 @@ fun SummaryCard(r: DailyReport, title: String, app: App? = null, onRelabel: () -
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Timeline(r)
-        Text(
-            "${r.deepSessions.size} focused session${if (r.deepSessions.size == 1) "" else "s"} (25+ min)" +
-                (r.deepSessions.maxOfOrNull { it.seconds }?.let { " (longest ${fmtDuration(it)})" } ?: "") +
-                " · ${r.distractionEvents} distraction${if (r.distractionEvents == 1) "" else "s"}" +
-                (r.worstHour?.let { " · most wasted around ${LocalTime.of(Instant.ofEpochSecond(r.dayStart + it.first * 3600L).atZone(ZoneId.systemDefault()).hour, 0).format(DateTimeFormatter.ofPattern("h a"))}" } ?: ""),
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         if (r.deepSessions.isNotEmpty()) Expander("Longest focused sessions") {
             r.deepSessions.sortedByDescending { it.seconds }.take(5).forEach { Text("${clockRange(it.start, it.end)}  ·  ${fmtDuration(it.seconds)}") }
         }
         if (r.topSubjects.isNotEmpty()) Expander("Where the time went") {
-            if (app != null) Text("Labeled wrong? Change it here — OnTask remembers and fixes past days too.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             r.topSubjects.forEachIndexed { i, s ->
                 if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -208,7 +207,9 @@ private fun Timeline(r: DailyReport) {
     var width by remember { mutableStateOf(1) }
     var hover by remember(r) { mutableStateOf<Pair<Run, Float>?>(null) }
     var dragX by remember { mutableStateOf<Float?>(null) }
+    // Both read the current view (not the values from the last redraw): a pinch delivers many steps in a row.
     fun zoom(factor: Double, atFrac: Double = 0.5) {
+        val (from, to) = view; val span = to - from
         val newSpan = (span * factor).coerceIn(MIN_SPAN_SEC, 86_400.0)
         val anchor = from + span * atFrac
         var a = anchor - newSpan * atFrac
@@ -216,6 +217,7 @@ private fun Timeline(r: DailyReport) {
         view = a to a + newSpan
     }
     fun pan(dx: Float) {
+        val (from, to) = view; val span = to - from
         val shift = -dx / width * span
         val a = (from + shift).coerceIn(0.0, 86_400.0 - span)
         view = a to a + span
@@ -232,11 +234,14 @@ private fun Timeline(r: DailyReport) {
                     .onSizeChanged { width = it.width.coerceAtLeast(1) }
                     .onPointerEvent(PointerEventType.Move) { e ->
                         val x = e.changes.first().position.x
+                        // A trackpad pinch zooms around the pointer.
+                        Pinch.target = { f -> zoom(f, (x / width).toDouble().coerceIn(0.0, 1.0)) }
                         dragX?.let { pan(x - it); dragX = x; hover = null } ?: run { hover = runAt(x)?.let { it to x } }
                     }
                     .onPointerEvent(PointerEventType.Press) { e -> dragX = e.changes.first().position.x }
                     .onPointerEvent(PointerEventType.Release) { dragX = null }
-                    .onPointerEvent(PointerEventType.Exit) { hover = null; dragX = null }
+                    .onPointerEvent(PointerEventType.Enter) { e -> val x = e.changes.first().position.x; Pinch.target = { f -> zoom(f, (x / width).toDouble().coerceIn(0.0, 1.0)) } }
+                    .onPointerEvent(PointerEventType.Exit) { hover = null; dragX = null; Pinch.target = null }
                     .onPointerEvent(PointerEventType.Scroll) { e ->
                         val c = e.changes.first()
                         val d = c.scrollDelta
@@ -280,7 +285,7 @@ private fun Timeline(r: DailyReport) {
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Hover to see what you did · scroll to zoom, drag to move", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
             TextButton({ zoom(1.5) }, enabled = span < 86_400.0) { Text("−") }
             TextButton({ zoom(1 / 1.5) }, enabled = span > MIN_SPAN_SEC) { Text("+") }
             if (from != from0.toDouble() || to != to0.toDouble()) TextButton({ view = from0.toDouble() to to0.toDouble() }) { Text("Reset") }

@@ -70,6 +70,7 @@ fun main() {
             Window(onCloseRequest = { visible = false }, state = windowState, title = "OnTask", icon = androidx.compose.ui.res.painterResource("icon.png")) {
                 val raises by Nav.raises.collectAsState()
                 // Without a Dock icon macOS doesn't activate OnTask by itself, so bring it forward explicitly.
+                LaunchedEffect(Unit) { dev.ontask.ui.Pinch.install(window.rootPane) }
                 LaunchedEffect(raises) {
                     runCatching { java.awt.Desktop.getDesktop().requestForeground(true) }
                     window.toFront(); window.requestFocus()
