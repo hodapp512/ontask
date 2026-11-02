@@ -148,7 +148,7 @@ export function reportBody(r: DocumentData, edit?: { uid: string; categories: Ca
 
 function siteRow(s: { name: string; category?: string; categoryId?: string; seconds: number; itemKey?: string; title?: string }, edit?: { uid: string; categories: Cat[] }): HTMLElement {
   if (!edit?.categories.length) return h("div", { class: "site" },
-    h("div", { class: "row between" }, h("span", {}, s.name), h("span", { class: "muted" }, fmtDuration(s.seconds))),
+    h("div", { class: "site-line" }, h("span", { class: "site-name" }, s.name), h("span", { class: "muted" }, fmtDuration(s.seconds))),
     s.category && h("span", { class: "muted small" }, s.category));
   const note = h("span", { class: "muted small" });
   // A page or video gets one of your categories; "Varies" is for whole sites.
@@ -162,7 +162,7 @@ function siteRow(s: { name: string; category?: string; categoryId?: string; seco
     },
   }, options.map((c) => h("option", { value: c.id, selected: c.id === s.categoryId }, c.label)),
     !options.some((c) => c.id === s.categoryId) && h("option", { value: "", selected: true, disabled: true }, s.category ?? "Unclassified")) as HTMLSelectElement;
-  return h("div", { class: "site" }, h("div", { class: "row between" }, h("span", {}, s.name), h("span", { class: "muted" }, fmtDuration(s.seconds))), h("div", { class: "row" }, sel, note));
+  return h("div", { class: "site" }, h("div", { class: "site-line" }, h("span", { class: "site-name" }, s.name), h("span", { class: "muted" }, fmtDuration(s.seconds))), h("div", { class: "row" }, sel, note));
 }
 
 function scheduleCard(s: DocumentData | undefined, eveningDone: boolean): HTMLElement | null {
