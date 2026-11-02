@@ -370,3 +370,6 @@ when it comes to the front.*
 - **The card ends with "Done: start 50 min Focus"** so the afternoon starts from the check-in.
 - The partner sees the midday answers in the daily report; no separate message.
 - *Rejected:* an afternoon commitment line checked in the evening (not now); "Lunch first" on the card.
+- *Revised after first use (same day):* the card was too long. Plan-line checkboxes → free text; the morning summary
+  is one line (focused, wasted, longest stretch; no timeline, no top apps); Distracted and Low energy merged; "Too
+  much on my plate" → Overwhelmed; Focus from the card is 30 min, not 50; "Do this later" moved to the top.

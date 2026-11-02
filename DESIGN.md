@@ -134,18 +134,18 @@ nothing under 25 min focused, then 5 min per 25 (at most 10 under an hour, 15 af
 - **Today's plan** on arrival: one free-form note at the top of Home, starting empty (yesterday's "change for
   tomorrow" is shown as a hint).
 - **Midday check-in** at the midpoint of actual working time; skipped if the day started < ~2h before end of work hours.
-  1. **This morning:** focused time and %, wasted time, longest focused stretch, where most time went, and the
-     morning's timeline bar (from first sit-down to lunch, or to now).
-  2. **What did you get done?** Plan lines as checkboxes (ticked lines get a ✓ in the plan, also on Home) + anything else.
-  3. **What should you have gotten done?** Free text; *Add to this afternoon's plan* puts it at the top of the plan.
-  4. **Today's plan**, editable: "Still the right plan for the afternoon?"
-  5. **What's in the way?** Chips (Distracted / Interruptions/meetings / Low energy / Unclear what to do / Stuck on a
-     problem / Too much on my plate / Other), each with one suggestion (Low energy: *Start break*, a 10-min break).
-     Shown only after a struggling morning: under 60% focused or 30+ min wasted, and the last hour before lunch (breaks
-     and away left out) no better than the morning; otherwise a *Something in the way?* link.
-  6. **Done: start 50 min Focus** / *Done* / *Later ▾* (10 min / 30 min / 1 h).
-- **Every pop-up stays on top of other windows.** Check-ins can be put off twice a day each (Later, or closing the
-  window = 10 min); after that the window stays until answered.
+  - **Do this later ▾** at the top (10 min / 30 min / 1 h).
+  1. **This morning:** one line: focused time, wasted time, longest focused stretch.
+  2. **How's the day going?** *What did you get done?* and *What should you have gotten done?* (free text; the second
+     has *Add to this afternoon's plan*).
+  3. **Today's plan**, editable: "Still the right plan for the afternoon?"
+  4. **What's in the way?** Chips (Distracted / low energy, Interruptions/meetings, Unclear what to do, Stuck on a
+     problem, Overwhelmed, Other), each with one suggestion (Distracted / low energy: *Start break*, 10 min). Shown
+     only after a struggling morning: under 60% focused or 30+ min wasted, and the last hour before lunch (breaks and
+     away left out) no better than the morning; otherwise a *Something in the way?* link.
+  5. **Done: start 30 min Focus** / *Done*.
+- **Every pop-up stays on top of other windows.** Check-ins can be put off twice a day each (Do this later, or closing
+  the window = 10 min); after that the window stays until answered.
 - The daily report gets "Morning 64% focused · Afternoon 48%" (split at lunch, or noon) and the midday answers.
 - **Morning check** (work days, with Today's plan): "Working 9:00–5:00 today?" Yes / start later or finish early / day off.
 - **Evening check-in + reflection** (one prompt) **30 minutes before work hours end** (15–60, in Settings):
