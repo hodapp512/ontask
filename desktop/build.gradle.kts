@@ -22,7 +22,12 @@ dependencies {
     testImplementation(kotlin("test"))
 }
 
-tasks.test { useJUnitPlatform() }
+tasks.test {
+    useJUnitPlatform()
+    // Tests render screens off-screen; headless keeps the test JVM ("GradleWorkerMain") from taking the front on macOS
+    // (OnTask would otherwise track it as an app you used).
+    systemProperty("java.awt.headless", "true")
+}
 tasks.processResources { filesMatching("version.properties") { expand("version" to project.version) } }
 
 // The Swift helper is built before `run` so the app can launch it.

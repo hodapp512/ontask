@@ -24,6 +24,9 @@ data class DailyReport(
     val topSubjects: List<Subject>,
 )
 
+/** Rows shorter than this are left out of "Where the time went" (they still count in the totals). */
+const val MIN_SUBJECT_SEC = 10L
+
 /** All report numbers are computed on demand from SQL; nothing is cached. */
 class Reports(private val db: Db, private val zone: ZoneId = ZoneId.systemDefault()) {
 
@@ -93,6 +96,7 @@ class Reports(private val db: Db, private val zone: ZoneId = ZoneId.systemDefaul
             }
             // Names that display the same (e.g. "MainKt" and "OnTask") become one row.
             val merged = subjects.groupBy { it.name to it.category }.map { (k, v) -> Subject(k.first, k.second, v.sumOf { it.seconds }, v.firstNotNullOfOrNull { it.itemKey }, v.firstNotNullOfOrNull { it.title }) }
+                .filter { it.seconds >= MIN_SUBJECT_SEC } // a glance at something isn't where the time went
                 .sortedByDescending { it.seconds }.take(20)
             subjects.clear(); subjects.addAll(merged)
 

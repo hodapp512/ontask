@@ -52,8 +52,15 @@ class Tracker(
         totalsDay = day; totals.clear(); totals.putAll(seeded)
     }
 
+    /** What was in front before a background Java tool briefly took over (see [JAVA_TOOLS]). */
+    private var lastReal: Sample? = null
+
     @Synchronized
-    fun onSample(s: Sample, nowSec: Long, procMs: Long): Segment {
+    fun onSample(sample: Sample, nowSec: Long, procMs: Long): Segment {
+        // A build's test runner or a Java script can grab the front for a moment; that time counts toward what you had
+        // open before, instead of showing up as "GradleWorkerMain" in Where the time went.
+        val tool = sample.bundleId == "net.java.openjdk.java" && sample.app in JAVA_TOOLS
+        val s = if (tool) lastReal?.let { sample.copy(app = it.app, bundleId = it.bundleId, title = it.title, url = it.url) } ?: sample else sample.also { lastReal = it }
         val st = settings()
         val cls = classifier()
         val away = isAway(s, st.awayAfterSec)
@@ -141,3 +148,6 @@ class Tracker(
     @Synchronized
     fun currentSegment(): Segment? = open
 }
+
+/** Java processes that aren't apps you use: Gradle's test runner and daemon, the single-file source launcher. */
+val JAVA_TOOLS = setOf("GradleWorkerMain", "GradleDaemon", "GradleMain", "SourceLauncher", "JavaLauncher")

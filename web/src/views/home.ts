@@ -4,7 +4,7 @@ import { httpsCallable } from "firebase/functions";
 import QRCode from "qrcode";
 import { db, fns } from "../firebase";
 import { h } from "../dom";
-import { LEVELS, REACTIONS, ago, clock, fmtDate, deepShare, firstName, fmtDuration, greeting, segAt, segDetail, timelineSvg, timelineWindow, todayKey, type LevelKey, type Seg } from "../format";
+import { LEVELS, REACTIONS, ago, clock, clockAt, fmtDate, type DayClock, deepShare, firstName, fmtDuration, greeting, segAt, segDetail, timelineSvg, timelineWindow, todayKey, type LevelKey, type Seg } from "../format";
 import { enablePush, pushState } from "../session";
 
 type Cleanup = () => void;
@@ -131,7 +131,8 @@ export function reportBody(r: DocumentData, edit?: { uid: string; categories: Ca
   const sum = shown.reduce((a, l) => a + (totals[l.key] ?? 0), 0) || 1;
   const share = deepShare(totals);
   const bar = h("div", { class: "bar" }); bar.innerHTML = shown.map((l) => `<div style="width:${((totals[l.key] ?? 0) / sum) * 100}%;background:${l.color}"></div>`).join("");
-  const tl = timelineEl((r.timeline ?? []) as Seg[]);
+  const day: DayClock | undefined = typeof r.dayStart === "number" && r.tz ? { start: r.dayStart, tz: r.tz } : undefined;
+  const tl = timelineEl((r.timeline ?? []) as Seg[], day);
   const sessions = (r.deepSessions ?? []).length;
   return h("div", { class: "stack" },
     h("div", { class: "row between" },
@@ -142,7 +143,7 @@ export function reportBody(r: DocumentData, edit?: { uid: string; categories: Ca
     tl,
     sessions > 0 && h("details", {}, h("summary", {}, "Longest focused sessions"),
       ([...(r.deepSessions ?? [])] as { a: number; b: number }[]).sort((x, y) => (y.b - y.a) - (x.b - x.a)).slice(0, 5)
-        .map((s) => h("p", { class: "row between" }, h("span", {}, `${clock(Math.floor(s.a / 60))}–${clock(Math.floor(s.b / 60))}`), h("span", { class: "muted" }, fmtDuration(s.b - s.a))))),
+        .map((s) => h("p", { class: "row between" }, h("span", {}, `${clockAt(s.a, day)}–${clockAt(s.b, day)}`), h("span", { class: "muted" }, fmtDuration(s.b - s.a))))),
     (r.topSites ?? []).length > 0 && h("details", {}, h("summary", {}, "Where the time went"),
       (r.topSites as any[]).slice(0, 8).map((s) => siteRow(s, edit))),
   );
@@ -280,7 +281,7 @@ async function personCard(u: User, linkId: string, l: DocumentData): Promise<HTM
  * stretches, drag to move along the day. Gestures are tracked on the container, which is never redrawn, so a pinch or
  * drag keeps working while the bar inside is redrawn.
  */
-export function timelineEl(segs: Seg[]): HTMLElement {
+export function timelineEl(segs: Seg[], day?: DayClock): HTMLElement {
   const detail = h("p", { class: "muted small tl-detail" });
   const base = timelineWindow(segs);
   let win: [number, number] = [base[0], base[1]];
@@ -290,7 +291,7 @@ export function timelineEl(segs: Seg[]): HTMLElement {
   let frame = 0;
   const draw = () => {
     frame = 0;
-    box.innerHTML = timelineSvg(segs, 320, 40, win);
+    box.innerHTML = timelineSvg(segs, 320, 40, win, day);
     if (selected) box.querySelectorAll("rect[data-i]").forEach((el) => el.classList.toggle("dim", el.getAttribute("data-i") !== String(segs.indexOf(selected!))));
     reset.hidden = win[0] === base[0] && win[1] === base[1];
   };
@@ -304,7 +305,7 @@ export function timelineEl(segs: Seg[]): HTMLElement {
   const fracAt = (x: number) => { const r = bar(); return Math.min(1, Math.max(0, (x - r.left) / (r.width || 1))); };
   const pick = (x: number) => {
     selected = segAt(segs, fracAt(x), win);
-    if (selected) detail.textContent = segDetail(selected);
+    if (selected) detail.textContent = segDetail(selected, day);
     redraw();
   };
 

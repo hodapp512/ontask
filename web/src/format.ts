@@ -46,29 +46,38 @@ export function timelineWindow(segs: Seg[]): [number, number] {
   return [from, to];
 }
 
+/** When the day started (epoch seconds) and in which time zone, so offsets can be shown as real clock times. */
+export type DayClock = { start: number; tz: string };
+
+/** "2:45 PM" for [t] seconds into the day: the real clock time when [day] is known, else midnight + t. */
+export function clockAt(t: number, day?: DayClock): string {
+  if (!day) return clock(Math.floor(t / 60));
+  return new Date((day.start + t) * 1000).toLocaleTimeString("en-US", { timeZone: day.tz, hour: "numeric", minute: "2-digit" });
+}
+
 /**
  * Clock ticks for a window (seconds after midnight): the smallest step from 5 minutes to 6 hours that gives at most
  * five ticks, each at a round time ("10 AM", "10:15").
  */
-export function timelineTicks(from: number, to: number): { t: number; label: string }[] {
+export function timelineTicks(from: number, to: number, day?: DayClock): { t: number; label: string }[] {
   const step = [5, 10, 15, 30, 60, 120, 180, 240, 360].map((m) => m * 60).find((s) => (to - from) / s <= 5) ?? 21600;
   const out: { t: number; label: string }[] = [];
   for (let t = Math.ceil(from / step) * step; t <= to; t += step) {
-    const c = clock(Math.floor(t / 60));
-    out.push({ t, label: t % 3600 === 0 ? c.replace(":00", "") : c.replace(/ [AP]M$/, "") });
+    const c = clockAt(t, day);
+    out.push({ t, label: c.includes(":00 ") ? c.replace(":00", "") : c.replace(/ [AP]M$/, "") });
   }
   return out;
 }
 
 /** The timeline as SVG plus clock ticks; [win] zooms to part of the day (default: the active part). */
-export function timelineSvg(segs: Seg[], width = 320, height = 22, win: [number, number] = timelineWindow(segs)): string {
+export function timelineSvg(segs: Seg[], width = 320, height = 22, win: [number, number] = timelineWindow(segs), day?: DayClock): string {
   const color = (k: string) => LEVELS.find((l) => l.short === k)?.color ?? "#ccc";
   const [from, to] = win;
   const x = (t: number) => ((t - from) / (to - from)) * width;
   const rects = segs.filter((s) => s.b > from && s.a < to)
     .map((s) => `<rect data-i="${segs.indexOf(s)}" x="${Math.max(0, x(s.a))}" y="0" width="${Math.max(Math.min(width, x(s.b)) - Math.max(0, x(s.a)), 1)}" height="${height}" fill="${color(s.k)}"/>`).join("");
   // Labels near the edges hang inward so they stay on screen.
-  const ticks = timelineTicks(from, to).map(({ t, label }) => {
+  const ticks = timelineTicks(from, to, day).map(({ t, label }) => {
     const p = ((t - from) / (to - from)) * 100;
     return `<span style="left:${p}%;transform:translateX(${p < 8 ? 0 : p > 92 ? -100 : -50}%)">${label}</span>`;
   }).join("");
@@ -123,10 +132,10 @@ export function segAt(segs: Seg[], frac: number, win: [number, number] = timelin
 }
 
 /** "Entertainment / News / Social · 2:10 PM–2:40 PM · 30m — youtube.com – Funny Cat Video 25m". */
-export function segDetail(s: Seg): string {
+export function segDetail(s: Seg, day?: DayClock): string {
   const level = s.c ?? LEVELS.find((l) => l.short === s.k)?.label ?? "";
   const what = (s.t ?? []).map((x) => `${x.n} ${fmtDuration(x.s)}`).join(", ") || (s.k === "A" ? "away from the computer" : "no app recorded");
-  return `${level} · ${clock(Math.floor(s.a / 60))}–${clock(Math.floor(s.b / 60))} · ${fmtDuration(s.b - s.a)} — ${what}`;
+  return `${level} · ${clockAt(s.a, day)}–${clockAt(s.b, day)} · ${fmtDuration(s.b - s.a)} — ${what}`;
 }
 
 /** Dates everywhere read like "Nov 1, 2026" ([weekday]: "Sunday, Nov 1, 2026"). */

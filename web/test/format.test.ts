@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deepShare, fmtDuration, timelineSvg, todayKey, ago, firstName, greeting, timelineWindow, segAt, segDetail, timelineTicks, fmtDate } from "../src/format";
+import { deepShare, fmtDuration, timelineSvg, todayKey, ago, firstName, greeting, timelineWindow, segAt, segDetail, timelineTicks, fmtDate, clockAt } from "../src/format";
 
 describe("format", () => {
   it("formats durations", () => { expect(fmtDuration(45)).toBe("45s"); expect(fmtDuration(300)).toBe("5m"); expect(fmtDuration(5400)).toBe("1h 30m"); });
@@ -35,6 +35,10 @@ describe("timeline zoom", () => {
     expect(timelineWindow([])).toEqual([0, 86400]);
     expect(timelineTicks(14 * 3600 + 42 * 60, 15 * 3600 + 5 * 60).map((t) => t.label)).toEqual(["2:45", "2:50", "2:55", "3 PM", "3:05"]);
     expect(fmtDate(new Date(2026, 10, 1))).toBe("Nov 1, 2026");
+    // Nov 1, 2026 in Chicago has 25 hours (clocks fell back): 22 h after midnight is 9 PM, not 10 PM.
+    const day = { start: Date.UTC(2026, 10, 1, 5) / 1000, tz: "America/Chicago" };
+    expect(clockAt(22 * 3600, day)).toBe("9:00 PM");
+    expect(timelineTicks(21 * 3600, 23 * 3600, day).map((t) => t.label)).toEqual(["8 PM", "8:30", "9 PM", "9:30", "10 PM"]);
     // Away overnight and a 2-minute wake at 3 AM don't stretch the day back to midnight.
     expect(timelineWindow([{ a: 0, b: 2 * 3600 + 360, k: "A" }, { a: 3 * 3600, b: 3 * 3600 + 120, k: "M" }, { a: 8 * 3600 + 600, b: 12 * 3600, k: "D" }])).toEqual([8 * 3600, 12 * 3600]);
     expect(timelineWindow([{ a: 8 * 3600 + 600, b: 12 * 3600, k: "D" }, { a: 13 * 3600, b: 16 * 3600 + 60, k: "W" }])).toEqual([8 * 3600, 17 * 3600]);

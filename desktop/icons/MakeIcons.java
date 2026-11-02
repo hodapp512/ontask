@@ -78,6 +78,7 @@ public class MakeIcons {
     }
 
     public static void main(String[] args) throws Exception {
+        System.setProperty("java.awt.headless", "true"); // draw off-screen; don't appear as an app ("SourceLauncher")
         File set = new File("desktop/icons/OnTask.iconset"); set.mkdirs();
         for (int base : new int[]{16, 32, 128, 256, 512}) {
             ImageIO.write(macIcon(base), "png", new File(set, "icon_" + base + "x" + base + ".png"));

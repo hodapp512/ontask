@@ -285,3 +285,14 @@ when it comes to the front.*
 - **Clock times are computed as clock times on that date,** not "midnight + minutes": on the day clocks fall back
   (Nov 1, 2026) the latter was an hour off, which showed "105 minutes past bedtime" at 10:15 PM for a 9:30 bedtime
   and would have shifted the evening check-in, the next work start and the timeline's clock labels.
+
+## 2026-11-01 · Build tools in Where the time went; short rows; phone clock times
+
+- **"GradleWorkerMain" and "SourceLauncher" were OnTask's own builds**, not the user's activity: the test runner and
+  the logo script briefly took the front on macOS. Tests and the logo script now run headless, the tracker counts any
+  such Java tool's moment in front toward what was open before, and the existing entries (8½ minutes over three days)
+  were removed.
+- **Where the time went leaves out rows under 10 seconds** (a glance isn't where the time went); they still count in
+  the totals.
+- **The phone shows real clock times** for the timeline, its hover text and focused sessions: the report now carries
+  the day's start and time zone, so clock-change days and partners in other time zones read right.

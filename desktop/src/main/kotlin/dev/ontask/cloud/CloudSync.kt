@@ -260,6 +260,9 @@ class CloudSync(
 
     fun reportPayload(r: DailyReport, nowMs: Long, titles: Boolean = false): JsonObject = buildJsonObject {
         put("date", r.date.toString())
+        // Timeline times are seconds after the day's start; with these the phone shows real clock times (right on
+        // daylight-saving days, and for a partner in another time zone).
+        put("dayStart", r.dayStart); put("tz", zone.id)
         put("totals", buildJsonObject { Level.entries.forEach { put(it.name, r.totalsAll[it] ?: 0) } })
         put("workTotals", buildJsonObject { Level.entries.forEach { put(it.name, r.totalsWork[it] ?: 0) } })
         put("timeline", buildJsonArray {
