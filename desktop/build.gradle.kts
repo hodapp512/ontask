@@ -12,6 +12,9 @@ group = "dev.ontask"
 version = (findProperty("appVersion") as String?) ?: "0.1.0"
 
 
+// Classifier, categories, page rules and the heat score, shared with the Android app.
+kotlin.sourceSets.named("main") { kotlin.srcDir("../shared/src/main/kotlin") }
+
 dependencies {
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)

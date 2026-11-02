@@ -41,6 +41,8 @@ android {
         debug { signingConfig = signingConfigs.getByName("release") }
     }
     buildFeatures { compose = true }
+    // Classifier, categories, page rules and the heat score, shared with the Mac app.
+    sourceSets.getByName("main").kotlin.directories += "../../shared/src/main/kotlin"
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
 }
 

@@ -179,19 +179,3 @@ class Verdicts(private val db: Db) {
     @Synchronized
     fun clear(item: String) { cache.remove(item); db.use { c -> c.prepareStatement("DELETE FROM verdicts WHERE item=?").use { it.setString(1, item); it.executeUpdate() } } }
 }
-
-/**
- * Identifies one page or video: for YouTube the video id, otherwise the address without query or fragment, or the
- * app and window title when there's no address.
- */
-fun itemKey(app: String?, title: String?, url: String?): String {
-    if (!url.isNullOrBlank()) runCatching {
-        val u = URI(url.trim())
-        val host = u.host?.lowercase()?.removePrefix("www.")?.removePrefix("m.") ?: return@runCatching
-        val v = u.rawQuery?.split('&')?.firstOrNull { it.startsWith("v=") }?.removePrefix("v=")
-        if (host.endsWith("youtube.com") && v != null) return "youtube.com/watch?v=$v"
-        if (host == "youtu.be") return "youtube.com/watch?v=" + u.path.trim('/')
-        return host + (u.path?.trimEnd('/') ?: "")
-    }
-    return "${app ?: "?"}|${title ?: ""}"
-}
