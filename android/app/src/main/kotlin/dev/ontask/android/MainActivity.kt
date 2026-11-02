@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -50,13 +51,26 @@ import kotlinx.coroutines.tasks.await
 
 class MainActivity : ComponentActivity() {
     private var notifGranted by mutableStateOf(false)
+    /** A "Which category is this?" question opened from a notification: key, label, is it a page or video. */
+    private var ask by mutableStateOf<Triple<String, String, Boolean>?>(null)
+
+    override fun onNewIntent(intent: android.content.Intent) { super.onNewIntent(intent); takeAsk(intent) }
+    private fun takeAsk(i: android.content.Intent?) {
+        val key = i?.getStringExtra(ASK_KEY) ?: return
+        ask = Triple(key, i.getStringExtra(ASK_LABEL) ?: key, i.getBooleanExtra(ASK_ITEM, false))
+    }
     private val askNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { notifGranted = it }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         notifGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        takeAsk(intent)
         setContent { OnTaskTheme { Root() } }
+    }
+
+    companion object {
+        const val ASK_KEY = "ask.key"; const val ASK_LABEL = "ask.label"; const val ASK_ITEM = "ask.item"
     }
 
     @Composable
@@ -70,6 +84,32 @@ class MainActivity : ComponentActivity() {
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             if (u == null) Login() else Signed(u)
         }
+        ask?.let { (key, label, item) -> AskDialog(key, label, item) { ask = null } }
+    }
+
+    /** "Which category is this?" for something the phone couldn't sort: the answer is saved for every device. */
+    @Composable
+    private fun AskDialog(key: String, label: String, item: Boolean, onDone: () -> Unit) {
+        val cats = remember { dev.ontask.Category.assignable.filter { !item || !it.variable } }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = onDone,
+            title = { Text(if (item) "Is this work? What is it?" else "Which category is this?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(label, style = MaterialTheme.typography.bodyLarge)
+                    cats.forEach { c ->
+                        androidx.compose.material3.OutlinedButton({
+                            val t = dev.ontask.android.track.Tracker.running
+                            if (t != null) t.file(key, c, null, dev.ontask.Source.USER_LABEL)
+                            else if (item) dev.ontask.android.track.PhoneRules.saveVerdict(Cloud.deviceId(this@MainActivity), key, null, c.name, dev.ontask.Source.USER_LABEL, null)
+                            else dev.ontask.android.track.PhoneRules.saveRule(dev.ontask.classify.RuleKind.valueOf(key.substringBefore('|')), key.substringAfter('|'), c.name)
+                            onDone()
+                        }, Modifier.fillMaxWidth()) { Text(c.label) }
+                    }
+                }
+            },
+            confirmButton = { androidx.compose.material3.TextButton(onDone) { Text("Not now") } },
+        )
     }
 
     @Composable
@@ -97,6 +137,7 @@ class MainActivity : ComponentActivity() {
     private fun Signed(u: FirebaseUser) {
         LaunchedEffect(u.uid) {
             runCatching { Cloud.ensureUser(this@MainActivity, u) }
+            dev.ontask.android.track.PhoneRules.start(u.uid)
             if (!notifGranted) askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
         var tab by remember { mutableStateOf(0) }

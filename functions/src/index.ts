@@ -9,6 +9,7 @@ import { firstName } from "./logic/messages";
 import { fmtDate, ownParts, partnerParts, reportDue, reportHtml, reportText, type CheckinDoc, type ReportDoc } from "./logic/report";
 import { bedtimeNight, bedtimePushDue, checkinState, habitsDue, isWorkDay } from "./logic/schedule";
 import { mergeHeat, mergeReports, type DayParts, type DeviceReport } from "./logic/merge";
+import { judge, type Cat } from "./logic/judge";
 import { localParts } from "./logic/routing";
 import { buildPrompt, ollamaLibraryUrl, parseCandidates, validateCandidates, type Recommendation } from "./logic/modelrec";
 import type { ScheduleDoc } from "./logic/types";
@@ -23,6 +24,8 @@ const TEXTBELT_KEY = defineSecret("TEXTBELT_KEY");
 const SMTP_URL = defineSecret("SMTP_URL");
 const SMTP_FROM = defineSecret("SMTP_FROM");
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
+// Jev (typesafe.ai) key for judging what's on the phone; set with `firebase functions:secrets:set JEV_API_KEY`.
+const JEV_API_KEY = defineSecret("JEV_API_KEY");
 const safe = (s: { value(): string }) => { try { return s.value() || undefined; } catch { return undefined; } };
 const secrets = (): Secrets => ({ textbeltKey: safe(TEXTBELT_KEY), smtpUrl: safe(SMTP_URL), smtpFrom: safe(SMTP_FROM) });
 const senders = realSenders(secrets);
@@ -74,6 +77,24 @@ export const onDeviceHeatWritten = onDocumentWritten({ document: "users/{uid}/de
   const today = localParts(new Date(), s?.tz ?? "America/Chicago").date;
   const heat = mergeHeat(all.docs.map((d) => (d.get("days") ?? {}) as Record<string, DayParts>), today, (d) => isWorkDay(s, d));
   await db.doc(`users/${uid}/heat/year`).set({ ...heat, updatedAt: Date.now() });
+});
+
+/**
+ * The phone asks which category an app, page or video is. Uses the account's own categories (sync/categories,
+ * falling back to the Mac's list in schedule/current). Returns { category } or { category: null } when unsure.
+ */
+export const judgeSeen = onCall({ invoker: "public", secrets: [JEV_API_KEY] }, async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+  const key = safe(JEV_API_KEY);
+  if (!key) return { category: null, reason: "no-key" };
+  const d = (req.data ?? {}) as { app?: string; title?: string; url?: string; screenText?: string };
+  const [syncCats, sched] = await Promise.all([db.doc(`users/${uid}/sync/categories`).get(), db.doc(`users/${uid}/schedule/current`).get()]);
+  const chk = await db.doc(`users/${uid}/checkins/${localParts(new Date(), sched.get("tz") ?? "UTC").date}`).get();
+  const listed = ((sched.get("categories") ?? []) as { id: string; label: string; variable?: boolean }[]);
+  const cats: Cat[] = listed.length ? listed : Object.entries((syncCats.get("items") ?? {}) as Record<string, { label: string; variable?: boolean; deleted?: boolean }>).map(([id, v]) => ({ id, ...v }));
+  const r = await judge({ app: d.app?.slice(0, 100), title: d.title?.slice(0, 300), url: d.url?.slice(0, 500), screenText: d.screenText?.slice(0, 1500), plan: chk.get("plan") }, cats, key).catch(() => null);
+  return { category: r?.category ?? null, probability: r?.probability ?? null };
 });
 
 export const onReactionCreated = onDocumentCreated({ document: "links/{linkId}/reactions/{id}" }, async (event) => {

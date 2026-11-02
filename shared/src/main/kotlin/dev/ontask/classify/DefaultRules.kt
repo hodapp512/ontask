@@ -18,6 +18,20 @@ object DefaultRules {
         ENTERTAINMENT to listOf("Spotify", "Music", "TV", "Netflix", "VLC", "Steam", "Discord"),
     )
 
+    /** Android apps by package name (APP rules also match the bundle/package id). */
+    private val androidApps = mapOf(
+        WORK_SUPPORT to listOf("com.google.android.gm", "com.google.android.calendar", "com.samsung.android.calendar", "com.microsoft.teams",
+            "com.Slack", "us.zoom.videomeetings", "com.google.android.apps.docs", "com.google.android.apps.docs.editors.docs",
+            "com.google.android.apps.docs.editors.sheets", "com.microsoft.office.outlook", "dev.ontask.android"),
+        PERSONAL_ADMIN to listOf("com.samsung.android.messaging", "com.google.android.apps.messaging", "com.whatsapp", "org.telegram.messenger",
+            "org.thoughtcrime.securesms", "com.samsung.android.dialer", "com.google.android.dialer", "com.android.settings",
+            "com.sec.android.app.camera", "com.google.android.apps.maps", "com.samsung.android.app.notes", "com.google.android.keep",
+            "com.amazon.mShop.android.shopping", "com.sec.android.gallery3d", "com.google.android.apps.photos"),
+        VARIABLE to listOf("com.google.android.youtube", "com.reddit.frontpage", "com.facebook.katana", "com.linkedin.android", "com.medium.reader", "com.substack.app"),
+        ENTERTAINMENT to listOf("com.instagram.android", "com.zhiliaoapp.musically", "com.twitter.android", "com.netflix.mediaclient", "com.spotify.music",
+            "com.disney.disneyplus", "tv.twitch.android.app", "com.discord", "com.snapchat.android", "com.pinterest"),
+    )
+
     private val domains = mapOf(
         CORE_WORK to listOf("github.com", "gitlab.com", "stackoverflow.com", "localhost", "console.firebase.google.com",
             "developer.apple.com", "kotlinlang.org", "docs.oracle.com", "claude.ai"),
@@ -35,6 +49,7 @@ object DefaultRules {
         fun add(kind: RuleKind, map: Map<Category, List<String>>) =
             map.forEach { (cat, items) -> items.forEach { add(Rule(id--, kind, it, cat, user = false)) } }
         add(RuleKind.APP, apps)
+        add(RuleKind.APP, androidApps)
         add(RuleKind.DOMAIN, domains)
     }
 }

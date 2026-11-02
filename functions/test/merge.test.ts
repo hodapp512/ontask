@@ -33,3 +33,16 @@ describe("merging devices", () => {
     expect(isWorkDay(s, "2026-11-09")).toBe(false);  // Monday off by exception
   });
 });
+
+import { describe as describeSeen, judge } from "../src/logic/judge";
+describe("judging on the phone", () => {
+  const cats = [{ id: "CORE_WORK", label: "Work" }, { id: "ENTERTAINMENT", label: "Entertainment / News / Social" }, { id: "VARIABLE", label: "Varies", variable: true }];
+  const answer = (choice: string, p: number) => (async () => new Response(JSON.stringify({ answers: { c: { choice, probabilities: { [choice]: p } } } }))) as unknown as typeof fetch;
+  it("describes what's seen like the Mac", () => {
+    expect(describeSeen({ app: "Chrome", title: "Kotlin docs", url: "https://www.kotlinlang.org/docs" })).toBe("App: Chrome\nSite: kotlinlang.org\nTitle: Kotlin docs\nAddress: https://www.kotlinlang.org/docs");
+  });
+  it("returns the category id when sure, nothing when not", async () => {
+    expect(await judge({ app: "Duolingo" }, cats, "k", answer("Work", 0.8))).toEqual({ category: "CORE_WORK", probability: 0.8 });
+    expect(await judge({ app: "Duolingo" }, cats, "k", answer("Work", 0.4))).toBeNull();
+  });
+});

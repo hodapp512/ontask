@@ -47,6 +47,7 @@ fun SettingsScreen(uid: String, notificationsOn: Boolean, onEnableNotifications:
             Text(Cloud.auth.currentUser?.displayName ?: ""); Muted(Cloud.auth.currentUser?.email ?: "")
             OutlinedButton(onSignOut) { Text("Sign out") }
         }
+        TrackingCard()
         OCard("Notifications on this phone") {
             Muted(if (notificationsOn) "On ✓" else "Off")
             if (!notificationsOn) Button(onEnableNotifications) { Text("Turn on notifications") }
@@ -92,5 +93,32 @@ private fun BackupContact(uid: String, say: (String) -> Unit) {
         OutlinedTextField(phone, { phone = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Phone (for texts)") })
         OutlinedTextField(email, { email = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Email") })
         OutlinedButton({ ref.set(mapOf("phone" to phone.trim().ifBlank { null }, "email" to email.trim().ifBlank { null }), SetOptions.merge()); say("Saved.") }) { Text("Save contact details") }
+    }
+}
+
+/**
+ * Phone tracking setup: the Accessibility service (what's in front), staying awake on Samsung, and the one-time
+ * notice that names and titles OnTask can't sort itself are sent to Jev through OnTask's server.
+ */
+@Composable
+private fun TrackingCard() {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val prefs = remember { ctx.getSharedPreferences("ontask", android.content.Context.MODE_PRIVATE) }
+    var on by remember { mutableStateOf(dev.ontask.android.track.Tracker.isOn(ctx)) }
+    var jev by remember { mutableStateOf(prefs.getBoolean("jev.ok", false)) }
+    // Re-check when coming back from Android's settings.
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) { on = dev.ontask.android.track.Tracker.isOn(ctx); onPauseOrDispose {} }
+    OCard("Tracking on this phone") {
+        Text(if (on) "On ✓ — OnTask counts your phone time with your Mac's." else "Off. Turn it on so your phone time counts too.")
+        if (!on) {
+            Muted("Settings → Accessibility → Installed apps → OnTask focus tracking → On.")
+            Button({ ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)) }) { Text("Open Accessibility settings") }
+        }
+        Muted("Samsung stops background apps. In App info → Battery, choose Unrestricted (or add OnTask to Never sleeping apps).")
+        OutlinedButton({ ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:" + ctx.packageName))) }) { Text("Open App info") }
+        if (!jev) {
+            Muted("Apps and pages your rules don't cover are judged by Jev: their name and title (never your screen) go through OnTask's server to Jev. Without this, OnTask asks you instead.")
+            Button({ prefs.edit().putBoolean("jev.ok", true).apply(); jev = true }) { Text("OK, use Jev") }
+        } else Muted("Unknown apps and pages are judged by Jev ✓")
     }
 }
