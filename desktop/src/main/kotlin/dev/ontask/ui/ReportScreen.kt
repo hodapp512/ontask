@@ -137,6 +137,7 @@ private fun AccessibilityBanner(app: App) {
 }
 
 /** The phone-style summary: deep-focus share, a bar by level, the timeline, and where the time went. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun SummaryCard(r: DailyReport, title: String, app: App? = null, onRelabel: () -> Unit = {}, header: @Composable () -> Unit = {}, more: @Composable ColumnScope.() -> Unit = {}) {
     val denom = Level.entries.filter { it != Level.AWAY }.sumOf { r.totalsAll[it] ?: 0 }
@@ -163,14 +164,25 @@ fun SummaryCard(r: DailyReport, title: String, app: App? = null, onRelabel: () -
         Row(Modifier.fillMaxWidth().height(12.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))) {
             Level.entries.forEach { l -> val v = r.totalsAll[l] ?: 0; if (v > 0) androidx.compose.foundation.layout.Box(Modifier.weight(v.toFloat()).fillMaxHeight().background(levelColor(l))) }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Level.entries.forEach { l -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) { Dot(levelColor(l), 10); Text("${l.label} ${fmtDuration(r.totalsAll[l] ?: 0)}") } }
-        }
+        // The day's totals; hovering shows the same split for work hours only (when there was time outside them).
         val workTotal = r.totalsWork.values.sum()
-        if (workTotal > 0 && workTotal < total) Text(
-            "During work hours: ${fmtDuration(r.totalsWork[Level.DEEP] ?: 0)} focused, ${fmtDuration(r.totalsWork[Level.MIXED] ?: 0)} mixed, ${fmtDuration(r.totalsWork[Level.WASTED] ?: 0)} wasted",
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        val legend: @Composable () -> Unit = {
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Level.entries.forEach { l -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) { Dot(levelColor(l), 10); Text("${l.label} ${fmtDuration(r.totalsAll[l] ?: 0)}") } }
+            }
+        }
+        if (workTotal > 0 && workTotal < total) androidx.compose.foundation.TooltipArea(
+            tooltip = {
+                androidx.compose.material3.Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), tonalElevation = 6.dp, shadowElevation = 6.dp) {
+                    Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                        Text("During work hours", style = MaterialTheme.typography.labelLarge)
+                        Text("${fmtDuration(r.totalsWork[Level.DEEP] ?: 0)} focused · ${fmtDuration(r.totalsWork[Level.MIXED] ?: 0)} mixed · ${fmtDuration(r.totalsWork[Level.WASTED] ?: 0)} wasted",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            },
+            delayMillis = 300,
+        ) { legend() } else legend()
         Timeline(r)
         if (r.deepSessions.isNotEmpty()) Expander("Longest focused sessions") {
             r.deepSessions.sortedByDescending { it.seconds }.take(5).forEach { Text("${clockRange(it.start, it.end)}  ·  ${fmtDuration(it.seconds)}") }
