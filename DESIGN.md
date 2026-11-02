@@ -189,6 +189,18 @@ it; today doesn't until it's over). The Mac uploads one small `heat/year` docume
   relabel history, work-hour changes re-mark today). `schedule/current` is still written by the Mac for the server.
 - Platform notes for Android, iPhone and Windows: `docs/PLATFORMS.md`.
 
+### Android app
+- Native app (`android/`, sideloaded APK) with everything the web app did on the phone: Home (merged day, plan, heat
+  map), Mac linking, partner and supporter views, settings, native push. Shares `shared/` Kotlin with the Mac
+  (models, classifier, default rules incl. Android packages, page logic, heat score).
+- **Tracking** via an Accessibility service: the app in front, browsers' address bars, the YouTube app's video
+  title; every 5 s while the screen is on and unlocked (home screens and keyboards don't count). Classified with the
+  shared rules, categories, source rules and verdicts from Firestore. Uploads its own day report and heat numbers
+  every 2 minutes and on screen-off; raw activity stays on the phone.
+- **Unknown apps and undecided pages** go to the `judgeSeen` Cloud Function (Jev, key in Secret Manager; one-time
+  notice on the phone). Sure (60%+) → a rule or verdict for every device; otherwise a notification asks.
+- The Mac's Home and heat map add the phone's day (phone stretches drawn shorter, rows marked 📱).
+
 ### Work hours on Home
 The Home subtitle shows today's work hours ("Work hours 9:00 AM–5:00 PM", or "Day off"); clicking it changes them
 for today (or takes the day off; shorter hours need a reason, and the partner is told). Everything reads the current
