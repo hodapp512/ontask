@@ -248,7 +248,10 @@ Format: **Decision** — why. *Rejected:* alternatives, and why not.
   judged, feeds straight to time-wasting); moving it out folds them back into the site.
 - **Any site gets a readable name** ("Wikipedia: Eric Gill"), not just the ones OnTask knows.
 
-## 2026-11-01 · Bedtime push only while something is in use
+## 2026-11-01 · Bedtime push only while something is in use (reverted the same day)
+
+*Reverted: the push goes out at bedtime every night, in use or not, as originally built. The phone app still records
+when it comes to the front.*
 
 - **The phone's bedtime push only goes out while you're using something:** the Mac (keyboard, mouse or a video) or
   the OnTask phone app, within the last 5 minutes. A phone lying on the nightstand stays quiet. If nothing is in use
@@ -259,3 +262,5 @@ Format: **Decision** — why. *Rejected:* alternatives, and why not.
   container that's never redrawn (redrawing the bar mid-gesture made pinch glitchy and broke taps after zooming); the
   description has its own line and wraps; edge clock labels stay on screen; the hint is just "Tap to see what you
   did · pinch to zoom".
+- **Icon links carry a version (`?v=3`), and the manifest isn't cached,** so phones fetch a new logo instead of
+  showing a cached one after it changes. Bump the version whenever the icons change.

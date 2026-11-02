@@ -89,13 +89,10 @@ describe("bedtime push", () => {
     expect(bedtimeNight(s, at("2026-11-02T11:30:00Z"))).toBeNull();          // 5:30 AM
     expect(bedtimeNight({ ...s, bedtimeMin: undefined }, at("2026-11-02T03:31:00Z"))).toBeNull();
   });
-  it("only pushes while the Mac or the phone app is in use, once a night", () => {
-    const now = at("2026-11-02T03:35:00Z");
-    expect(bedtimePushDue(s, now, t("2026-11-02T03:33:00Z"), false)).toBe(true);   // used 2 min ago
-    expect(bedtimePushDue(s, now, t("2026-11-02T02:00:00Z"), false)).toBe(false);  // nothing in use: phone stays quiet
-    expect(bedtimePushDue(s, now, undefined, false)).toBe(false);
-    expect(bedtimePushDue(s, now, t("2026-11-02T03:33:00Z"), true)).toBe(false);   // already pushed tonight
-    expect(bedtimePushDue(s, at("2026-11-02T06:00:00Z"), t("2026-11-02T05:58:00Z"), false)).toBe(true); // picked up at midnight
+  it("pushes once a night, at bedtime, whether or not anything is in use", () => {
+    expect(bedtimePushDue(s, at("2026-11-02T03:31:00Z"), false)).toBe(true);
+    expect(bedtimePushDue(s, at("2026-11-02T03:36:00Z"), true)).toBe(false);   // already pushed tonight
+    expect(bedtimePushDue(s, at("2026-11-02T03:29:00Z"), false)).toBe(false);  // before bedtime
   });
 });
 

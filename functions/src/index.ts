@@ -155,10 +155,7 @@ export const sweep = onSchedule({ schedule: "every 5 minutes", secrets: MSG_SECR
     const night = bedtimeNight(s, now);
     if (night) {
       const flag = db.doc(`users/${uid}/sweepState/${night}`);
-      const devices = await db.collection(`users/${uid}/devices`).get();
-      // Mac: last keyboard/mouse/video use. Phone: last time the OnTask app was in front.
-      const lastUsed = Math.max(0, ...devices.docs.map((d) => Number(d.get("kind") === "mac" ? d.get("lastActiveMs") ?? 0 : d.get("lastSeenMs") ?? 0)));
-      if (bedtimePushDue(s, now, lastUsed || undefined, !!(await flag.get()).get("bedtimePushed"))) {
+      if (bedtimePushDue(s, now, !!(await flag.get()).get("bedtimePushed"))) {
         await senders.push(tokens, "Bedtime", "Time to put the screens away and get some sleep.", { type: "bedtime" });
         await flag.set({ bedtimePushed: true }, { merge: true });
       }

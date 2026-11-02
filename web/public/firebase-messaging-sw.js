@@ -9,7 +9,7 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   const n = payload.notification || {};
-  self.registration.showNotification(n.title || "OnTask", { body: n.body || "", icon: "/icon-192.png", data: payload.data || {} });
+  self.registration.showNotification(n.title || "OnTask", { body: n.body || "", icon: "/icon-192.png?v=3", data: payload.data || {} });
 });
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();
