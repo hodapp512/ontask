@@ -373,3 +373,5 @@ when it comes to the front.*
 - *Revised after first use (same day):* the card was too long. Plan-line checkboxes → free text; the morning summary
   is one line (focused, wasted, longest stretch; no timeline, no top apps); Distracted and Low energy merged; "Too
   much on my plate" → Overwhelmed; Focus from the card is 30 min, not 50; "Do this later" moved to the top.
+- *Timing:* the midday check-in comes **30 minutes before** the midpoint of the working day (e.g. 12:32 instead of
+  1:02 for a 9:05 start and 5 PM end), so it lands before lunch and leaves more afternoon to act on it.

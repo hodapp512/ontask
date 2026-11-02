@@ -51,7 +51,8 @@ class Rhythm(private val zone: ZoneId = ZoneId.systemDefault(), private val midd
         if (middayEnabled && !s.middayDone && s.presentNow && s.planningDone) {
             // Skipped when the day started less than ~2h before the end of work hours.
             if (endTs - first < 2 * 3600L) return null
-            val midpoint = first + (endTs - first) / 2
+            // Half an hour before the midpoint of the day, so it lands before lunch and leaves the afternoon to act on it.
+            val midpoint = first + (endTs - first) / 2 - 30 * 60
             if (now >= midpoint) return Prompt.MIDDAY
         }
         return null

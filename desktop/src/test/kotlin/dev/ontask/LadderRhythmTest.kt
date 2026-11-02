@@ -131,8 +131,8 @@ class LadderRhythmTest {
         assertNull(r.due(sched, st(first = null), at(10)))
         assertEquals(Prompt.PLANNING, r.due(sched, st(first = at(9, 5)), at(9, 6)))
         assertEquals(Prompt.PLANNING_SHORT, r.due(sched, st(first = at(13)), at(13, 1)))   // arrived after midday
-        assertNull(r.due(sched, st(plan = true), at(10)))                                     // before midpoint (13:02)
-        assertEquals(Prompt.MIDDAY, r.due(sched, st(plan = true), at(13, 5)))
+        assertNull(r.due(sched, st(plan = true), at(12, 30)))                                 // before midpoint − 30 min (12:32)
+        assertEquals(Prompt.MIDDAY, r.due(sched, st(plan = true), at(12, 35)))
         assertNull(r.due(sched, st(plan = true, mid = true), at(15)))
     }
 

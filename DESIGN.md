@@ -133,7 +133,7 @@ nothing under 25 min focused, then 5 min per 25 (at most 10 under an hour, 15 af
 - The day is anchored to **first presence at the computer** on a work day, not clock time.
 - **Today's plan** on arrival: one free-form note at the top of Home, starting empty (yesterday's "change for
   tomorrow" is shown as a hint).
-- **Midday check-in** at the midpoint of actual working time; skipped if the day started < ~2h before end of work hours.
+- **Midday check-in** 30 minutes before the midpoint of actual working time (first sit-down → end of work hours); skipped if the day started < ~2h before end of work hours.
   - **Do this later ▾** at the top (10 min / 30 min / 1 h).
   1. **This morning:** one line: focused time, wasted time, longest focused stretch.
   2. **How's the day going?** *What did you get done?* and *What should you have gotten done?* (free text; the second
