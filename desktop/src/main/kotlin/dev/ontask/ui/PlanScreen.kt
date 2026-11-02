@@ -130,7 +130,7 @@ internal fun MiddayCard(app: App, date: LocalDate, onDone: () -> Unit) {
         style = MaterialTheme.typography.bodyLarge,
     )
     SectionCard("How's the day going?", null) {
-        OutlinedTextField(gotDone, { gotDone = it }, Modifier.fillMaxWidth(), label = { Text("What did you get done?") }, minLines = 2)
+        OutlinedTextField(gotDone, { gotDone = it }, Modifier.fillMaxWidth(), label = { Text("What did you get done?") })
         OutlinedTextField(should, { should = it }, Modifier.fillMaxWidth(), label = { Text("What should you have gotten done?") })
         if (should.isNotBlank()) TextButton({ plan = should.trim() + if (plan.isBlank()) "" else "\n$plan"; should = "" }) { Text("Add to this afternoon's plan") }
     }
