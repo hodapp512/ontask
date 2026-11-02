@@ -67,7 +67,11 @@ export function timelineSvg(segs: Seg[], width = 320, height = 22, win: [number,
   const x = (t: number) => ((t - from) / (to - from)) * width;
   const rects = segs.filter((s) => s.b > from && s.a < to)
     .map((s) => `<rect data-i="${segs.indexOf(s)}" x="${Math.max(0, x(s.a))}" y="0" width="${Math.max(Math.min(width, x(s.b)) - Math.max(0, x(s.a)), 1)}" height="${height}" fill="${color(s.k)}"/>`).join("");
-  const ticks = timelineTicks(from, to).map(({ t, label }) => `<span style="left:${((t - from) / (to - from)) * 100}%">${label}</span>`).join("");
+  // Labels near the edges hang inward so they stay on screen.
+  const ticks = timelineTicks(from, to).map(({ t, label }) => {
+    const p = ((t - from) / (to - from)) * 100;
+    return `<span style="left:${p}%;transform:translateX(${p < 8 ? 0 : p > 92 ? -100 : -50}%)">${label}</span>`;
+  }).join("");
   return `<svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" preserveAspectRatio="none" role="img" aria-label="Timeline"><rect width="${width}" height="${height}" fill="#e6ebe6" rx="4"/>${rects}</svg><div class="axis">${ticks}</div>`;
 }
 

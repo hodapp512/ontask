@@ -255,3 +255,7 @@ Format: **Decision** — why. *Rejected:* alternatives, and why not.
   at bedtime, the push comes the moment you pick something up later that night (until 5 AM), once per night.
 - A web app can't see general phone use, only when OnTask itself is open; the phone app now records that each time
   it comes to the front.
+- **Phone timeline, reworked after real use:** a taller bar (40 px) to make pinching easy; gestures are tracked on a
+  container that's never redrawn (redrawing the bar mid-gesture made pinch glitchy and broke taps after zooming); the
+  description has its own line and wraps; edge clock labels stay on screen; the hint is just "Tap to see what you
+  did · pinch to zoom".

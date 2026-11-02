@@ -35,8 +35,8 @@ details.card > summary { color:var(--text); font-weight:600; }
 .notice.row { flex-wrap:wrap; }
 a { color:var(--primary); }
 .axis { position:relative; height:14px; font-size:11px; color:var(--muted); margin-top:2px; }
-.axis span { position:absolute; transform:translateX(-50%); white-space:nowrap; } .axis span:first-child { transform:none; }
+.axis span { position:absolute; white-space:nowrap; }
 .tl-zoom button.small { padding:2px 10px; min-width:32px; }
-.tl svg { cursor:pointer; touch-action:pan-y; user-select:none; } .tl rect.dim { opacity:.45; } .tl-detail { min-height:2.6em; }
+.tl { touch-action:pan-y; user-select:none; -webkit-user-select:none; cursor:pointer; } .tl svg { display:block; border-radius:6px; } .tl rect.dim { opacity:.45; } .tl-detail { min-height:2.6em; overflow-wrap:anywhere; margin-top:4px; }
 .site { display:flex; flex-direction:column; gap:4px; padding:6px 0; border-top:1px solid var(--line); }
 select.cat { width:auto; padding:4px 8px; font-size:14px; }
