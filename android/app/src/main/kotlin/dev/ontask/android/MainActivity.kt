@@ -104,9 +104,10 @@ class MainActivity : ComponentActivity() {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             bottomBar = {
-                NavigationBar {
+                NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                     listOf("Home" to "⌂", "People" to "👥", "Settings" to "⚙").forEachIndexed { i, (label, icon) ->
-                        NavigationBarItem(tab == i, { tab = i; person = null }, icon = { Text(icon) }, label = { Text(label) })
+                        NavigationBarItem(tab == i, { tab = i; person = null }, icon = { Text(icon) }, label = { Text(label) },
+                            colors = androidx.compose.material3.NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primaryContainer))
                     }
                 }
             },

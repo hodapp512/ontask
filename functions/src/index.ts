@@ -38,7 +38,7 @@ export const onEventCreated = onDocumentCreated({ document: "users/{uid}/events/
   // Events addressed to the tracked user's own phone.
   // (Snoozing a check-in on the Mac used to push "Don't forget your check-in." here; it comes back on the Mac instead.)
   if (ev.type === "evening_checkin_phone") {
-    await senders.push(await tokensOf(uid), "OnTask", "Time for your evening check-in.", { type: String(ev.type) });
+    await pushTo(uid, await tokensOf(uid), "OnTask", "Time for your evening check-in.", { type: String(ev.type) });
   }
   const n = await routeEvent(db, senders, uid, { type: ev.type, ts: ev.ts, payload: ev.payload }, now);
   await event.data!.ref.update({ processedAt: now.getTime(), delivered: n });
@@ -80,11 +80,21 @@ export const onReactionCreated = onDocumentCreated({ document: "links/{linkId}/r
   const r = event.data?.data(); if (!r) return;
   const labels: Record<string, string> = { thumbs_up: "👍", proud: "Proud of you", call_me: "Call me when you can", take_a_walk: "Take a walk" };
   const body = labels[r.kind] + (r.reply ? ` — "${r.reply}"` : "");
-  await senders.push(await tokensOf(r.trackedUid), "From your partner", body, { type: "reaction" });
+  await pushTo(r.trackedUid, await tokensOf(r.trackedUid), "From your partner", body, { type: "reaction" });
 });
 
 async function tokensOf(uid: string): Promise<string[]> {
   return Object.keys(((await db.doc(`users/${uid}`).get()).get("fcmTokens") as Record<string, unknown> | undefined) ?? {});
+}
+
+/**
+ * Pushes to a user's own devices and forgets registrations that no longer exist (an uninstalled app or web app),
+ * so a removed one doesn't linger.
+ */
+async function pushTo(uid: string, tokens: string[], title: string, body: string, data: Record<string, string>) {
+  const r = await senders.push(tokens, title, body, data);
+  if (r.invalidTokens.length) await db.doc(`users/${uid}`).update(Object.fromEntries(r.invalidTokens.map((t) => [`fcmTokens.${t}`, admin.firestore.FieldValue.delete()]))).catch(() => {});
+  return r;
 }
 
 // ---- Callable: pairing and device linking ---------------------------------------------------------------------
@@ -183,13 +193,13 @@ export const sweep = onSchedule({ schedule: "every 5 minutes", secrets: MSG_SECR
     const uid = doc.ref.parent.parent!.id;
     const s = doc.data() as ScheduleDoc;
     const tokens = await tokensOf(uid);
-    for (const h of habitsDue(s.habits ?? [], s.tz, now)) await senders.push(tokens, "OnTask", h.name, { type: "habit", habitId: h.id });
+    for (const h of habitsDue(s.habits ?? [], s.tz, now)) await pushTo(uid, tokens, "OnTask", h.name, { type: "habit", habitId: h.id });
     await checkinSweep(uid, s, now, tokens);
     const night = bedtimeNight(s, now);
     if (night) {
       const flag = db.doc(`users/${uid}/sweepState/${night}`);
       if (bedtimePushDue(s, now, !!(await flag.get()).get("bedtimePushed"))) {
-        await senders.push(tokens, "Bedtime", "Time to put the screens away and get some sleep.", { type: "bedtime" });
+        await pushTo(uid, tokens, "Bedtime", "Time to put the screens away and get some sleep.", { type: "bedtime" });
         await flag.set({ bedtimePushed: true }, { merge: true });
       }
     }
@@ -204,7 +214,7 @@ async function checkinSweep(uid: string, s: ScheduleDoc, now: Date, tokens: stri
   const flag = db.doc(`users/${uid}/sweepState/${date}`);
   const state = (await flag.get()).data() ?? {};
   if (st.state === "remind" && !state.reportSent && st.level > (state.reminded ?? 0)) {
-    await senders.push(tokens, "OnTask", st.level >= 3 ? "Your check-in is overdue." : "Time for your evening check-in.", { type: "checkin_reminder" });
+    await pushTo(uid, tokens, "OnTask", st.level >= 3 ? "Your check-in is overdue." : "Time for your evening check-in.", { type: "checkin_reminder" });
     await flag.set({ reminded: st.level }, { merge: true });
   }
   await dailyReportSweep(uid, s, now, date, state);
