@@ -12,6 +12,13 @@ export async function ensureUser(u: User) {
   else await updateDoc(ref, { lastSeenMs: Date.now(), ...(u.email ? { email: u.email } : {}) });
   // So the Mac can show which phones are linked to this account.
   await setDoc(doc(db, "users", u.uid, "devices", deviceId()), { kind: "phone", name: deviceName(), lastSeenMs: Date.now() }, { merge: true }).catch(() => {});
+  // Each time the app comes to the front (at most once a minute): the bedtime push only goes out while something is in use.
+  let last = Date.now();
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible" || Date.now() - last < 60_000) return;
+    last = Date.now();
+    setDoc(doc(db, "users", u.uid, "devices", deviceId()), { lastSeenMs: last }, { merge: true }).catch(() => {});
+  });
 }
 
 function deviceId(): string {

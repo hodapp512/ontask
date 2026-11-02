@@ -247,3 +247,11 @@ Format: **Decision** — why. *Rejected:* alternatives, and why not.
 - **Moving a site into Varies re-sorts its history page by page:** past pages become their own rows (Unsure until
   judged, feeds straight to time-wasting); moving it out folds them back into the site.
 - **Any site gets a readable name** ("Wikipedia: Eric Gill"), not just the ones OnTask knows.
+
+## 2026-11-01 · Bedtime push only while something is in use
+
+- **The phone's bedtime push only goes out while you're using something:** the Mac (keyboard, mouse or a video) or
+  the OnTask phone app, within the last 5 minutes. A phone lying on the nightstand stays quiet. If nothing is in use
+  at bedtime, the push comes the moment you pick something up later that night (until 5 AM), once per night.
+- A web app can't see general phone use, only when OnTask itself is open; the phone app now records that each time
+  it comes to the front.

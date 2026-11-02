@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { partnerMessage, textBeltSafe, withClose } from "../src/logic/messages";
 import { decide, driftAllowed, halfDayStart, inQuietHours, localParts } from "../src/logic/routing";
-import { bedtimeDue, checkinState, habitsDue } from "../src/logic/schedule";
+import { bedtimeNight, bedtimePushDue, checkinState, habitsDue } from "../src/logic/schedule";
 import { fmtDate, ownParts, partnerParts, reportDue, reportHtml, reportText } from "../src/logic/report";
 import { buildPrompt, ollamaLibraryUrl, parseCandidates, validateCandidates } from "../src/logic/modelrec";
 import { DEFAULT_PARTNER_PREFS, type PartnerPrefs, type ScheduleDoc } from "../src/logic/types";
@@ -81,11 +81,21 @@ describe("schedule", () => {
 
 describe("bedtime push", () => {
   const s: ScheduleDoc = { tz: "America/Chicago", workWeek: {}, habits: [], bedtimeMin: 21 * 60 + 30 };
-  it("fires once, in the 5-minute window that contains bedtime", () => {
-    expect(bedtimeDue(s, at("2026-11-02T03:29:00Z"))).toBe(false);  // 9:29 PM CST
-    expect(bedtimeDue(s, at("2026-11-02T03:31:00Z"))).toBe(true);
-    expect(bedtimeDue(s, at("2026-11-02T03:36:00Z"))).toBe(false);
-    expect(bedtimeDue({ ...s, bedtimeMin: undefined }, at("2026-11-02T03:31:00Z"))).toBe(false);
+  const t = (iso: string) => at(iso).getTime();
+  it("belongs to the night from bedtime to 5 AM", () => {
+    expect(bedtimeNight(s, at("2026-11-02T03:29:00Z"))).toBeNull();          // 9:29 PM CST Nov 1
+    expect(bedtimeNight(s, at("2026-11-02T03:31:00Z"))).toBe("2026-11-01");
+    expect(bedtimeNight(s, at("2026-11-02T08:00:00Z"))).toBe("2026-11-01");  // 2 AM
+    expect(bedtimeNight(s, at("2026-11-02T11:30:00Z"))).toBeNull();          // 5:30 AM
+    expect(bedtimeNight({ ...s, bedtimeMin: undefined }, at("2026-11-02T03:31:00Z"))).toBeNull();
+  });
+  it("only pushes while the Mac or the phone app is in use, once a night", () => {
+    const now = at("2026-11-02T03:35:00Z");
+    expect(bedtimePushDue(s, now, t("2026-11-02T03:33:00Z"), false)).toBe(true);   // used 2 min ago
+    expect(bedtimePushDue(s, now, t("2026-11-02T02:00:00Z"), false)).toBe(false);  // nothing in use: phone stays quiet
+    expect(bedtimePushDue(s, now, undefined, false)).toBe(false);
+    expect(bedtimePushDue(s, now, t("2026-11-02T03:33:00Z"), true)).toBe(false);   // already pushed tonight
+    expect(bedtimePushDue(s, at("2026-11-02T06:00:00Z"), t("2026-11-02T05:58:00Z"), false)).toBe(true); // picked up at midnight
   });
 });
 

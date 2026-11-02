@@ -15,12 +15,28 @@ export function habitsDue(habits: HabitDef[], tz: string, now: Date, windowMin =
   });
 }
 
-/** True in the 5-minute sweep window that contains bedtime, so the phone gets one push at bedtime. */
-export function bedtimeDue(s: ScheduleDoc, now: Date, windowMin = 5): boolean {
-  if (s.bedtimeMin === undefined || s.bedtimeMin === null) return false;
-  const { hour, minute } = localParts(now, s.tz);
-  const diff = (hour * 60 + minute - s.bedtimeMin + 1440) % 1440;
-  return diff < windowMin;
+/** The night ends at 5 AM. */
+export const NIGHT_END_MIN = 5 * 60;
+/** "In use" = the Mac or the OnTask phone app was used this recently. */
+export const IN_USE_MS = 5 * 60_000;
+
+/** The night [now] falls in (the date bedtime was on, yyyy-MM-dd), or null between 5 AM and bedtime. */
+export function bedtimeNight(s: ScheduleDoc, now: Date): string | null {
+  if (s.bedtimeMin === undefined || s.bedtimeMin === null) return null;
+  const { hour, minute, date } = localParts(now, s.tz);
+  const cur = hour * 60 + minute, bed = s.bedtimeMin;
+  const yesterday = () => localParts(new Date(now.getTime() - 86_400_000), s.tz).date;
+  if (bed >= NIGHT_END_MIN) return cur >= bed ? date : cur < NIGHT_END_MIN ? yesterday() : null;
+  return cur >= bed && cur < NIGHT_END_MIN ? yesterday() : null; // bedtime after midnight
+}
+
+/**
+ * The bedtime push goes out once per night, and only while something is in use (the Mac, or the OnTask phone app
+ * open, within the last 5 minutes), so it never wakes a phone lying on the nightstand. Not in use at bedtime: it
+ * comes the moment you pick something up later that night.
+ */
+export function bedtimePushDue(s: ScheduleDoc, now: Date, lastUsedMs: number | undefined, alreadyPushed: boolean): boolean {
+  return !alreadyPushed && bedtimeNight(s, now) !== null && lastUsedMs !== undefined && now.getTime() - lastUsedMs <= IN_USE_MS;
 }
 
 export function rangesFor(s: ScheduleDoc, now: Date): { startMin: number; endMin: number }[] {

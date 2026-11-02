@@ -7,7 +7,7 @@ import { randomBytes } from "node:crypto";
 import { deliverToPartner, releaseDeferred, routeEvent, takeQueuedAlerts, type Link } from "./deliver";
 import { firstName } from "./logic/messages";
 import { fmtDate, ownParts, partnerParts, reportDue, reportHtml, reportText, type CheckinDoc, type ReportDoc } from "./logic/report";
-import { bedtimeDue, checkinState, habitsDue } from "./logic/schedule";
+import { bedtimeNight, bedtimePushDue, checkinState, habitsDue } from "./logic/schedule";
 import { localParts } from "./logic/routing";
 import { buildPrompt, ollamaLibraryUrl, parseCandidates, validateCandidates, type Recommendation } from "./logic/modelrec";
 import type { ScheduleDoc } from "./logic/types";
@@ -152,9 +152,13 @@ export const sweep = onSchedule({ schedule: "every 5 minutes", secrets: MSG_SECR
     const tokens = await tokensOf(uid);
     for (const h of habitsDue(s.habits ?? [], s.tz, now)) await senders.push(tokens, "OnTask", h.name, { type: "habit", habitId: h.id });
     await checkinSweep(uid, s, now, tokens);
-    if (bedtimeDue(s, now)) {
-      const flag = db.doc(`users/${uid}/sweepState/${localParts(now, s.tz).date}`);
-      if (!(await flag.get()).get("bedtimePushed")) {
+    const night = bedtimeNight(s, now);
+    if (night) {
+      const flag = db.doc(`users/${uid}/sweepState/${night}`);
+      const devices = await db.collection(`users/${uid}/devices`).get();
+      // Mac: last keyboard/mouse/video use. Phone: last time the OnTask app was in front.
+      const lastUsed = Math.max(0, ...devices.docs.map((d) => Number(d.get("kind") === "mac" ? d.get("lastActiveMs") ?? 0 : d.get("lastSeenMs") ?? 0)));
+      if (bedtimePushDue(s, now, lastUsed || undefined, !!(await flag.get()).get("bedtimePushed"))) {
         await senders.push(tokens, "Bedtime", "Time to put the screens away and get some sleep.", { type: "bedtime" });
         await flag.set({ bedtimePushed: true }, { merge: true });
       }
