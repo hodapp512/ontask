@@ -1,5 +1,7 @@
 package dev.ontask
 
+import androidx.compose.foundation.layout.padding
+
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.unit.dp
 
@@ -33,6 +35,13 @@ class UiRenderTest {
         val app = UiShots.newApp()
         app.priorities.set(java.time.LocalDate.now(), listOf("Finish the proposal\nReview PRs"))
         UiShots.shot("midday", false, 700, 1500) { dev.ontask.ui.PlanPromptContent(app, dev.ontask.plan.Prompt.MIDDAY, {}, {}, laterLeft = 2) }
+    }
+
+    @Test fun renderTodayHours() {
+        val app = UiShots.newApp()
+        UiShots.shot("today-hours", false, 560, 532) {
+            androidx.compose.material3.Surface { androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.padding(20.dp)) { dev.ontask.ui.HoursCheckCard(app, java.time.LocalDate.now(), startEditing = true, onClose = {}) } }
+        }
     }
 
     @Test fun renderEveningPrompt() {

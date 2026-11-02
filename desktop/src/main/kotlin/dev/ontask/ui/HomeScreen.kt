@@ -1,6 +1,7 @@
 package dev.ontask.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -82,7 +83,7 @@ fun HomeScreen(app: App) {
         maxWidth = 1500.dp,
         // Today's work hours; clicking edits them for today.
         afterSubtitle = {
-            Text(remember(tick, now / 60) { workHoursLabel(app, today) } + " ✎", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary,
+            Text(remember(tick, now / 60) { workHoursLabel(app, today) } + " ✎", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.clickable { editingHours = true }.pointerHoverIcon(androidx.compose.ui.input.pointer.PointerIcon.Hand))
         },
     ) {
@@ -193,14 +194,14 @@ private fun WeekExpander(app: App, today: LocalDate) {
 /** Today's work hours, from the Home subtitle: change them for today only (or take the day off). */
 @Composable
 private fun TodayHoursWindow(app: App, date: LocalDate, onClose: () -> Unit) {
-    val size = androidx.compose.ui.unit.DpSize(560.dp, 420.dp)
+    val size = androidx.compose.ui.unit.DpSize(560.dp, 600.dp)
     androidx.compose.ui.window.Window(
         onCloseRequest = onClose, title = "Today's work hours", alwaysOnTop = true, resizable = false,
         state = androidx.compose.ui.window.rememberWindowState(size = size, position = centeredOnActiveScreen(size)),
     ) {
         OnTaskTheme(remember { themeOf(app) }) {
             androidx.compose.material3.Surface(Modifier.fillMaxSize()) {
-                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     HoursCheckCard(app, date, startEditing = true, onClose = onClose)
                     Text("Your usual hours are in Settings → Work hours.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
