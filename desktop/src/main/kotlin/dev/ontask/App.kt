@@ -453,7 +453,7 @@ class App(val dir: Path = dataDir()) {
         if (!bedtimeEnabled) return
         val b = dev.ontask.plan.Bedtime(bedtimeMin)
         val st = bedState()
-        val n = b.due(now, active = !live.away, working = live.classification?.level == Level.DEEP, state = st) ?: return
+        val n = b.due(now, active = !live.away, state = st) ?: return
         val prev = st?.takeIf { it.night == n.night } ?: dev.ontask.plan.Bedtime.NightState(n.night)
         saveBedState(prev.copy(count = n.level, lastTs = now))
         events.emit("bedtime_nudge", now, "level" to n.level, "minutes_past" to n.minutesPast)

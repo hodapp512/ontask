@@ -220,7 +220,7 @@ fun BedtimeWindow(app: App, n: App.BedtimeNudge, mode: ThemeMode) {
                 Text(
                     when (n.level) {
                         1 -> "Time to wind down and put the screen away. Whatever's left will still be there tomorrow."
-                        2 -> "Still here? Late-night scrolling borrows from tomorrow. Finish up and go to bed."
+                        2 -> "Still here? Late nights borrow from tomorrow, work included. Wrap up and go to bed."
                         else -> "This is reminder number ${n.level} tonight. Close the laptop and get some sleep."
                     },
                     style = MaterialTheme.typography.bodyLarge,

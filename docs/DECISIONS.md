@@ -276,3 +276,9 @@ when it comes to the front.*
 - **The totals bar and its legend show screen time only** (Focused, Mixed, Wasted); Away was noise there. The
   timeline still shows away stretches as gaps.
 - **"During work hours: …" is a tooltip** on the day's totals (Mac), not its own line.
+
+## 2026-11-01 · Bedtime reminders while working
+
+- **Follow-up bedtime reminders come every 15 minutes whatever you're doing, Work included.** The first version
+  skipped Work time ("working late isn't screen addiction"), which left the user working at 10:15 PM with no reminder
+  after a 9:41 one. "I'm working" still buys 30 minutes.

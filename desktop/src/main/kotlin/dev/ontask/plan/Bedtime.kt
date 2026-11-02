@@ -7,8 +7,8 @@ import java.time.ZoneId
 /**
  * Bedtime reminders. From [bedtimeMin] (minutes after midnight, e.g. 22:30) until [wakeMin] the next morning (5 AM)
  * is "the night". At bedtime, if you're at the computer, one reminder; after that, another every [repeatMin] minutes
- * while you're still at it and not doing Work (working late isn't screen addiction). Each one is firmer: from the
- * third on, the window can't be closed for [lockSec] seconds.
+ * while you're still at it, whatever you're doing (working late counts too; "I'm working" buys 30 minutes). Each one
+ * is firmer: from the third on, the window can't be closed for [lockSec] seconds.
  */
 class Bedtime(
     val bedtimeMin: Int,
@@ -42,15 +42,12 @@ class Bedtime(
         return ((now - bed) / 60).toInt().coerceAtLeast(0)
     }
 
-    /**
-     * The reminder to show now, if any. [active]: you're at the computer (not Away). [working]: what's in front of you
-     * counts as Work (Focused), so later reminders wait.
-     */
-    fun due(now: Long, active: Boolean, working: Boolean, state: NightState?): Nudge? {
+    /** The reminder to show now, if any. [active]: you're at the computer (not Away). */
+    fun due(now: Long, active: Boolean, state: NightState?): Nudge? {
         val night = nightOf(now) ?: return null
         val s = state?.takeIf { it.night == night } ?: NightState(night)
         if (!active || now < s.snoozeUntil) return null
-        if (s.count > 0 && (working || now - s.lastTs < repeatMin * 60L)) return null
+        if (s.count > 0 && now - s.lastTs < repeatMin * 60L) return null
         val level = s.count + 1
         return Nudge(night, level, minutesPast(night, now), lockSec = if (level >= 3) 20 else 0)
     }

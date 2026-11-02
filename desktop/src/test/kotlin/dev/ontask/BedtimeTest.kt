@@ -24,25 +24,25 @@ class BedtimeTest {
     }
 
     @Test fun firstReminderAtBedtimeOnlyIfYoureThere() {
-        assertNull(b.due(at(26, 22, 31), active = false, working = false, state = null))
-        val n = b.due(at(26, 22, 31), active = true, working = true, state = null)!! // even when working, once
+        assertNull(b.due(at(26, 22, 31), active = false, state = null))
+        val n = b.due(at(26, 22, 31), active = true, state = null)!!
         assertEquals(1, n.level); assertEquals(0, n.lockSec)
     }
 
-    @Test fun moreEveryFifteenMinutesWhileSurfingFirmerFromTheThird() {
+    @Test fun moreEveryFifteenMinutesWhileStillAtItFirmerFromTheThird() {
         val s1 = Bedtime.NightState(night, count = 1, lastTs = at(26, 22, 31))
-        assertNull(b.due(at(26, 22, 40), active = true, working = false, state = s1))
-        val n2 = b.due(at(26, 22, 46), active = true, working = false, state = s1)!!
+        assertNull(b.due(at(26, 22, 40), active = true, state = s1))
+        val n2 = b.due(at(26, 22, 46), active = true, state = s1)!!
         assertEquals(2, n2.level); assertEquals(16, n2.minutesPast)
-        assertNull(b.due(at(26, 22, 46), active = true, working = true, state = s1))        // working late: no nagging
-        assertNull(b.due(at(26, 22, 46), active = false, working = false, state = s1))      // gone to bed
+        assertEquals(2, b.due(at(26, 22, 46), active = true, state = s1)!!.level) // working late gets reminders too
+        assertNull(b.due(at(26, 22, 46), active = false, state = s1))      // gone to bed
         val s2 = s1.copy(count = 2, lastTs = at(26, 22, 46))
-        assertEquals(20, b.due(at(26, 23, 2), active = true, working = false, state = s2)!!.lockSec)
-        assertNull(b.due(at(26, 23, 2), active = true, working = false, state = s2.copy(snoozeUntil = at(26, 23, 10))))
+        assertEquals(20, b.due(at(26, 23, 2), active = true, state = s2)!!.lockSec)
+        assertNull(b.due(at(26, 23, 2), active = true, state = s2.copy(snoozeUntil = at(26, 23, 10))))
     }
 
     @Test fun aNewNightStartsOver() {
         val old = Bedtime.NightState(night, count = 5, lastTs = at(27, 1, 0))
-        assertEquals(1, b.due(at(27, 22, 35), active = true, working = false, state = old)!!.level)
+        assertEquals(1, b.due(at(27, 22, 35), active = true, state = old)!!.level)
     }
 }

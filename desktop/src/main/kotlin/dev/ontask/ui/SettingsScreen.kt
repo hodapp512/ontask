@@ -98,7 +98,7 @@ private fun RhythmSettings(app: App) {
                 listOf(15, 30, 45, 60).forEach { m -> FilterChip(lead == m, { lead = m; app.prefs.set("rhythm.evening_lead_min", m) }, label = { Text("$m min before") }) }
             }
         }
-        SwitchSetting("Bedtime reminder", "At bedtime, a reminder to put the screen away; more of them every 15 minutes while you're still at it (not while you're working).", bedOn) { bedOn = it; app.prefs.set("bedtime.enabled", it) }
+        SwitchSetting("Bedtime reminder", "At bedtime, a reminder to put the screen away; more of them every 15 minutes while you're still at it.", bedOn) { bedOn = it; app.prefs.set("bedtime.enabled", it) }
         if (bedOn) {
             // 8:00 PM to 2:00 AM in 15-minute steps (values past midnight wrap).
             val fmt = java.time.format.DateTimeFormatter.ofLocalizedTime(java.time.format.FormatStyle.SHORT)
