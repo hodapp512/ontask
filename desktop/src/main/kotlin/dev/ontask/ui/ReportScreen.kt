@@ -162,13 +162,14 @@ fun SummaryCard(r: DailyReport, title: String, app: App? = null, onRelabel: () -
             }
         }
         Row(Modifier.fillMaxWidth().height(12.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))) {
-            Level.entries.forEach { l -> val v = r.totalsAll[l] ?: 0; if (v > 0) androidx.compose.foundation.layout.Box(Modifier.weight(v.toFloat()).fillMaxHeight().background(levelColor(l))) }
+            // Screen time only: Away isn't part of the bar or the totals below it.
+            Level.entries.filter { it != Level.AWAY }.forEach { l -> val v = r.totalsAll[l] ?: 0; if (v > 0) androidx.compose.foundation.layout.Box(Modifier.weight(v.toFloat()).fillMaxHeight().background(levelColor(l))) }
         }
         // The day's totals; hovering shows the same split for work hours only (when there was time outside them).
         val workTotal = r.totalsWork.values.sum()
         val legend: @Composable () -> Unit = {
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Level.entries.forEach { l -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) { Dot(levelColor(l), 10); Text("${l.label} ${fmtDuration(r.totalsAll[l] ?: 0)}") } }
+                Level.entries.filter { it != Level.AWAY }.forEach { l -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) { Dot(levelColor(l), 10); Text("${l.label} ${fmtDuration(r.totalsAll[l] ?: 0)}") } }
             }
         }
         if (workTotal > 0 && workTotal < total) androidx.compose.foundation.TooltipArea(

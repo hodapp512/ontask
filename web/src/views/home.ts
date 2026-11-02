@@ -126,9 +126,11 @@ async function sendCorrection(uid: string, subject: string, category: string, it
 /** The "Today so far" view: the same on your phone and for your partner (who can't relabel anything). */
 export function reportBody(r: DocumentData, edit?: { uid: string; categories: Cat[] }): HTMLElement {
   const totals = (r.totals ?? {}) as Partial<Record<LevelKey, number>>;
-  const sum = LEVELS.reduce((a, l) => a + (totals[l.key] ?? 0), 0) || 1;
+  // Screen time only: Away isn't part of the bar or the totals under it.
+  const shown = LEVELS.filter((l) => l.key !== "AWAY");
+  const sum = shown.reduce((a, l) => a + (totals[l.key] ?? 0), 0) || 1;
   const share = deepShare(totals);
-  const bar = h("div", { class: "bar" }); bar.innerHTML = LEVELS.map((l) => `<div style="width:${((totals[l.key] ?? 0) / sum) * 100}%;background:${l.color}"></div>`).join("");
+  const bar = h("div", { class: "bar" }); bar.innerHTML = shown.map((l) => `<div style="width:${((totals[l.key] ?? 0) / sum) * 100}%;background:${l.color}"></div>`).join("");
   const tl = timelineEl((r.timeline ?? []) as Seg[]);
   const sessions = (r.deepSessions ?? []).length;
   return h("div", { class: "stack" },
@@ -136,7 +138,7 @@ export function reportBody(r: DocumentData, edit?: { uid: string; categories: Ca
       h("p", { class: "big" }, share !== null ? `${share}% focused` : `${fmtDuration(totals.DEEP ?? 0)} focused`),
       h("p", { class: "screen-time" }, h("span", { class: "muted small" }, "Screen time"), h("strong", {}, fmtDuration((totals.DEEP ?? 0) + (totals.MIXED ?? 0) + (totals.WASTED ?? 0))))),
     bar,
-    h("div", { class: "legend" }, LEVELS.map((l) => h("span", {}, h("span", { class: "dot", style: `background:${l.color}` }), `${l.label} ${fmtDuration(totals[l.key] ?? 0)}`))),
+    h("div", { class: "legend" }, shown.map((l) => h("span", {}, h("span", { class: "dot", style: `background:${l.color}` }), `${l.label} ${fmtDuration(totals[l.key] ?? 0)}`))),
     tl,
     sessions > 0 && h("details", {}, h("summary", {}, "Longest focused sessions"),
       ([...(r.deepSessions ?? [])] as { a: number; b: number }[]).sort((x, y) => (y.b - y.a) - (x.b - x.a)).slice(0, 5)

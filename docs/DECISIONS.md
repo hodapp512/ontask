@@ -273,3 +273,6 @@ when it comes to the front.*
   Where the time went: the dropdowns show it's editable.
 - **Trackpad pinch zooms the Mac timeline,** through Apple's gesture events (com.apple.eawt.event, opened with
   --add-exports; Compose doesn't deliver pinches). Pinches go to the timeline under the pointer; elsewhere nothing.
+- **The totals bar and its legend show screen time only** (Focused, Mixed, Wasted); Away was noise there. The
+  timeline still shows away stretches as gaps.
+- **"During work hours: …" is a tooltip** on the day's totals (Mac), not its own line.
