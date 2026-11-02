@@ -1,5 +1,5 @@
 import * as admin from "firebase-admin";
-import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
@@ -7,7 +7,8 @@ import { randomBytes } from "node:crypto";
 import { deliverToPartner, releaseDeferred, routeEvent, takeQueuedAlerts, type Link } from "./deliver";
 import { firstName } from "./logic/messages";
 import { fmtDate, ownParts, partnerParts, reportDue, reportHtml, reportText, type CheckinDoc, type ReportDoc } from "./logic/report";
-import { bedtimeNight, bedtimePushDue, checkinState, habitsDue } from "./logic/schedule";
+import { bedtimeNight, bedtimePushDue, checkinState, habitsDue, isWorkDay } from "./logic/schedule";
+import { mergeHeat, mergeReports, type DayParts, type DeviceReport } from "./logic/merge";
 import { localParts } from "./logic/routing";
 import { buildPrompt, ollamaLibraryUrl, parseCandidates, validateCandidates, type Recommendation } from "./logic/modelrec";
 import type { ScheduleDoc } from "./logic/types";
@@ -41,6 +42,38 @@ export const onEventCreated = onDocumentCreated({ document: "users/{uid}/events/
   }
   const n = await routeEvent(db, senders, uid, { type: ev.type, ts: ev.ts, payload: ev.payload }, now);
   await event.data!.ref.update({ processedAt: now.getTime(), delivered: n });
+});
+
+// ---- Per-device reports -> the merged day everyone reads -------------------------------------------------------
+
+/** A device's day report changed: merge all devices' reports for that day into reports/{date}. */
+export const onDeviceReportWritten = onDocumentWritten({ document: "users/{uid}/deviceReports/{id}" }, async (event) => {
+  const date = (event.data?.after.get("date") ?? event.data?.before.get("date")) as string | undefined;
+  if (!date) return;
+  const uid = event.params.uid;
+  const all = await db.collection(`users/${uid}/deviceReports`).where("date", "==", date).get();
+  const merged = mergeReports(all.docs.map((d) => d.data() as DeviceReport));
+  if (merged) await db.doc(`users/${uid}/reports/${date}`).set(merged);
+});
+
+/** The same for the titled rows only you can read (reportItems). */
+export const onDeviceReportItemsWritten = onDocumentWritten({ document: "users/{uid}/deviceReportItems/{id}" }, async (event) => {
+  const date = (event.data?.after.get("date") ?? event.data?.before.get("date")) as string | undefined;
+  if (!date) return;
+  const uid = event.params.uid;
+  const all = await db.collection(`users/${uid}/deviceReportItems`).where("date", "==", date).get();
+  const merged = mergeReports(all.docs.map((d) => ({ date, ...(d.data() as object) }) as DeviceReport));
+  if (merged) await db.doc(`users/${uid}/reportItems/${date}`).set({ topSites: merged.topSites ?? [], updatedAt: merged.updatedAt ?? Date.now() });
+});
+
+/** A device's year of heat numbers changed: recompute the merged heat/year (scores, total, streak). */
+export const onDeviceHeatWritten = onDocumentWritten({ document: "users/{uid}/deviceHeat/{id}" }, async (event) => {
+  const uid = event.params.uid;
+  const [all, sched] = await Promise.all([db.collection(`users/${uid}/deviceHeat`).get(), db.doc(`users/${uid}/schedule/current`).get()]);
+  const s = sched.data() as ScheduleDoc | undefined;
+  const today = localParts(new Date(), s?.tz ?? "America/Chicago").date;
+  const heat = mergeHeat(all.docs.map((d) => (d.get("days") ?? {}) as Record<string, DayParts>), today, (d) => isWorkDay(s, d));
+  await db.doc(`users/${uid}/heat/year`).set({ ...heat, updatedAt: Date.now() });
 });
 
 export const onReactionCreated = onDocumentCreated({ document: "links/{linkId}/reactions/{id}" }, async (event) => {

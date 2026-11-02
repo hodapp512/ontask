@@ -62,6 +62,7 @@ class CloudSync(
     private var client: CloudClient? = null
     private var clientCfg: CloudConfig? = null
     private var lastReportTs = 0L
+    private var lastHeatTs = 0L
     private var lastInfoTs = 0L
     private val json = Json
 
@@ -105,7 +106,9 @@ class CloudSync(
             val uid = c.ensureUid()
             drainEvents(c, uid)
             val corrected = applyPhoneCorrections(c, uid)
-            if (force || corrected || nowSec - lastReportTs >= 600) { uploadReport(c, uid, LocalDate.now(zone)); uploadHeat(c, uid); lastReportTs = nowSec }
+            // Every 2 minutes (and at once on stepping away), so the merged day stays current everywhere.
+            if (force || corrected || nowSec - lastReportTs >= 120) { uploadReport(c, uid, LocalDate.now(zone)); lastReportTs = nowSec }
+            if (force || nowSec - lastHeatTs >= 600) { uploadHeat(c, uid); lastHeatTs = nowSec }
             uploadScheduleIfChanged(c, uid)
             uploadCheckinFlag(c, uid)
             pullReactions(c, uid)
@@ -189,18 +192,26 @@ class CloudSync(
         set(v) { prefs.set("cloud.partner_titles", v) }
 
     /**
-     * The daily report your partner may read (page titles only if [partnerSeesTitles]), and the titled rows in a
-     * document only you can read, for your phone.
+     * This Mac's day report (page titles only if [partnerSeesTitles]) and its titled rows, each as this device's own
+     * document. The server merges all devices' documents into the day everyone reads (reports/{date}, and reportItems
+     * for the titles only you can read).
      */
     private fun uploadReport(c: CloudClient, uid: String, date: LocalDate) {
         val r = reports.daily(date)
         val payload = reportPayload(r, System.currentTimeMillis(), titles = partnerSeesTitles).let { p ->
             val (am, pm) = halves(date)
-            if (am == null && pm == null) p else JsonObject(p + ("halves" to buildJsonObject { am?.let { put("morning", it) }; pm?.let { put("afternoon", it) } }))
+            val withHalves = if (am == null && pm == null) p else JsonObject(p + ("halves" to buildJsonObject { am?.let { put("morning", it) }; pm?.let { put("afternoon", it) } }))
+            JsonObject(withHalves + ("device" to deviceJson()))
         }
-        c.write("users/$uid/reports", date.toString(), payload)
-        c.write("users/$uid/reportItems", date.toString(), buildJsonObject { put("topSites", sitesJson(r.topSubjects, titles = true)); put("updatedAt", System.currentTimeMillis()) })
+        c.write("users/$uid/deviceReports", "${date}_${deviceId()}", payload)
+        c.write("users/$uid/deviceReportItems", "${date}_${deviceId()}", buildJsonObject {
+            put("date", date.toString()); put("device", deviceJson())
+            put("topSites", sitesJson(r.topSubjects, titles = true)); put("updatedAt", System.currentTimeMillis())
+        })
     }
+
+    private fun deviceJson() = buildJsonObject { put("id", deviceId()); put("kind", "mac"); put("name", hostName()) }
+    private fun hostName(): String = runCatching { java.net.InetAddress.getLocalHost().hostName.removeSuffix(".local") }.getOrDefault("Mac")
 
     /**
      * "Where the time went" rows. With [titles], pages and videos on Varies sites are their own rows (with the key the
@@ -259,26 +270,27 @@ class CloudSync(
     }
 
     /**
-     * The year heat map for the phone and your partner, as one small document: per day with screen time, effective
-     * focus ("e"), focused seconds ("f") and focus % ("p"); plus the year's focused total and the streak.
+     * This Mac's numbers for each day of the heat map's year (all additive, so the server can add other devices'
+     * and score the sum): users/{uid}/deviceHeat/{device}. The server writes the merged heat/year everyone reads.
      */
     private fun uploadHeat(c: CloudClient, uid: String) {
-        val (days, streak) = heat() ?: return
-        val payload = heatPayload(days, streak)
+        val (days, _) = heat() ?: return
+        val payload = heatPayload(days)
         val hash = payload.toString().hashCode().toString()
         if (prefs.get("cloud.heat_hash") == hash) return
-        c.write("users/$uid/heat", "year", JsonObject(payload + ("updatedAt" to kotlinx.serialization.json.JsonPrimitive(System.currentTimeMillis()))))
+        c.write("users/$uid/deviceHeat", deviceId(), JsonObject(payload + mapOf("device" to deviceJson(), "updatedAt" to kotlinx.serialization.json.JsonPrimitive(System.currentTimeMillis()))))
         prefs.set("cloud.heat_hash", hash)
     }
 
-    fun heatPayload(days: Map<LocalDate, dev.ontask.report.DayStat>, streak: Int): JsonObject = buildJsonObject {
+    fun heatPayload(days: Map<LocalDate, dev.ontask.report.DayStat>): JsonObject = buildJsonObject {
         put("days", buildJsonObject {
             days.filterValues { it.active > 0 }.toSortedMap().forEach { (d, s) ->
-                put(d.toString(), buildJsonObject { put("e", s.effectiveSec); put("f", s.deep); put("p", s.pct) })
+                put(d.toString(), buildJsonObject {
+                    put("deep", s.deep); put("active", s.active); put("workDeep", s.workDeep); put("workActive", s.workActive)
+                    put("offWasted", s.offWasted); put("offActive", s.offActive)
+                })
             }
         })
-        put("totalSec", days.values.sumOf { it.deep })
-        put("streak", streak)
     }
 
     private fun pullReactions(c: CloudClient, uid: String) {

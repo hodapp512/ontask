@@ -74,7 +74,7 @@ class CloudTest {
             val posts = fake.requests.filter { it.first == "POST" && it.second.contains("/users/uid-1/events") }
             assertEquals(2, posts.size)
             assertTrue(posts[0].third.contains("Doctor") && posts[0].third.contains("work_hours_change"))
-            assertTrue(fake.requests.any { it.first == "PATCH" && it.second.contains("/users/uid-1/reports/${LocalDate.now()}") })
+            assertTrue(fake.requests.any { it.first == "PATCH" && it.second.contains("/users/uid-1/deviceReports/${LocalDate.now()}_mac-") })
             val sched = fake.requests.first { it.first == "PATCH" && it.second.contains("/schedule/current") }.third
             assertTrue("Morning prayer" in sched && "workWeek" in sched)
             assertTrue(events.pending().isEmpty()) // marked synced

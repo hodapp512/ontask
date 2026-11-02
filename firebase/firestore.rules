@@ -5,7 +5,9 @@ rules_version = '2';
 //   users/{uid}/contact/{doc}       phone / email for channels    (owner only; functions read it)
 //   users/{uid}/events/{id}         outbox written by the Mac     (owner creates; functions process)
 //   users/{uid}/reports/{date}      daily aggregates              (owner writes; partner reads if share == "report")
-//   users/{uid}/heat/year           year heat map scores          (same as reports)
+//   users/{uid}/heat/year           year heat map scores          (same as reports; written by the server)
+//   users/{uid}/deviceReports/{date_device}, deviceReportItems/{date_device}, deviceHeat/{device}
+//                                   each device's own uploads     (owner; the server merges them)
 //   users/{uid}/reportItems/{date}  page and video titles         (owner only; the partner never reads these)
 //   users/{uid}/schedule/current    work hours, habits, times     (owner)
 //   users/{uid}/devices/{id}        linked Macs and phones        (owner; shown in both apps)
@@ -39,13 +41,18 @@ service cloud.firestore {
         allow create: if isOwner(uid) && request.resource.data.keys().hasAll(['type', 'ts']);
       }
       match /reports/{date} {
-        allow write: if isOwner(uid);
+        allow write: if false; // merged by the server from deviceReports
         allow read: if isOwner(uid) || partnerSeesReport(uid);
       }
-      match /reportItems/{date} { allow read, write: if isOwner(uid); }
+      match /reportItems/{date} { allow read: if isOwner(uid); allow write: if false; }
+      // Each device's own day report, titled rows and heat numbers; the server merges them into reports,
+      // reportItems and heat/year.
+      match /deviceReports/{id} { allow read, write: if isOwner(uid); }
+      match /deviceReportItems/{id} { allow read, write: if isOwner(uid); }
+      match /deviceHeat/{id} { allow read, write: if isOwner(uid); }
       // The year heat map (per-day scores only): shared like the daily report.
       match /heat/{doc} {
-        allow write: if isOwner(uid);
+        allow write: if false; // merged by the server from deviceHeat
         allow read: if isOwner(uid) || partnerSeesReport(uid);
       }
       match /schedule/{doc} { allow read, write: if isOwner(uid); }

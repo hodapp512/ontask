@@ -38,6 +38,15 @@ export function rangesFor(s: ScheduleDoc, now: Date): { startMin: number; endMin
   return s.exceptions?.[date] ?? s.workWeek[String(isoWeekday)] ?? [];
 }
 
+/** Whether [date] (yyyy-MM-dd) has work hours: its exception if any, else its weekday's template. */
+export function isWorkDay(s: ScheduleDoc | undefined, date: string): boolean {
+  if (!s) return false;
+  const ex = s.exceptions?.[date];
+  if (ex) return ex.length > 0;
+  const wd = new Date(date + "T12:00:00Z").getUTCDay() || 7; // ISO: Sunday = 7
+  return (s.workWeek[String(wd)] ?? []).length > 0;
+}
+
 export function workEndMin(s: ScheduleDoc, now: Date): number | null {
   const r = rangesFor(s, now);
   return r.length ? Math.max(...r.map((x) => x.endMin)) : null;
