@@ -186,7 +186,7 @@ class App(val dir: Path = dataDir()) {
     }
 
     fun unblockNudgeOk() { _unblockNudge.value = null }
-    fun unblockNudgeStruggling() { _unblockNudge.value = null; _intervention.value = ladder.struggling() }
+    fun unblockNudgeStruggling() { _unblockNudge.value = null; _intervention.value = ladder.struggling()?.let { decorate(it, nowSec()) } }
 
     private fun checkRegularEnded(now: Long) {
         val active = unblocks.active(now).filter { it.kind == dev.ontask.block.UnblockKind.REGULAR }
@@ -234,7 +234,9 @@ class App(val dir: Path = dataDir()) {
     private var batteryAsked = false
     private val snoozeUntil = HashMap<Prompt, Long>()
 
-    val tracker = Tracker(TickStore(db), { classifier }, { settings })
+    /** Focus since your last break, and any break or lunch running (see [Breaks]). Guarded by itself. */
+    val breaks = dev.ontask.intervene.Breaks()
+    val tracker = Tracker(TickStore(db), { classifier }, { settings }, notWork = { synchronized(breaks) { breaks.active?.kind == dev.ontask.intervene.Breaks.Kind.LUNCH } })
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     fun start() {
@@ -270,12 +272,24 @@ class App(val dir: Path = dataDir()) {
         wasAway = live.away
         val wasted = !live.away && live.classification?.level == Level.WASTED
         if (wasted) driftSite()?.let { lastWastedSite = it }
-        ladder.cfg = ladder.cfg.copy(lockSec = prefs.int("ladder.lock_sec", 30).coerceIn(30, 180), step1WastedSec = prefs.int("ladder.step1_sec", 120))
+        val (due, earned, onBreak) = synchronized(breaks) {
+            breaks.forgetBefore(LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toEpochSecond())
+            Triple(breaks.tick(now, settings.tickSec.toLong(), if (live.away) null else live.classification?.level), breaks.earnedSec(), breaks.onBreak())
+        }
+        if (due != null) {
+            if (due != dev.ontask.intervene.Breaks.Due.LUNCH_CHECK) ladder.breakOver(now)
+            if (prefs.bool("ladder.enabled", true)) _breakCard.value = breakCard(due, now)
+        }
+        // With a break earned, the first prompt is "Is this a break?" after a minute; otherwise "drifting" after two.
+        ladder.cfg = ladder.cfg.copy(lockSec = prefs.int("ladder.lock_sec", 30).coerceIn(30, 180), step1WastedSec = if (earned > 0) 60 else prefs.int("ladder.step1_sec", 120))
         val strict = blocking.strictNow(now)
-        val iv = ladder.tick(now, wasted, strict || beforeWorkAfterSitDown(now), unblocks.unblocksInLast(now, ladder.cfg.unblockWindowSec.toLong()))
-            ?.copy(partnerAllowed = strict, site = lastWastedSite)
-        if (iv != null && prefs.bool("ladder.enabled", true)) _intervention.value = iv
-        if (_intervention.value != null && ladder.step == Step.NONE) _intervention.value = null
+        val iv = ladder.tick(now, wasted, (strict || beforeWorkAfterSitDown(now)) && !onBreak, unblocks.unblocksInLast(now, ladder.cfg.unblockWindowSec.toLong()))
+            ?.let { decorate(it, now) }
+        if (iv != null && prefs.bool("ladder.enabled", true)) { _intervention.value = iv; closedIv = null; if (iv.step.n >= 2) _breakCard.value = null }
+        if (ladder.step == Step.NONE) { _intervention.value = null; closedIv = null }
+        // A prompt closed with its window's close button comes back until it's answered.
+        closedIv?.let { (c, at) -> if (now >= at && _intervention.value == null) { closedIv = null; if (ladder.step == c.step) _intervention.value = decorate(c, now) } }
+        closedCard?.let { (c, at) -> if (now >= at && _breakCard.value == null) { closedCard = null; _breakCard.value = c } }
 
         if (ai.enabled && !ai.metadataOnly && !live.away && now - lastAi >= prefs.int("ai.interval_sec", 30) && tracker.needsAi() && !aiBusy) { lastAi = now; scope.launch(IO) { aiCycle(live.sample) } }
         variableCheck(now, live)
@@ -360,11 +374,21 @@ class App(val dir: Path = dataDir()) {
         _unknownAsk.value = UnknownAsk(name)
     }
 
+    /** The window's close button: asked again in a minute if you're still on it. */
+    fun unknownClosed(name: String) { _unknownAsk.value = null; unknownNotNow[name] = nowSec() + 60 }
+
     /** Your answer to "Which category is this?": files the site or app under [cat], or (null, "Not now") asks again later. */
     fun answerUnknown(name: String, cat: Category?) {
         _unknownAsk.value = null
         if (cat == null) { unknownNotNow[name] = nowSec() + 15 * 60; return }
         reclassify(name, cat)
+    }
+
+    /** The "I can't tell" window's close button: asked again in a minute if you're still on that page. */
+    fun variableClosed(item: String) {
+        if (_variableAsk.value?.item == item) _variableAsk.value = null
+        synchronized(variableAsked) { variableAsked.remove(item) }
+        lastAskTs = nowSec() - 60
     }
 
     private var lastBackfill = 0L
@@ -448,14 +472,73 @@ class App(val dir: Path = dataDir()) {
 
     fun interventionWork() {
         val s = tracker.live.value.sample; val c = tracker.live.value.classification
-        if (s != null && c != null) {
+        val seg = tracker.currentSegment()
+        // On a Varies site (YouTube…) it's this page or video that's work, not the whole site.
+        if (seg != null && seg.category.variable) answerVariable(dev.ontask.classify.itemKey(seg.app, seg.title, seg.url), seg.title, Category.CORE_WORK)
+        else if (s != null && c != null) {
             val domain = dev.ontask.classify.domainOf(s.url)
             val (kind, pattern) = if (domain != null) dev.ontask.classify.RuleKind.DOMAIN to domain else dev.ontask.classify.RuleKind.APP to (s.app ?: "")
             if (pattern.isNotBlank()) { ruleStore.label(kind, pattern, Category.CORE_WORK, c.category, nowSec()); reloadRules() }
         }
-        ladder.workConfirmed(); _intervention.value = null
+        ladder.workConfirmed(); _intervention.value = null; closedIv = null
     }
-    fun interventionBack() { ladder.backToWork(nowSec()); _intervention.value = null }
+    fun interventionBack() { ladder.backToWork(nowSec()); _intervention.value = null; closedIv = null }
+
+    /** Fills in what the prompts say about breaks: earned, focused since the last one, Lunch, totals. */
+    private fun decorate(iv: Intervention, now: Long): Intervention = synchronized(breaks) {
+        val t = java.time.Instant.ofEpochSecond(now).atZone(ZoneId.systemDefault())
+        iv.copy(
+            partnerAllowed = blocking.strictNow(now), site = lastWastedSite,
+            breakSec = if (iv.step == Step.PROMPT) breaks.earnedSec() else 0, focusedSec = breaks.focusedSec, toEarnSec = breaks.toEarnSec(),
+            lunch = iv.step == Step.PROMPT && breaks.lunchOffered(t.toLocalDate().toString(), t.hour * 60 + t.minute),
+            breaksHourSec = breaks.breakSec(now, now - 3600), breaksTodaySec = breaks.breakSec(now, t.toLocalDate().atStartOfDay(t.zone).toEpochSecond()),
+        )
+    }
+
+    /** "Back to work: 25 min Focus" (or the 10-minute "just start"): starts Focus, which blocks distractions. */
+    fun interventionFocus(minutes: Int = 25) {
+        val now = nowSec()
+        synchronized(breaks) { breaks.end(now) }
+        focus.start(minutes, now)
+        scope.launch(IO) { blocking.tick(nowSec()) }
+        _breakCard.value = null; closedCard = null
+        interventionBack()
+    }
+
+    /** "Yes, 5-min break": the earned length, with no drift prompts until it's over. */
+    fun interventionBreak() { synchronized(breaks) { breaks.startBreak(nowSec()) }; events.emit("break_start", nowSec()); ladder.reset(); _intervention.value = null; closedIv = null }
+
+    /** Lunch: up to 45 minutes, once a day between 11:00 and 2:00. */
+    fun interventionLunch() {
+        val now = nowSec()
+        synchronized(breaks) { breaks.startLunch(now, LocalDate.now().toString()) }
+        events.emit("lunch_start", now); ladder.reset(); _intervention.value = null; closedIv = null
+    }
+
+    /** The prompt's own close button: it comes back in 30 seconds while you're still drifting. */
+    fun interventionClosed() { _intervention.value?.let { closedIv = it to nowSec() + 30 }; _intervention.value = null }
+    private var closedIv: Pair<Intervention, Long>? = null
+
+    /** "That's 5 minutes. Back to work?", "Is lunch over?" and "Lunch is over". */
+    data class BreakCard(val due: dev.ontask.intervene.Breaks.Due, val minutes: Long, val breaksHourSec: Long, val breaksTodaySec: Long, val canExtend: Boolean)
+    private val _breakCard = MutableStateFlow<BreakCard?>(null)
+    val breakCard: StateFlow<BreakCard?> = _breakCard
+    private var closedCard: Pair<BreakCard, Long>? = null
+
+    private fun breakCard(due: dev.ontask.intervene.Breaks.Due, now: Long): BreakCard = synchronized(breaks) {
+        val last = breaks.lastTaken()
+        BreakCard(
+            due, if (due == dev.ontask.intervene.Breaks.Due.BREAK_OVER) ((last?.let { it.second - it.first } ?: 0) + 30) / 60 else (now - (breaks.active?.start ?: now)) / 60,
+            breaks.breakSec(now, now - 3600), breaks.breakSec(now, LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toEpochSecond()),
+            canExtend = due == dev.ontask.intervene.Breaks.Due.LUNCH_CHECK || due == dev.ontask.intervene.Breaks.Due.BREAK_OVER && breaks.canExtend(now),
+        )
+    }
+
+    /** "5 more minutes" (once per break) or "15 more minutes" of lunch. */
+    fun breakMore() { synchronized(breaks) { breaks.extend(nowSec()) }; ladder.reset(); _breakCard.value = null; closedCard = null }
+    /** "just close": no Focus, but drifting on still escalates. */
+    fun breakCardDone() { if (_breakCard.value?.due == dev.ontask.intervene.Breaks.Due.LUNCH_CHECK) synchronized(breaks) { breaks.end(nowSec()) }; ladder.breakOver(nowSec()); _breakCard.value = null; closedCard = null }
+    fun breakCardClosed() { _breakCard.value?.let { closedCard = it to nowSec() + 30 }; _breakCard.value = null }
 
     /** The last site you were drifting on, named by the prompts' block button even after you've switched away. */
     @Volatile private var lastWastedSite: String? = null
@@ -471,8 +554,7 @@ class App(val dir: Path = dataDir()) {
         scope.launch(IO) { blocking.tick(nowSec()) }
         interventionBack()
     }
-    fun interventionStruggling() { _intervention.value = ladder.struggling()?.copy(partnerAllowed = blocking.strictNow(nowSec()), site = lastWastedSite) }
-    fun interventionDismiss() { _intervention.value = null }
+    fun interventionStruggling() { _intervention.value = ladder.struggling()?.let { decorate(it, nowSec()) } }
 
     /** Today's first moment at the computer (refreshed every 30 s by the rhythm check). */
     @Volatile private var firstPresence: Pair<LocalDate, Long?>? = null

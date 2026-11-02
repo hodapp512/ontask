@@ -100,16 +100,30 @@ Active during work hours and Focus sessions, and on work days **from your first 
 (prompts only then: no partner messages, unblocking stays relaxed). Drifting = time in a Wasted category; under a
 minute away doesn't break the run.
 
+**Breaks are earned.** Focused minutes since your last break add up; time that isn't focused (Mixed or Wasted) is
+taken off minute for minute once a stretch lasts a minute; 5+ min away, a break, or lunch starts it again. Earned:
+nothing under 25 min focused, then 5 min per 25 (at most 10 under an hour, 15 after).
+
 | Step | Trigger | Response |
 |---|---|---|
-| 1 | 2 min of drifting, or 2nd unblock within 60 min | A prompt **centered on the screen you're using**, on top, taking focus: *Back to work / Yes, it's work / I'm struggling* |
-| 2 | +3 min, or 3rd unblock within 60 min | Firmer centered window, **can't be closed for 30 s**: drift time, your message, today's plan, unblock count |
+| 1 (break earned) | 1 min of drifting | Centered, takes focus: **"Is this a break? You've focused 40 min, so you've got 5 minutes."** *Yes, 5-min break / I'm working / Back to work: 25 min Focus* (+ *Lunch*) |
+| 1 (not earned) | 2 min of drifting, or 2nd unblock within 60 min | Centered, takes focus: **"It looks like you're drifting."** + "You've focused 12 min since your last break. 13 min more earns a 5-minute break." *Back to work: 25 min Focus / I'm working* (+ *Lunch*) / *just close* |
+| 2 | +3 min, or 3rd unblock within 60 min | Firmer centered window, **can't be closed for 30 s**: drift time, your message, today's plan, break totals; *Back to work: 25 min Focus / It's actually work / Help me get started* |
 | 3 | +5 min, or 4th unblock within 60 min | Work hours: offer to message the partner (user confirms, can edit). Before work hours: the step-2 window again |
 
-- Every step offers **"Block <site> for 15 minutes"**: blocks the site you were drifting on (even a Varies site like
-  YouTube), counts as Back to work; the partner isn't told.
+- **During a break** there are no drift prompts. It ends quietly after 2 min of focused work, or with **"That's 5
+  minutes. Back to work?"** (break totals: last hour and today) → *Back to work: 25 min Focus / 5 more minutes* (once)
+  / *just close*. Still drifting a minute after a break or lunch → straight to step 2.
+- **Lunch** (11:00–2:00, once a day, offered on step 1): no drift prompts; **"Is lunch over?" at 30 min** (*Focus / 15
+  more minutes*), over at 45 min. Working during lunch doesn't end it. Lunch time isn't work time in the totals.
+- **Help me get started** (steps 2–3): pick the smallest next step from today's plan (10-min Focus), *Just start: 10 min
+  Focus*, *Block <site> for 15 minutes*, and in work hours *Message my partner*.
+- **Closing any prompt with the window's close button only hides it:** drift prompts and break cards come back after
+  30 s, category questions after a minute, until answered.
+- Break and lunch time on time-wasting sites still counts as Wasted (red).
 - "Back to work" gives **5 minutes** of grace. Drifting again **within the hour picks up where the last drift left
-  off** (second drift at step 2, third at step 3); an hour clear resets it. "Yes, it's work" resets and creates a rule.
+  off** (second drift at step 2, third at step 3); an hour clear resets it. "I'm working" resets; on a Varies site it
+  marks that page or video as Work, elsewhere it creates a rule.
 - Drifting alerts to the partner (binge + work-hours unblocks) are capped **2 before noon and 2 after**, on the server;
   extras go into the daily report with their times.
 - Messages end with a low-effort prompt (e.g. "No need to reply — but a 👍 helps").

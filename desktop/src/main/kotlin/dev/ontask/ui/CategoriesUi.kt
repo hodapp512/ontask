@@ -44,7 +44,7 @@ import dev.ontask.Level
 fun VariableAskWindow(app: App, ask: App.VariableAsk, mode: ThemeMode) {
     val cats = remember { Category.assignable.filter { !it.variable } }
     Window(
-        onCloseRequest = { app.answerVariable(ask.item, ask.title, null) }, title = "OnTask", alwaysOnTop = true, resizable = false, focusable = false,
+        onCloseRequest = { app.variableClosed(ask.item) }, title = "OnTask", alwaysOnTop = true, resizable = false, focusable = false,
         state = rememberWindowState(size = DpSize(480.dp, 250.dp), position = centeredOnActiveScreen(DpSize(480.dp, 250.dp))),
     ) {
         OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) {
@@ -74,7 +74,7 @@ fun UnknownAskWindow(app: App, ask: App.UnknownAsk, mode: ThemeMode) {
     val cats = remember { Category.assignable }
     val size = DpSize(480.dp, 250.dp)
     Window(
-        onCloseRequest = { app.answerUnknown(ask.name, null) }, title = "OnTask", alwaysOnTop = true, resizable = false, focusable = false,
+        onCloseRequest = { app.unknownClosed(ask.name) }, title = "OnTask", alwaysOnTop = true, resizable = false, focusable = false,
         state = rememberWindowState(size = size, position = centeredOnActiveScreen(size)),
     ) {
         OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) {

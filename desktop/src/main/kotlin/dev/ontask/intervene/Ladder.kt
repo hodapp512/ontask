@@ -17,8 +17,16 @@ data class LadderConfig(
 
 enum class Step(val n: Int) { NONE(0), PROMPT(1), WINDOW(2), PARTNER(3) }
 
-/** [partnerAllowed]: false before work hours, when step 3 doesn't offer to message the partner. */
-data class Intervention(val step: Step, val driftSec: Long, val unblocks: Int, val partnerAllowed: Boolean = true, val site: String? = null)
+/**
+ * [partnerAllowed]: false before work hours, when step 3 doesn't offer to message the partner. The rest is filled in by
+ * the caller from [Breaks]: [breakSec] > 0 makes step 1 the "Is this a break?" check; [focusedSec] and [toEarnSec] are
+ * focus since the last break and what's left to earn one; [lunch] offers Lunch; break totals for the last hour and today.
+ */
+data class Intervention(
+    val step: Step, val driftSec: Long, val unblocks: Int, val partnerAllowed: Boolean = true, val site: String? = null,
+    val breakSec: Long = 0, val focusedSec: Long = 0, val toEarnSec: Long = 0, val lunch: Boolean = false,
+    val breaksHourSec: Long = 0, val breaksTodaySec: Long = 0,
+)
 
 /**
  * The binge ladder. Feed it one observation per tick; it says when to escalate. Pure state machine: no clocks, no UI.
@@ -32,6 +40,9 @@ class Ladder(var cfg: LadderConfig = LadderConfig()) {
     /** The highest step the last drift reached, and when it ended: a new drift within the hour starts one step higher. */
     private var lastPeak = 0
     private var lastEnd = 0L
+    /** Set when a break or lunch ends: still drifting a minute later goes straight to step 2. */
+    private var afterBreak = false
+    private var afterBreakTs = 0L
 
     val graceActive get() = graceUntil > 0
 
@@ -39,8 +50,10 @@ class Ladder(var cfg: LadderConfig = LadderConfig()) {
         if (now < graceUntil) { wastedSince = null; return null }
         if (!active) { reset(); return null }
         if (wasted) { if (wastedSince == null) wastedSince = now; lastWasted = now }
-        else if (wastedSince != null && now - lastWasted >= cfg.wastedBreakSec) { endRun(now); wastedSince = null; if (unblocksInWindow < cfg.unblocksStep1) step = Step.NONE }
+        else if (wastedSince != null && now - lastWasted >= cfg.wastedBreakSec) { endRun(now); wastedSince = null; afterBreak = false; if (unblocksInWindow < cfg.unblocksStep1) step = Step.NONE }
 
+        // Back at work a minute after the break: it's over, and the next drift starts gently again.
+        if (afterBreak && wastedSince == null && now - afterBreakTs >= cfg.wastedBreakSec) afterBreak = false
         val drift = wastedSince?.let { now - it } ?: 0L
         var target = 0
         if (drift >= cfg.step1WastedSec) target = 1
@@ -48,6 +61,7 @@ class Ladder(var cfg: LadderConfig = LadderConfig()) {
         if (drift >= cfg.step1WastedSec + cfg.step2ExtraSec + cfg.step3ExtraSec) target = 3
         // Drifting again soon after: start where the last drift left off (second drift at step 2, third at step 3).
         if (target > 0 && lastPeak > 0 && now - lastEnd <= cfg.resumeWithinSec) target = minOf(3, target + lastPeak)
+        if (afterBreak && drift >= 60) target = maxOf(target, 2)
         if (unblocksInWindow >= cfg.unblocksStep1) target = maxOf(target, 1)
         if (unblocksInWindow >= cfg.unblocksStep2) target = maxOf(target, 2)
         if (unblocksInWindow >= cfg.unblocksStep3) target = maxOf(target, 3)
@@ -57,10 +71,13 @@ class Ladder(var cfg: LadderConfig = LadderConfig()) {
     }
 
     /** "Yes, it's work": resets the ladder, and forgets earlier drifts (the caller also creates a rule). */
-    fun workConfirmed() { reset(); lastPeak = 0 }
+    fun workConfirmed() { reset(); lastPeak = 0; afterBreak = false }
+
+    /** A break or lunch is over: drifting on afterwards escalates at once. */
+    fun breakOver(now: Long) { reset(); afterBreak = true; afterBreakTs = now }
 
     /** "Back to work" (or blocking the site): a short grace, then a new drift picks up where this one left off. */
-    fun backToWork(now: Long) { endRun(now); reset(); graceUntil = now + cfg.graceSec }
+    fun backToWork(now: Long) { endRun(now); reset(); afterBreak = false; graceUntil = now + cfg.graceSec }
 
     private fun endRun(now: Long) {
         if (step.n == 0) return

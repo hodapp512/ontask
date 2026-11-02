@@ -15,6 +15,52 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LadderRhythmTest {
+    private fun Breaks.run(from: Long, to: Long, level: Level?): Breaks.Due? { var due: Breaks.Due? = null; var t = from; while (t < to) { tick(t, 5, level)?.let { due = it }; t += 5 }; return due }
+
+    @Test fun breaksAreEarnedByFocusAndLostToOtherTime() {
+        val b = Breaks()
+        b.run(0, 24 * 60, Level.DEEP); assertEquals(0, b.earnedSec())               // under 25 min: nothing
+        b.run(24 * 60, 30 * 60, Level.DEEP); assertEquals(300, b.earnedSec())      // 30 min → 5
+        b.run(1800, 1830, Level.WASTED); assertEquals(1800, b.focusedSec)          // a dip under a minute is ignored
+        b.run(1830, 1840, Level.DEEP)
+        b.run(1840, 1840 + 6 * 60, Level.MIXED); assertEquals(1810 - 360, b.focusedSec) // 6 min of email: minute for minute
+        b.run(3000, 3000 + 60 * 60, Level.DEEP); assertEquals(900, b.earnedSec())  // over an hour: up to 15
+        b.run(7000 + 3600, 7300 + 3600, null); assertEquals(0, b.focusedSec)                     // 5 min away starts again
+    }
+
+    @Test fun earnedCapsAtTenUnderAnHour() {
+        val b = Breaks(); b.run(0, 55 * 60, Level.DEEP); assertEquals(600, b.earnedSec())
+    }
+
+    @Test fun aBreakRunsOutOrEndsQuietlyWhenBackAtWork() {
+        val b = Breaks(); b.run(0, 30 * 60, Level.DEEP)
+        b.startBreak(1800); assertTrue(b.onBreak())
+        assertNull(b.run(1800, 2095, Level.WASTED))
+        assertEquals(Breaks.Due.BREAK_OVER, b.run(2095, 2110, Level.WASTED)); assertEquals(0, b.focusedSec)
+        assertTrue(b.canExtend(2110)); assertTrue(b.extend(2110)); assertTrue(b.onBreak())
+        assertEquals(Breaks.Due.BREAK_OVER, b.run(2110, 2420, Level.WASTED)); assertTrue(!b.canExtend(2420)) // once
+        assertEquals(610, b.breakSec(2420, 0)) // the 10 s the card was up counts too
+        val c = Breaks(); c.run(0, 30 * 60, Level.DEEP); c.startBreak(1800)
+        assertNull(c.run(1800, 1800 + 125, Level.DEEP)); assertTrue(!c.onBreak())   // 2 min of work ends it quietly
+    }
+
+    @Test fun lunchAsksAtThirtyAndEndsAtFortyFiveEvenWhileWorking() {
+        val b = Breaks()
+        assertTrue(b.lunchOffered("d", 12 * 60)); assertTrue(!b.lunchOffered("d", 10 * 60 + 59))
+        b.startLunch(0, "d"); assertTrue(!b.lunchOffered("d", 12 * 60))
+        assertEquals(Breaks.Due.LUNCH_CHECK, b.run(0, 30 * 60 + 5, Level.DEEP)); assertTrue(b.onBreak())
+        assertEquals(Breaks.Due.LUNCH_OVER, b.run(30 * 60 + 5, 45 * 60 + 5, Level.DEEP)); assertTrue(!b.onBreak())
+    }
+
+    @Test fun driftingOnAfterABreakGoesStraightToStepTwo() {
+        val l = Ladder()
+        l.breakOver(0)
+        assertNull(l.tick(0, true, true, 0)); assertEquals(Step.WINDOW, l.tick(65, true, true, 0)?.step)
+        val m = Ladder(); m.breakOver(0)
+        m.tick(0, false, true, 0); m.tick(70, false, true, 0)                       // back at work: forgotten
+        m.tick(100, true, true, 0); assertEquals(Step.PROMPT, m.tick(225, true, true, 0)?.step)
+    }
+
     @Test fun driftEscalatesThroughSteps() {
         val l = Ladder(); var t = 0L
         fun run(until: Long, wasted: Boolean = true, unblocks: Int = 0): Intervention? { var last: Intervention? = null; while (t < until) { l.tick(t, wasted, true, unblocks)?.let { last = it }; t += 10 }; return last }

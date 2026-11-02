@@ -333,3 +333,24 @@ when it comes to the front.*
   a category dropdown. A drag of 4 px or more is a pan, not a click. Changing a category there is the same as on
   Where the time went (a rule, or just that page for Varies sites) and relabels history.
 - *Rejected:* plain scroll-to-zoom kept for mouse wheels (can't tell a wheel from a trackpad, and it caused the bug).
+
+## 2026-11-02 · Earned breaks and a drift prompt people answer (grilled)
+- **Why:** "I'm struggling" on the first prompt would never be clicked, and the prompt had no honest answer for "I'm
+  taking a break". Goals: prompts that get answered, a gentle path from time-wasting back to work, breaks that are
+  fine after real work, and a push toward longer focused stretches.
+- **Breaks are earned by focus:** 5 min per 25 min focused (10 max under an hour, 15 after); nothing under 25 min.
+  Time that isn't focused subtracts minute for minute (dips under a minute ignored) instead of resetting the count;
+  5+ min away resets it.
+- **With a break earned, a minute on something Wasted asks "Is this a break?"**, so you know you're taking one and
+  that it ends soon; it ends with "That's 5 minutes. Back to work?" (5 more once). Breaks aren't offered otherwise.
+- **Without one, step 1 says "It looks like you're drifting"** (not "You've drifted"; firm, not soft) with how many
+  more focused minutes earn a break, and no break button: just get to work.
+- **"Back to work" starts a 25-minute Focus**; a small "just close" remains. "Yes, it's work" became "I'm working".
+- **"I'm struggling" became "Help me get started" on steps 2–3**, holding the next-step picker, a 10-minute start,
+  the block-the-site offer and the partner message. The block offer left step 1.
+- **Lunch on demand** 11:00–2:00 once a day: asks at 30 min, 15 more allowed, 45 max; working during it doesn't end it.
+- **Prompts closed with the window's close button come back** (30 s; category questions 1 min) until answered.
+- Prompts after a break show break totals for the last hour and the day.
+- *Rejected:* a two-step "Is this work? → No → break or drift?" (two clicks for one answer); offering break lengths;
+  breaks under 25 min focused, even short ones; showing break time as neutral instead of red; a fixed lunch window
+  in the schedule (would allow an hour of YouTube on days without lunch); requiring 2 hours of work before Lunch.

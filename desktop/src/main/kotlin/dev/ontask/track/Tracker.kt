@@ -34,6 +34,8 @@ class Tracker(
     private val classifier: () -> Classifier,
     private val settings: () -> Settings,
     private val zone: ZoneId = ZoneId.systemDefault(),
+    /** Times inside work hours that don't count as work time (lunch). */
+    private val notWork: (Long) -> Boolean = { false },
 ) {
     private var open: Segment? = null
     private var openKey: String? = null
@@ -66,7 +68,7 @@ class Tracker(
         val away = isAway(s, st.awayAfterSec)
         // Away ticks drop app/title/url: nothing useful to record, and they all merge into one segment.
         val key = if (away) "away" else listOf(s.app, s.bundleId, s.title, s.url).joinToString("\u0001")
-        val workTime = st.schedule.isWork(nowSec, zone)
+        val workTime = st.schedule.isWork(nowSec, zone) && !notWork(nowSec)
 
         val cur = open
         val extend = cur != null && key == openKey && cls === openClassifier && cur.workTime == workTime &&
