@@ -94,6 +94,7 @@ fun HomeScreen(app: App) {
         }
         BlockingHelperBanner(app, now)
         HelperBanner(app)
+        ProblemsHint(app, now)
         TodayCard(app, today) { reflecting = true }
         val summary: @Composable () -> Unit = {
             report?.let { r ->

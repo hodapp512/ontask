@@ -117,6 +117,8 @@ fun ApplicationScope.OnTaskTray(app: App, open: (Dest?) -> Unit) {
         onAction = { open(null) },
         menu = {
             status?.let { Item(it, enabled = false, onClick = {}) }
+            val problems = remember(now, version) { app.problems() }
+            if (problems.isNotEmpty()) Item("⚠️ " + (problems.singleOrNull() ?: "${problems.size} things aren't working") + " — see Diagnostics", onClick = { open(Dest.DIAGNOSTICS) })
             Item("Today: focused ${fmtDuration(deep)}, wasted ${fmtDuration(wasted)}", enabled = false, onClick = {})
             if (openCount > 0) Item("$openCount site${if (openCount == 1) "" else "s"} unblocked right now", enabled = false, onClick = {})
             val pausedUntil = remember(now, version) { app.askPausedUntil }

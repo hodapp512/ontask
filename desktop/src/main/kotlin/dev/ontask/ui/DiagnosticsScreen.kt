@@ -1,6 +1,15 @@
 package dev.ontask.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.window.DialogWindow
+import androidx.compose.ui.window.rememberDialogState
+import dev.ontask.ai.AiAccuracy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -50,6 +59,7 @@ fun DiagnosticsScreen(app: App) {
     var res by remember { mutableStateOf<Resources?>(null) }
     var rules by remember { mutableStateOf(app.ruleStore.userRules()) }
     var aiStats by remember { mutableStateOf(app.ai.stats(App.nowSec() - 86400)) }
+    var accuracy by remember { mutableStateOf(app.ai.accuracy.weekly(App.nowSec())) }
 
     // Recomputed every 10 seconds, only while this screen is open.
     var relabeled by remember { mutableStateOf(0) }
@@ -63,6 +73,7 @@ fun DiagnosticsScreen(app: App) {
                 res = Resources(app.metrics.heapMb(), recent, avg, app.metrics.self(), app.helper.pid?.let { app.metrics.ps(it) } ?: ProcMetrics(null, null))
                 rules = app.ruleStore.userRules()
                 aiStats = app.ai.stats(App.nowSec() - 86400)
+                accuracy = app.ai.accuracy.weekly(App.nowSec())
             }
             delay(10_000)
         }
@@ -71,55 +82,125 @@ fun DiagnosticsScreen(app: App) {
     Page("Diagnostics", "A look under the hood: is OnTask working, how accurate is it, and how much of your Mac does it use. Updates every 10 seconds while open.") {
         val tick = app.settings.tickSec
         res?.let { r ->
-            SectionCard("Is everything running?") {
+            val problems = app.problems()
+            SectionCard("Is everything running?", if (problems.isEmpty()) "Everything is working." else "🔴 marks what isn't working.") {
+                val scope = androidx.compose.runtime.rememberCoroutineScope()
                 val reader = app.helper.status
-                KV("Activity reader", if (reader == "running") "Running ✓" else reader)
-                Hint("A small companion program (ontask-helper) that tells OnTask which app and window are in front, whether you're at the keyboard, and — if you allow it — the text on screen. It's separate from the blocking service, which edits your hosts file.")
+                Status("Activity reader", reader == "running", if (reader == "running") "Running ✓" else reader)
+                Hint("OnTask's small companion program (ontask-helper): it tells OnTask which app and window are in front, whether you're at the keyboard, and, if you allow it, the text on screen.")
                 val blockingHelper by app.helperHealth.collectAsState()
-                KV("Blocking helper", when { app.blocking.mode == dev.ontask.block.BlockMode.DRY_RUN -> "Test mode (not used)"; blockingHelper == dev.ontask.block.HelperHealth.OK -> "Running ✓"; else -> blockingHelper?.problem?.replaceFirstChar { it.uppercase() } ?: "Checking…" })
+                Status("Blocking helper", !app.helperNeeded(), when { app.blocking.mode == dev.ontask.block.BlockMode.DRY_RUN -> "Test mode (not used)"; blockingHelper == dev.ontask.block.HelperHealth.OK -> "Running ✓"; else -> blockingHelper?.problem?.replaceFirstChar { it.uppercase() } ?: "Checking…" })
+                Hint("A separate service that edits your hosts file to block sites.")
                 if (app.helper.restarts > 0 || app.helper.failures > 0) KV("Reader hiccups", "restarted ${app.helper.restarts}×, ${app.helper.failures} missed checks")
-                val ax = app.tracker.live.value.sample?.accessibilityTrusted == true
-                if (ax) KV("Can see window titles", "Yes ✓")
-                else Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Can see window titles: no", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                    val scope = androidx.compose.runtime.rememberCoroutineScope()
-                    Button({ scope.launch { app.permissions.requestAccessibility() } }) { Text("Allow…") }
+                val ax = app.tracker.live.value.sample?.accessibilityTrusted != false
+                Status("Can see window titles", ax, if (ax) "Yes ✓" else "No")
+                if (!ax) {
+                    Hint("Needs Accessibility for OnTask in System Settings → Privacy & Security. If OnTask is already switched on there, macOS is matching an older copy of OnTask: Reset and ask again removes that entry, then switch OnTask on once more.")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button({ scope.launch { app.permissions.requestAccessibility() } }) { Text("Allow…") }
+                        OutlinedButton({ scope.launch { app.permissions.resetAccessibility() } }) { Text("Reset and ask again") }
+                    }
+                }
+                if (app.ai.enabled) {
+                    val aiProblem = app.ai.lastProblem ?: app.aiError
+                    Status("AI labeling", aiProblem == null, aiProblem ?: "Working ✓")
                 }
             }
             SectionCard("How much of your Mac it uses", "Target: about 250 MB of memory and under 1% CPU.") {
-                KV("Memory (OnTask)", r.self.rssMb?.let { "%.0f MB".format(it) } ?: "?")
-                KV("Memory (activity reader)", r.helper.rssMb?.let { "%.0f MB".format(it) } ?: "—")
-                KV("CPU (OnTask, last 10 s / average)", "%.2f%% / %.2f%%".format(r.jvmRecent, r.jvmAvg))
-                KV("CPU (activity reader)", r.helper.cpuPct?.let { "%.1f%%".format(it) } ?: "—")
+                KV("Memory", "OnTask " + (r.self.rssMb?.let { "%.0f MB".format(it) } ?: "?") + " · activity reader " + (r.helper.rssMb?.let { "%.0f MB".format(it) } ?: "—"))
+                Hint("Memory each program is holding right now. The activity reader is the companion program above.")
+                KV("CPU right now", "%.1f%%".format(r.jvmRecent + (r.helper.cpuPct ?: 0.0)))
+                Hint("OnTask and the activity reader together, over the last 10 seconds, as a share of one processor core.")
+                KV("CPU on average", "%.1f%%".format(r.jvmAvg))
+                Hint("OnTask itself, averaged since it started.")
             }
         }
         stats?.let { s -> StatsSection(s, tick) }
-        SectionCard("AI use (last 24 hours)", "Only when nothing else could label what you were doing. Local models are free; cloud costs are rough estimates.") {
+        AccuracySection(accuracy)
+        SectionCard("AI use (last 24 hours)", "Only when nothing else could label what you were doing. Kev is free; Jev's costs are rough estimates.") {
             if (aiStats.isEmpty()) Text("No AI calls yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             aiStats.forEach { a ->
-                KV("${a.provider.lowercase().replaceFirstChar { it.uppercase() }} · ${a.model} (${if (a.tier.equals("vision", true)) "images" else "text"})",
+                KV("${a.provider.lowercase().replaceFirstChar { it.uppercase() }} · ${a.model}",
                     "${a.calls} calls" + (if (a.calls > a.failed) ", %.1f s each".format(a.avgMs / 1000) else "") + (if (a.failed > 0) ", ${a.failed} failed" else "") + (if (a.costUsd > 0) ", ~$${"%.4f".format(a.costUsd)}" else ""))
                 if (a.failed > 0) Hint("Latest failure: " + (a.lastError ?: "reason not recorded (before this update) — most likely the model wasn't downloaded yet"))
             }
-            (app.ai.lastProblem ?: app.aiError)?.let { Notice("AI isn't running right now: $it", error = true) }
         }
-        RulesSection(app, rules) { rules = app.ruleStore.userRules() }
+        var showRules by remember { mutableStateOf(false) }
+        var showLog by remember { mutableStateOf(false) }
+        SectionCard(
+            "Labeling rules",
+            "A rule tells OnTask what something is without guessing or asking AI, e.g. \"Website github.com is Core work\". " +
+                "Rules are added for you whenever you answer \"Yes, it's work\" or correct a label, and yours win over the built-in list.",
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("${rules.size} of your own · ${DefaultRules.all.size} built-in", Modifier.weight(1f))
+                OutlinedButton({ showRules = true }) { Text("See and edit rules…") }
+            }
+        }
         SectionCard("Activity log", "Every check, newest first: what was in front of you, how it was labeled, and what decided the label. Stays on this Mac.") {
+            OutlinedButton({ showLog = true }) { Text("Open activity log…") }
+        }
+        if (showRules) BigDialog("Labeling rules", { showRules = false }) { RulesPanel(app, rules) { rules = app.ruleStore.userRules() } }
+        if (showLog) BigDialog("Activity log", { showLog = false }) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(filter.text, { filter = filter.copy(text = it) }, label = { Text("Search app, website or title") }, singleLine = true, modifier = Modifier.weight(1f))
                 Picker("Level: ${filter.level?.label ?: "all"}", listOf<Level?>(null) + Level.entries, { it?.label ?: "all" }) { filter = filter.copy(level = it) }
                 Picker("Decided by: ${filter.source?.label ?: "all"}", listOf<Source?>(null) + Source.entries, { it?.label ?: "all" }) { filter = filter.copy(source = it) }
             }
-            log.forEach { r ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(fmtTime(r.ts), Modifier.weight(0.09f), style = MaterialTheme.typography.bodySmall)
-                    Text(fmtDuration(r.seconds.toLong()), Modifier.weight(0.06f), style = MaterialTheme.typography.bodySmall)
-                    Text(listOfNotNull(r.app, r.domain).joinToString(" · ").ifEmpty { "—" } + (r.title?.let { " — ${it.take(60)}" } ?: ""), Modifier.weight(0.45f), style = MaterialTheme.typography.bodySmall, maxLines = 1)
-                    Box(Modifier.weight(0.14f)) { (r.domain ?: r.app)?.let { n -> CategoryPicker(app, dev.ontask.track.displayAppName(n), r.category, { relabeled++ }, item = if (r.category.variable) dev.ontask.classify.itemKey(r.app, r.title, r.url) to r.title else null) } ?: Text(r.category.label, style = MaterialTheme.typography.bodySmall) }
-                    Text(r.source.label + if (r.workTime) "" else " (off-hours)", Modifier.weight(0.2f), style = MaterialTheme.typography.bodySmall)
+            LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                items(log) { r ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(fmtTime(r.ts), Modifier.weight(0.09f), style = MaterialTheme.typography.bodySmall)
+                        Text(fmtDuration(r.seconds.toLong()), Modifier.weight(0.06f), style = MaterialTheme.typography.bodySmall)
+                        Text(listOfNotNull(r.app, r.domain).joinToString(" · ").ifEmpty { "—" } + (r.title?.let { " — ${it.take(60)}" } ?: ""), Modifier.weight(0.45f), style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                        Box(Modifier.weight(0.14f)) { (r.domain ?: r.app)?.let { n -> CategoryPicker(app, dev.ontask.track.displayAppName(n), r.category, { relabeled++ }, item = if (r.category.variable) dev.ontask.classify.itemKey(r.app, r.title, r.url) to r.title else null) } ?: Text(r.category.label, style = MaterialTheme.typography.bodySmall) }
+                        Text(r.source.label + if (r.workTime) "" else " (off-hours)", Modifier.weight(0.2f), style = MaterialTheme.typography.bodySmall)
+                    }
                 }
+                if (log.isEmpty()) item { Text("No matching activity.") }
             }
-            if (log.isEmpty()) Text("No matching activity.")
+        }
+    }
+}
+
+/** One status line; anything not working is red with a 🔴. */
+@Composable
+private fun Status(k: String, ok: Boolean, v: String) {
+    if (ok) KV(k, v)
+    else Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        Text("🔴 $k", Modifier.weight(0.45f), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+        Text(v, Modifier.weight(0.55f), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+    }
+}
+
+/** A large window over the app for a long, searchable list (like a browser's cookie list). */
+@Composable
+private fun BigDialog(title: String, onClose: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+    val size = DpSize(960.dp, 720.dp)
+    DialogWindow(onCloseRequest = onClose, state = rememberDialogState(size = size), title = title) {
+        Surface(Modifier.fillMaxSize()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                    TextButton(onClose) { Text("Done") }
+                }
+                content()
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccuracySection(weeks: List<AiAccuracy.Week>) {
+    SectionCard(
+        "How often the AI was right",
+        "Each time you answer a question about something Kev or Jev labeled, or correct a label they chose, OnTask checks whether they had picked the same category. Labels you never touched aren't counted.",
+    ) {
+        if (weeks.isEmpty()) { Hint("Not measured yet. It starts counting the next time you answer a question or correct an AI label."); return@SectionCard }
+        val fmt = java.time.format.DateTimeFormatter.ofPattern("MMM d")
+        weeks.groupBy { it.weekStart }.forEach { (start, ws) ->
+            val label = java.time.Instant.ofEpochSecond(start).atZone(java.time.ZoneId.systemDefault()).toLocalDate().format(fmt)
+            KV("Week of $label", ws.joinToString(" · ") { w -> "${w.provider.name.lowercase().replaceFirstChar { it.uppercase() }} %.0f%% (%d of %d)".format(w.matched * 100.0 / w.checked, w.matched, w.checked) })
         }
     }
 }
@@ -147,8 +228,6 @@ private fun ColumnScope.StatsSection(s: DiagStats, tickSec: Int) {
                 Text(if (s.totalTicks > 0) "%.0f%%".format(n * 100.0 / s.totalTicks) else "—", style = MaterialTheme.typography.titleSmall)
             }
         }
-        HorizontalDivider()
-        KV("Accuracy", if (s.labels > 0) "When you corrected a label, OnTask had it wrong %d of %d times (%.0f%%)".format(s.disagreements, s.labels, s.disagreements * 100.0 / s.labels) else "Not measured yet — it learns from your corrections")
     }
     SectionCard("Checks", "One check = one look at what's in front of you. Checks are skipped when you're away or nothing changed, to save battery.") {
         KV("Checks so far", "%,d".format(s.totalTicks))
@@ -163,28 +242,37 @@ private fun ColumnScope.StatsSection(s: DiagStats, tickSec: Int) {
 private fun kindLabel(k: RuleKind) = when (k) { RuleKind.DOMAIN -> "Website"; RuleKind.APP -> "App"; RuleKind.TITLE -> "Window title contains" }
 
 @Composable
-private fun RulesSection(app: App, userRules: List<dev.ontask.classify.Rule>, onChange: () -> Unit) {
+private fun ColumnScope.RulesPanel(app: App, userRules: List<dev.ontask.classify.Rule>, onChange: () -> Unit) {
     var kind by remember { mutableStateOf(RuleKind.DOMAIN) }
     var pattern by remember { mutableStateOf("") }
-    SectionCard(
-        "Your labeling rules",
-        "A rule tells OnTask what something is without guessing or asking AI — e.g. \"Website github.com is Core work\". " +
-            "Rules are added for you whenever you answer \"Yes, it's work\" or correct a label, and yours win over the built-in list.",
-    ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Picker(kindLabel(kind), RuleKind.entries, ::kindLabel) { kind = it }
-            OutlinedTextField(pattern, { pattern = it }, label = { Text(when (kind) { RuleKind.DOMAIN -> "e.g. github.com"; RuleKind.APP -> "e.g. Xcode"; RuleKind.TITLE -> "e.g. Jira" }) }, singleLine = true, modifier = Modifier.weight(1f))
-            Picker("is…", Category.assignable, { it.label }) { cat ->
-                if (pattern.isNotBlank()) { app.ruleStore.label(kind, pattern, cat, Category.UNKNOWN, App.nowSec()); app.reloadRules(); pattern = ""; onChange() }
-            }
+    var search by remember { mutableStateOf("") }
+    Text("Add a rule", style = MaterialTheme.typography.titleSmall)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Picker(kindLabel(kind), RuleKind.entries, ::kindLabel) { kind = it }
+        OutlinedTextField(pattern, { pattern = it }, label = { Text(when (kind) { RuleKind.DOMAIN -> "e.g. github.com"; RuleKind.APP -> "e.g. Xcode"; RuleKind.TITLE -> "e.g. Jira" }) }, singleLine = true, modifier = Modifier.weight(1f))
+        Picker("is…", Category.assignable, { it.label }) { cat ->
+            if (pattern.isNotBlank()) { app.ruleStore.label(kind, pattern, cat, Category.UNKNOWN, App.nowSec()); app.reloadRules(); pattern = ""; onChange() }
         }
-        userRules.forEach { r ->
+    }
+    HorizontalDivider()
+    OutlinedTextField(search, { search = it }, label = { Text("Search rules") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+    val q = search.trim()
+    fun matches(r: dev.ontask.classify.Rule) = q.isEmpty() || r.pattern.contains(q, true) || r.category.label.contains(q, true)
+    val mine = userRules.filter(::matches)
+    // Built-in rules you've overridden aren't shown twice.
+    val own = userRules.map { it.kind to it.pattern.lowercase() }.toSet()
+    val builtIn = DefaultRules.all.filter { (it.kind to it.pattern.lowercase()) !in own && matches(it) }
+    LazyColumn(Modifier.fillMaxSize()) {
+        item { Text("Yours (${mine.size})", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(vertical = 6.dp)) }
+        items(mine, key = { "u" + it.id }) { r ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("${kindLabel(r.kind)} ${r.pattern}  →  ${r.category.label}", Modifier.weight(1f))
                 TextButton({ app.ruleStore.delete(r.id); app.reloadRules(); onChange() }) { Text("Delete") }
             }
         }
-        if (userRules.isEmpty()) Hint("No rules of your own yet.")
-        Hint("Plus ${DefaultRules.all.size} built-in rules for common sites and apps.")
+        if (mine.isEmpty()) item { Hint(if (q.isEmpty()) "No rules of your own yet." else "None match.") }
+        item { Text("Built in (${builtIn.size})", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp)) }
+        item { Hint("Common sites and apps. Add a rule of your own above to file one differently.") }
+        items(builtIn, key = { "b" + it.id }) { r -> Text("${kindLabel(r.kind)} ${r.pattern}  →  ${r.category.label}", Modifier.padding(vertical = 2.dp)) }
     }
 }

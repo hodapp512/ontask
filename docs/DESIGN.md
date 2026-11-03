@@ -45,7 +45,11 @@ This file describes how OnTask works now. **Why** each choice was made, and what
 
 ### Layered pipeline
 1. **Metadata** every few seconds: active app, window title, URL, input idle time. **Rules** (built-in + yours)
-   classify most of it for free.
+   classify most of it for free. The built-in list covers common apps and about 1,200 common English-language sites
+   (`shared/.../DefaultSites.kt`: the most-visited sites of the Tranco list minus ad/CDN/API hosts, plus well-known
+   tools and services, labeled by hand and spot-checked with Kev). Window titles need Accessibility for OnTask.app
+   (macOS checks the app, not the helper); a toggle left over from an older, differently signed build looks on but
+   doesn't count, so Diagnostics offers "Reset and ask again".
 2. **AI** (a decision model, see below) for what no rule covers, from app / title / address, plus **on-screen text**
    (Apple Vision OCR) when Screen Recording is allowed. Answers below 60% count as unsure.
 3. **Varies sites** are judged page by page (see *Pages on Varies sites*).
@@ -100,7 +104,8 @@ This file describes how OnTask works now. **Why** each choice was made, and what
   removable in Settings → Categories. Past decisions are *not* fed to the model as examples (testing showed it hurt).
 
 ### AI providers
-- **Kev** (open-source decision model, github.com/jaredpalmer/kev) **on this Mac, 0.8B by default** (4B optional).
+- **Kev** (open-source decision model, github.com/jaredpalmer/kev) **on this Mac: Kev 0.8B only** (about 3 GB of
+  memory while running; no size choice).
   OnTask installs it into its data folder (git + `uv`), starts it on demand, stops it after 10 idle minutes.
 - **Jev** (TypeSafe's cloud model, same System One API) as an option: API key in the Keychain, one-time notice that
   page titles and on-screen text are sent to TypeSafe.
@@ -285,7 +290,18 @@ trackpad pinch, ⌘-scroll or − / + / Reset; move along the day with a two-fin
 scrolling scrolls the page; focused sessions of 25+ min (count, longest); distraction events; regular vs. work unblocks; check-ins done/missed; priorities vs. where time went; worst hour; weekly heat map by hour.
 
 ### Diagnostics
-Activity log with filters; classification source per tick (rule / metadata / OCR / vision / user label) as %; avg processing time per tick and per model; ticks skipped (idle/unchanged); CPU and memory; classifier-vs-user-label disagreement rate (the key accuracy metric); rules list; cloud API calls and estimated cost; sync and notification delivery status.
+- **Is everything running?** Activity reader (the Swift helper), blocking helper, window titles, AI labeling. Anything
+  not working is marked 🔴 in red; the menu bar menu shows a ⚠️ line that opens Diagnostics, and Home shows a red
+  ⚠️ line for problems without a banner of their own there.
+- **Resources:** memory of OnTask and of the activity reader on one line; CPU right now (both, last 10 s) and on
+  average (OnTask since launch), each with a one-line explanation.
+- What decided each label (rule / metadata / OCR / vision / AI page / your label) as %; checks, skips, time per check.
+- **How often the AI was right:** each AI answer (sure or not) is remembered per page, site or app; when you answer
+  the question about it or correct its label, it's scored once as a match or a miss, per model, per week (last 8
+  weeks). Labels you never touched aren't counted.
+- AI use in the last 24 hours (calls, speed, failures with reasons, Jev's estimated cost).
+- **Labeling rules** and the **activity log** open in their own searchable windows (yours and the built-in rules;
+  the log keeps its filters and category menus), so the tab stays short.
 
 **All computed on demand** via SQL when the screen is opened — nothing runs live in the background.
 

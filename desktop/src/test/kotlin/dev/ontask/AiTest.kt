@@ -57,9 +57,9 @@ class AiTest {
         } finally { srv.stop(0) }
     }
 
-    @Test fun defaultsToSmallKevOnThisMac() {
+    @Test fun defaultsToKevOnThisMac() {
         val db = Db.memory(); val s = AiService(Prefs(db), db, Files.createTempDirectory("ai").toFile())
-        assertEquals(AiProvider.KEV, s.provider); assertEquals(KevSize.SMALL, s.kevSize); assertEquals(0.6, s.threshold)
+        assertEquals(AiProvider.KEV, s.provider); assertEquals(0.6, s.threshold)
         // Jev needs the cloud notice confirmed first.
         s.provider = AiProvider.JEV; s.enabled = true
         assertNull(s.classify(Sample(app = "Safari", title = "x"), null, emptyList()))

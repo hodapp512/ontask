@@ -32,17 +32,8 @@ object DefaultRules {
             "com.disney.disneyplus", "tv.twitch.android.app", "com.discord", "com.snapchat.android", "com.pinterest"),
     )
 
-    private val domains = mapOf(
-        CORE_WORK to listOf("github.com", "gitlab.com", "stackoverflow.com", "localhost", "console.firebase.google.com",
-            "developer.apple.com", "kotlinlang.org", "docs.oracle.com", "claude.ai"),
-        WORK_SUPPORT to listOf("mail.google.com", "calendar.google.com", "docs.google.com", "drive.google.com", "notion.so", "atlassian.net",
-            "slack.com", "teams.microsoft.com", "meet.google.com", "zoom.us", "wikipedia.org", "coursera.org", "udemy.com", "khanacademy.org", "edx.org"),
-        // Could be work or a time sink: judged page by page (feeds count as time-wasting).
-        VARIABLE to listOf("youtube.com", "vimeo.com", "reddit.com", "facebook.com", "linkedin.com", "medium.com", "substack.com"),
-        ENTERTAINMENT to listOf("netflix.com", "twitch.tv", "hulu.com", "disneyplus.com", "spotify.com", "instagram.com", "x.com", "twitter.com",
-            "tiktok.com", "threads.net", "news.ycombinator.com", "cnn.com", "nytimes.com", "bbc.com", "foxnews.com", "theguardian.com", "washingtonpost.com"),
-        PERSONAL_ADMIN to listOf("amazon.com", "ebay.com", "etsy.com", "walmart.com", "target.com", "web.whatsapp.com"),
-    )
+    /** Websites: see DefaultSites (about 1,200 common sites). */
+    private val domains = DefaultSites.domains()
 
     val all: List<Rule> = buildList {
         var id = -1L

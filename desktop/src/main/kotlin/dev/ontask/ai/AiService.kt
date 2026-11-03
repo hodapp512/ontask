@@ -4,6 +4,8 @@ import dev.ontask.Category
 import dev.ontask.Sample
 import dev.ontask.Source
 import dev.ontask.classify.domainOf
+import dev.ontask.classify.itemKey
+import dev.ontask.classify.siteDomain
 import dev.ontask.db.Db
 import dev.ontask.db.Prefs
 import java.io.File
@@ -29,6 +31,7 @@ class AiService(
     val client: SystemOneClient = SystemOneClient(),
     val keychain: Keychain = Keychain(),
     val kev: KevServer = KevServer(dataDir),
+    val accuracy: AiAccuracy = AiAccuracy(db),
     /** Tests: send every decision to this server instead of Kev or Jev. */
     private val testUrl: String? = null,
 ) {
@@ -44,10 +47,6 @@ class AiService(
     var provider: AiProvider
         get() = runCatching { AiProvider.valueOf(prefs.str("ai.provider", "KEV")) }.getOrDefault(AiProvider.KEV)
         set(v) { prefs.set("ai.provider", v.name); waitUntil = 0 }
-
-    var kevSize: KevSize
-        get() = runCatching { KevSize.valueOf(prefs.str("ai.kev_size", "SMALL")) }.getOrDefault(KevSize.SMALL)
-        set(v) { prefs.set("ai.kev_size", v.name); kev.stop(); waitUntil = 0 }
 
     /** Below this probability the model counts as unsure (and, for Varies pages, you're asked). */
     val threshold: Double get() = prefs.str("ai.threshold", "0.6").toDoubleOrNull() ?: 0.6
@@ -66,12 +65,14 @@ class AiService(
     /** General labelling: which category is this app, site or page? Null if the model can't run. */
     fun classify(s: Sample, ocr: String?, plan: List<String>): AiResult? {
         val d = decide(describe(s, plan, emptyMap(), ocr), "The person has this open on their computer right now. Which category is it?") ?: return null
+        (domainOf(s.url)?.let(::siteDomain) ?: s.app)?.let { accuracy.guessed(it, provider, d.first, System.currentTimeMillis() / 1000) }
         return AiResult(d.first, d.second, if (ocr.isNullOrBlank()) Source.METADATA else Source.OCR)
     }
 
     /** One page or video on a Varies site: which of your categories is it? [extra] holds looked-up facts (channel, description). */
     fun judgeItem(s: Sample, plan: List<String>, extra: Map<String, String>, screenText: String? = null): AiResult? {
         val d = decide(describe(s, plan, extra, screenText), "The person has this page or video open on their computer. Which category is it?") ?: return null
+        accuracy.guessed(itemKey(s.app, s.title, s.url), provider, d.first, System.currentTimeMillis() / 1000)
         return AiResult(d.first, d.second, Source.AI_PAGE)
     }
 
@@ -93,7 +94,7 @@ class AiService(
                 testUrl != null -> client.choose(testUrl, "test", null, state, instructions, options)
                 p == AiProvider.KEV -> {
                     if (!kev.installed) throw DecisionException("Kev isn't installed yet. Settings → AI labeling → Install Kev.")
-                    if (!kev.ensure(kevSize)) throw DecisionException("Kev didn't start. Diagnostics shows its log.")
+                    if (!kev.ensure()) throw DecisionException("Kev didn't start. Diagnostics shows its log.")
                     kev.touch()
                     client.choose(kev.baseUrl, "kev-latest", null, state, instructions, options)
                 }
@@ -117,7 +118,7 @@ class AiService(
 
     private fun record(p: AiProvider, ms: Long, inTok: Int?, ok: Boolean, error: String? = null) = db.use { c ->
         c.prepareStatement("INSERT INTO ai_calls(ts,provider,model,tier,ms,in_tokens,out_tokens,cost_usd,ok,error) VALUES (?,?,?,?,?,?,?,?,?,?)").use {
-            it.setLong(1, System.currentTimeMillis() / 1000); it.setString(2, p.name); it.setString(3, if (p == AiProvider.KEV) kevSize.repo else "jev-latest"); it.setString(4, "DECIDE")
+            it.setLong(1, System.currentTimeMillis() / 1000); it.setString(2, p.name); it.setString(3, if (p == AiProvider.KEV) KevServer.MODEL else "jev-latest"); it.setString(4, "DECIDE")
             it.setLong(5, ms); if (inTok == null) it.setNull(6, java.sql.Types.INTEGER) else it.setInt(6, inTok); it.setNull(7, java.sql.Types.INTEGER)
             it.setDouble(8, if (p == AiProvider.JEV) (inTok ?: 0) * JEV_USD_PER_TOKEN else 0.0); it.setInt(9, if (ok) 1 else 0); it.setString(10, error?.take(300)); it.executeUpdate()
         }

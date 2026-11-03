@@ -20,7 +20,9 @@ class ClassifierTest {
 
     @Test fun domainMatchesSubdomainsButNotSuffixLookalikes() {
         assertEquals(Category.VARIABLE, c.classify(s(app = "Google Chrome", url = "https://www.youtube.com/watch?v=1")).category)
-        assertEquals(Category.VARIABLE, c.classify(s(url = "https://music.youtube.com/")).category)
+        assertEquals(Category.VARIABLE, c.classify(s(url = "https://m.youtube.com/")).category)
+        // A more specific built-in site wins over its parent.
+        assertEquals(Category.ENTERTAINMENT, c.classify(s(url = "https://music.youtube.com/")).category)
         assertEquals(Category.UNKNOWN, c.classify(s(url = "https://notyoutube.com/")).category)
     }
 

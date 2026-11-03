@@ -158,6 +158,12 @@ object Schema {
         """
         CREATE TABLE ai_tried (item TEXT PRIMARY KEY, category TEXT, ts INTEGER NOT NULL);
         """,
+        // The AI's latest answer about each thing, and how those answers scored against yours (see AiAccuracy).
+        """
+        CREATE TABLE ai_guesses (key TEXT PRIMARY KEY, provider TEXT NOT NULL, category TEXT NOT NULL, ts INTEGER NOT NULL);
+        CREATE TABLE ai_checks (id INTEGER PRIMARY KEY, ts INTEGER NOT NULL, provider TEXT NOT NULL, matched INTEGER NOT NULL);
+        CREATE INDEX ai_checks_ts ON ai_checks(ts);
+        """,
     )
 
     fun migrate(db: Db) = db.use { c ->

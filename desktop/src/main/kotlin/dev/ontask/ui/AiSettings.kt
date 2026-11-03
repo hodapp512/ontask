@@ -24,7 +24,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import dev.ontask.App
 import dev.ontask.ai.AiProvider
-import dev.ontask.ai.KevSize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -36,7 +35,7 @@ fun AiSettings(app: App) {
     }
 }
 
-/** Settings and the setup wizard: on/off, Kev (this Mac) or Jev (cloud), and Kev's size and install. */
+/** Settings and the setup wizard: on/off, Kev (this Mac) or Jev (cloud), and installing Kev (0.8B, about 3 GB of memory). */
 @Composable
 fun AiSettingsBody(app: App) {
     var enabled by remember { mutableStateOf(app.ai.enabled) }
@@ -70,15 +69,9 @@ fun AiSettingsBody(app: App) {
 private fun KevSetup(app: App) {
     val kev = app.ai.kev
     val scope = rememberCoroutineScope()
-    var size by remember { mutableStateOf(app.ai.kevSize) }
     var installed by remember { mutableStateOf(kev.installed) }
     var busy by remember { mutableStateOf(false) }
     var line by remember { mutableStateOf("") }
-    SettingRow("Model size", "The small one is right most of the time and asks you when it isn't sure. The large one makes fewer mistakes but needs much more memory.") {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            KevSize.entries.forEach { s -> FilterChip(size == s, { app.ai.kevSize = s; size = s }, label = { Text(s.label) }) }
-        }
-    }
     if (!installed) {
         Notice(
             if (kev.uv == null) "Kev needs uv, a Python tool. In Terminal run: brew install uv — then press Install Kev."
@@ -97,7 +90,7 @@ private fun KevSetup(app: App) {
     } else {
         Text(
             (if (kev.running) "Running. " else "Starts when there's something to decide and stops after 10 idle minutes. ") +
-                if (kev.downloaded(size)) "" else "The first start downloads the model.",
+                if (kev.downloaded) "" else "The first start downloads the model.",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }

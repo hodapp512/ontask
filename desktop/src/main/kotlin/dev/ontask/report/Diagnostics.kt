@@ -21,8 +21,6 @@ data class DiagStats(
     val rawRows: Long,
     val hourlyRows: Long,
     val oldestRaw: Long?,
-    val labels: Long,
-    val disagreements: Long,
     val dbBytes: Long?,
 )
 
@@ -47,8 +45,6 @@ class Diagnostics(private val db: Db) {
             rawRows = scalar("SELECT COUNT(*) FROM ticks"),
             hourlyRows = scalar("SELECT COUNT(*) FROM hourly"),
             oldestRaw = scalar("SELECT COALESCE(MIN(start_ts),0) FROM ticks").takeIf { it > 0 },
-            labels = scalar("SELECT COUNT(*) FROM labels"),
-            disagreements = scalar("SELECT COUNT(*) FROM labels WHERE previous_category != category"),
             dbBytes = db.path?.let { p -> runCatching { java.nio.file.Files.size(p) }.getOrNull() },
         )
     }

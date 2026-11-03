@@ -508,3 +508,24 @@ when it comes to the front.*
 - **All documentation in `docs/`** (README stays at the root), with **`docs/FLOWS.md`**: Mermaid diagrams of the main
   flows, updated with every change like DESIGN.md and this file. *Rejected:* image diagrams (they go stale).
 
+## 2026-11-03 · Diagnostics clean-up, AI accuracy, a bigger built-in list (grilled)
+- **Up to 12 clock markers under a timeline** (hourly across a working day) instead of 6; the date arrows sit right
+  next to the date.
+- **Kev 0.8B only.** The 4B choice is gone (it needed about 10 GB of memory for somewhat fewer mistakes); its weights are
+  deleted once if they were downloaded. *Rejected:* keeping the choice hidden in settings.
+- **"Can't see window titles" while OnTask looks switched on:** the grant belongs to OnTask.app (macOS checks the
+  responsible app, not the helper), and every build since Oct 30 is signed with the same local certificate, so
+  rebuilds keep it. The leftover is an entry from an older, differently signed build; the fix is to reset it (the
+  user runs the reset, or presses "Reset and ask again") and allow again. No code bug.
+- **AI accuracy = agreement with your own answers and corrections**, per model per week. The old figure counted only
+  corrections, so it was always 100% wrong. Labels you never touched don't count as right. *Rejected:* counting
+  untouched labels as correct (flatters the number).
+- **Diagnostics problems are red with a 🔴**, plus a ⚠️ line in the menu bar menu and on Home (when Home has no banner
+  for it already). The activity log and the labeling rules open in their own searchable windows, like a browser's
+  cookie list. Memory is one line for both programs; CPU is "right now" and "on average", each explained.
+- **About 1,200 built-in sites**, from the Tranco top list (English-language, without ad/CDN/API hosts) plus
+  well-known tools and services, in a compact Kotlin file shared by Mac and phone. Adult and gambling sites are
+  Entertainment like any other; news stays Entertainment; existing built-in labels were kept. Your rules still win.
+  Kev was used as a second opinion, but on a bare site name it says "Work adjacent" about 80% of the time, so only
+  the 55 cases where it picked something else were reviewed again (4 changed). *Rejected:* a resource file (shared
+  code is a source folder on both builds, and the list is only ~19 KB).

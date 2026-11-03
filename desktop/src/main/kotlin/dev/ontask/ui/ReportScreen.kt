@@ -1,7 +1,10 @@
 package dev.ontask.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -71,10 +74,12 @@ fun DateBar(date: LocalDate, onDate: (LocalDate) -> Unit, onRefresh: () -> Unit)
     val fmt = remember { DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL) }
     // Compact: ◀ [Today ▾] ▶ — the middle opens a calendar.
     Row(verticalAlignment = Alignment.CenterVertically) {
-        TextButton({ onDate(date.minusDays(1)) }) { Text("◀") }
+        // Narrow arrow buttons, so they sit close to the date.
+        val arrow = PaddingValues(horizontal = 4.dp)
+        TextButton({ onDate(date.minusDays(1)) }, Modifier.widthIn(min = 32.dp), contentPadding = arrow) { Text("◀") }
         // A fixed width, so the arrows stay put whatever the date ("Today" or "Nov 30, 2026").
-        TextButton({ picking = true }, Modifier.width(150.dp)) { Text(if (date == LocalDate.now()) "📅 Today" else "📅 " + fmtDate(date), maxLines = 1) }
-        TextButton({ onDate(date.plusDays(1)) }, enabled = date < LocalDate.now()) { Text("▶") }
+        TextButton({ picking = true }, Modifier.width(140.dp), contentPadding = arrow) { Text(if (date == LocalDate.now()) "📅 Today" else "📅 " + fmtDate(date), maxLines = 1) }
+        TextButton({ onDate(date.plusDays(1)) }, Modifier.widthIn(min = 32.dp), enabled = date < LocalDate.now(), contentPadding = arrow) { Text("▶") }
     }
     if (picking) {
         val state = rememberDatePickerState(
@@ -106,6 +111,17 @@ internal fun HelperBanner(app: App) {
         error = true,
     )
     else if (live.sample?.accessibilityTrusted == false) AccessibilityBanner(app)
+}
+
+/** A one-line pointer to Diagnostics for problems that have no banner of their own here. */
+@Composable
+internal fun ProblemsHint(app: App, now: Long) {
+    val others = remember(now) { app.problems().filter { it != "OnTask can't see window titles" && it != "The activity reader isn't running" && !it.startsWith("Blocking isn't on") } }
+    if (others.isNotEmpty()) Text(
+        "⚠️ " + others.joinToString(" · ") + " — see Diagnostics",
+        Modifier.clickable { Nav.open(Dest.DIAGNOSTICS) }.pointerHoverIcon(androidx.compose.ui.input.pointer.PointerIcon.Hand),
+        color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium,
+    )
 }
 
 /**
@@ -374,8 +390,11 @@ private const val MIN_SPAN_SEC = 300.0
  * Clock ticks for a window (seconds after midnight): the smallest step from 5 minutes to 6 hours that gives at most
  * six ticks, each at a round time ("10 AM", "10:15").
  */
+/** At most this many clock markers under a timeline: hourly across a working day. */
+private const val MAX_TICKS = 12
+
 fun timelineTicks(from: Long, to: Long, dayStart: Long? = null): List<Pair<Long, String>> {
-    val step = listOf(5, 10, 15, 30, 60, 120, 180, 240, 360).map { it * 60L }.firstOrNull { (to - from) / it <= 6 } ?: 21_600L
+    val step = listOf(5, 10, 15, 30, 60, 120, 180, 240, 360).map { it * 60L }.firstOrNull { (to - from) / it <= MAX_TICKS } ?: 21_600L
     val first = (from + step - 1) / step * step
     return (first..to step step).map { t ->
         // With [dayStart], the label is the real clock time (right on daylight-saving days, when the day isn't 24 h).
@@ -412,7 +431,7 @@ fun timelineWindow(runs: List<Pair<Long, Long>>, away: List<Boolean> = runs.map 
 /** About five evenly spaced clock labels across the window, e.g. "8 AM", "10 AM". */
 fun timelineLabels(from: Long, to: Long): List<String> {
     val hours = ((to - from) / 3600).toInt().coerceAtLeast(1)
-    val step = listOf(1, 2, 3, 4, 6).firstOrNull { hours / it <= 6 } ?: 6
+    val step = listOf(1, 2, 3, 4, 6).firstOrNull { hours / it <= MAX_TICKS } ?: 6
     val fmt = java.time.format.DateTimeFormatter.ofPattern("h a")
     return (0..hours step step).map { java.time.LocalTime.of(((from / 3600 + it) % 24).toInt(), 0).format(fmt) }
 }

@@ -15,10 +15,10 @@ class ReportUiTest {
         // Away overnight and a 2-minute wake at 3 AM don't stretch the day back to midnight.
         val night = listOf(0L to 2 * 3600L + 360, 3 * 3600L to 3 * 3600L + 120, 8 * 3600L + 600 to 12 * 3600L)
         assertEquals(8 * 3600L to 12 * 3600L, timelineWindow(night, listOf(true, false, false)))
-        assertEquals(listOf("8 AM", "10 AM", "12 PM", "2 PM", "4 PM"), timelineLabels(8 * 3600L, 17 * 3600L).take(5))
+        assertEquals(listOf("8 AM", "9 AM", "10 AM", "11 AM", "12 PM"), timelineLabels(8 * 3600L, 17 * 3600L).take(5))
         // Zoomed in on 25 minutes: 5-minute ticks at round times.
         assertEquals(listOf("2:45", "2:50", "2:55", "3 PM", "3:05"), timelineTicks(14 * 3600L + 42 * 60, 15 * 3600L + 7 * 60).map { it.second })
-        assertEquals(listOf("8 AM", "10 AM", "12 PM", "2 PM", "4 PM"), timelineTicks(8 * 3600L, 17 * 3600L).map { it.second })
+        assertEquals(listOf("8 AM", "9 AM", "10 AM", "11 AM", "12 PM", "1 PM", "2 PM", "3 PM", "4 PM", "5 PM"), timelineTicks(8 * 3600L, 17 * 3600L).map { it.second })
     }
 
     @Test fun ownProcessIsCalledOnTask() {
