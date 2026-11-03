@@ -419,3 +419,12 @@ when it comes to the front.*
   "Display over other apps" permission). "Back to work" on the phone goes to the home screen (no phone blocking
   until v2). Focus since the last break is counted by the Mac only (phone focus is rare); phone breaks are shared.
   Phone check-in answers live in their own document so the Mac's check-in upload can never overwrite one.
+
+## 2026-11-02 · One timeline bar; Android updates over the air
+- **Mac and phone stretches share one full-height bar** (📱 in the hover/tap details). *Rejected:* shorter phone
+  bars overlaid on the Mac's (confusing, looked bad).
+- **Away chunks aren't drawn** on any timeline; they carried no information the gaps don't.
+- **The Android app updates itself:** releases are published with the web app on Firebase Hosting (already deployed
+  and authorized from this Mac), and the app installs them through Android's installer after you confirm.
+  *Rejected:* GitHub releases (needs a GitHub token and `gh`); wireless adb (still needs the computer); Play Store
+  (Accessibility policy review).

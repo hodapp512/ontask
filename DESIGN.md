@@ -199,7 +199,11 @@ it; today doesn't until it's over). The Mac uploads one small `heat/year` docume
   every 2 minutes and on screen-off; raw activity stays on the phone.
 - **Unknown apps and undecided pages** go to the `judgeSeen` Cloud Function (Jev, key in Secret Manager; one-time
   notice on the phone). Sure (60%+) → a rule or verdict for every device; otherwise a notification asks.
-- The Mac's Home and heat map add the phone's day (phone stretches drawn shorter, rows marked 📱).
+- The Mac's Home and heat map add the phone's day (rows marked 📱; on the timeline phone stretches share the one bar, 📱 on hover).
+- **Timelines don't draw Away time** (Mac, phone, web): the gaps say it.
+- **Updates without a cable:** `android/release.sh` publishes the APK and `version.json` with the web app
+  (`/android/`, no-cache); the phone checks every 6 hours and in Settings → App, downloads, and Android's installer asks
+  to confirm. Version = commit count.
 - **Prompts on the phone** (work hours only; the work day still starts at the Mac): the same ladder (`shared/`).
   Step 1 is a heads-up notification you can't swipe away ("Is this a break?" after 25+ min focus, else "It looks like
   you're drifting"), with Yes break / I'm working / Back to work (goes to the home screen) / Lunch. Steps 2–3 are a
