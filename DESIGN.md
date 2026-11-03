@@ -26,7 +26,8 @@ This file describes how OnTask works now. **Why** each choice was made, and what
   - **Not for work:** delay that grows per day (10 s, 30 s, 2 min, then 5 min; resets at 4 AM), 5 / 10 / 15 min,
     corner nudge at start and end (OK / I'm struggling → intervention), partner told every time.
   - The delay screen shows today's unblock count, today's plan, and the user's message (or a random alternative).
-- **Unblocking outside work hours:** instant, 5 min–2 h, ends when work hours start, not counted, nobody told.
+- **Unblocking outside work hours:** instant, 5 (default), 10, 15, 30 min or 1 h, ends when work hours start, not
+  counted, nobody told. Buttons say "Unblock", not "Open".
 - **Ad and malware blocking:** StevenBlack's hosts list (fakenews-porn variant), refreshed at startup and daily,
   cached offline; one "Disable ad blocking" switch (Home and menu bar).
 - **The root helper** is installed with one admin prompt (setup, or any launch where it's missing / outdated / not

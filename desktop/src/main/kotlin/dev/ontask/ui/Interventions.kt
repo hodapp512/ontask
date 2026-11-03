@@ -303,7 +303,7 @@ fun UnblockNudgeWindow(app: App, n: App.UnblockNudge, mode: ThemeMode) {
                         TextButton({ app.unblockNudgeStruggling() }) { Text("I'm struggling") }
                     }
                 } else {
-                    Text("You opened $sites for ${n.minutes} min (${ordinal(n.countToday)} today).", style = MaterialTheme.typography.titleSmall)
+                    Text("You unblocked $sites for ${n.minutes} min (${ordinal(n.countToday)} today).", style = MaterialTheme.typography.titleSmall)
                     Text("Back to work when it's up? Your partner has been told.", style = MaterialTheme.typography.bodyMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button({ app.unblockNudgeOk() }) { Text("OK") }

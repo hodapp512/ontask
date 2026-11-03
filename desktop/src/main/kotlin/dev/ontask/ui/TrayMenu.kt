@@ -184,7 +184,7 @@ internal fun UnblockPickerWindow(app: App, blocked: List<String>, onClose: () ->
                     WorkUnblockForm(app, site, onDone = onClose)
                     HorizontalDivider()
                     Text("Not for work?", style = MaterialTheme.typography.titleSmall)
-                    Text("You can still open it for 5–15 minutes, after a short wait that grows with each unblock today. Your partner is told.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("You can still unblock it for 5–15 minutes, after a short wait that grows with each unblock today. Your partner is told.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     OutlinedButton({ regular = true }) { Text("No, just for a bit…") }
                     Spacer(Modifier.weight(1f))
                     TextButton({ chosen = null }) { Text("← Choose another site") }
@@ -196,14 +196,14 @@ internal fun UnblockPickerWindow(app: App, blocked: List<String>, onClose: () ->
     }
 }
 
-/** Outside work hours: pick how long and it opens at once — no wait, nobody is told. Ends when work hours start. */
+/** Outside work hours: pick how long (5 minutes unless you choose more) and it's unblocked at once — no wait, nobody is told. Ends when work hours start. */
 @Composable
 internal fun LeisureUnblockForm(app: App, site: String, onDone: () -> Unit) {
-    var minutes by remember { mutableStateOf(30) }
+    var minutes by remember { mutableStateOf(5) }
     var error by remember { mutableStateOf<String?>(null) }
     val now = remember { App.nowSec() }
     val workStart = remember { app.settings.schedule.nextWorkStart(now) }
-    Text("Open $site for…", style = MaterialTheme.typography.titleMedium)
+    Text("Unblock $site for…", style = MaterialTheme.typography.titleMedium)
     Text("Outside work hours there's no wait. It's blocked again when time's up.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         app.blocking.unblocks.leisureDurationsMin.forEach { m -> FilterChip(minutes == m, { minutes = m }, label = { Text(fmtDuration(m * 60L)) }) }
@@ -211,7 +211,7 @@ internal fun LeisureUnblockForm(app: App, site: String, onDone: () -> Unit) {
     if (workStart != null && workStart < now + minutes * 60L)
         Text("Work hours start at ${fmtHm(workStart)}, so it closes then.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-    Button({ try { app.unblockLeisure(listOf(site), minutes); onDone() } catch (e: dev.ontask.block.UnblockRejected) { error = e.message } }) { Text("Open for ${fmtDuration(minutes * 60L)}") }
+    Button({ try { app.unblockLeisure(listOf(site), minutes); onDone() } catch (e: dev.ontask.block.UnblockRejected) { error = e.message } }) { Text("Unblock for ${fmtDuration(minutes * 60L)}") }
 }
 
 /** Work unblock: no delay, but a stated purpose and your partner is told. */
@@ -221,7 +221,7 @@ internal fun WorkUnblockForm(app: App, site: String, onDone: () -> Unit) {
     var minutes by remember { mutableStateOf(60) }
     var error by remember { mutableStateOf<String?>(null) }
     val max = app.blocking.unblocks.maxWorkMinutes
-    Text("Opens right away. Your partner is told the site and why, and OnTask checks you stay on that purpose.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text("Unblocks right away. Your partner is told the site and why, and OnTask checks you stay on that purpose.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     OutlinedTextField(purpose, { purpose = it; error = null }, label = { Text("What for? e.g. Acme customer: onboarding videos") }, singleLine = true, modifier = Modifier.fillMaxWidth())
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         Text("For", style = MaterialTheme.typography.bodyMedium)

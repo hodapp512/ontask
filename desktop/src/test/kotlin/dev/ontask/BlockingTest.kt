@@ -60,14 +60,14 @@ class BlockingTest {
         val e = env(); e.list.add(listOf("reddit.com"), 0)
         val sunday = at(20, 0, 25) // Sun evening; work starts Mon 9:00
         assertEquals(at(9, 0, 26), e.settings.schedule.nextWorkStart(sunday, ZoneOffset.UTC))
-        e.unblocks.startLeisure(listOf("reddit.com"), 120, sunday, e.settings.schedule.nextWorkStart(sunday, ZoneOffset.UTC))
+        e.unblocks.startLeisure(listOf("reddit.com"), 60, sunday, e.settings.schedule.nextWorkStart(sunday, ZoneOffset.UTC))
         assertEquals(emptyList(), e.svc.currentlyBlocked(sunday + 60))
         assertEquals(0, e.unblocks.todayCount(sunday + 60)) // doesn't feed the escalating delay
         assertEquals(listOf("unblock_leisure"), e.events.pending().map { it.type }) // the partner isn't told
-        assertFailsWith<UnblockRejected> { e.unblocks.startLeisure(listOf("reddit.com"), 15, sunday, null) }
-        // Late evening: a 2-hour unblock is cut off when work starts.
+        assertFailsWith<UnblockRejected> { e.unblocks.startLeisure(listOf("reddit.com"), 20, sunday, null) } // 5, 10, 15, 30 or 60 only
+        // Early morning: an hour's unblock is cut off when work starts.
         val late = at(8, 30)
-        val u = e.unblocks.startLeisure(listOf("reddit.com"), 120, late, e.settings.schedule.nextWorkStart(late, ZoneOffset.UTC)).single()
+        val u = e.unblocks.startLeisure(listOf("reddit.com"), 60, late, e.settings.schedule.nextWorkStart(late, ZoneOffset.UTC)).single()
         assertEquals(at(9), u.expiresTs)
     }
 

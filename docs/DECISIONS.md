@@ -432,3 +432,8 @@ when it comes to the front.*
   stronger signal (screen on, unlocked, app in front) while the Mac counts until its idle threshold. The overlapped
   Mac time is cut from the timeline and the totals, so nothing counts twice. *Rejected:* one combined stretch listing
   both devices (hides which one you were really on). "Where the time went" and the heat map are trimmed the same way.
+
+## 2026-11-02 · Shorter default unblock outside work hours
+- Outside work hours an unblock defaults to **5 minutes**, with 5 / 10 / 15 / 30 minutes / 1 hour (was 30 minutes
+  default, up to 2 hours): a short default makes "just a quick look" the easy choice. The wording is "Unblock", not
+  "Open". The work-hours "just for a bit" unblock is unchanged (5 minutes default, 15 at most).

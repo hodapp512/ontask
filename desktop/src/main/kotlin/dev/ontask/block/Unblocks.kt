@@ -26,7 +26,7 @@ class Unblocks(private val db: Db, private val prefs: Prefs, private val events:
     /** Not-for-work unblocks during work hours. */
     val durationsMin: List<Int> = listOf(5, 10, 15)
     /** Unblocks outside work hours. */
-    val leisureDurationsMin: List<Int> = listOf(5, 10, 30, 60, 120)
+    val leisureDurationsMin: List<Int> = listOf(5, 10, 15, 30, 60)
     val maxWorkMinutes get() = prefs.int("unblock.max_work_min", 180)
 
     /** Start of the current "unblock day" (resets at 4am). */
