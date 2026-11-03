@@ -470,3 +470,7 @@ when it comes to the front.*
 - **"Back to work" checks instead of granting 5 minutes of grace:** 5 minutes to switch with a reminder every 30 s
   while still on time-wasting, then the firmer window; after switching, a 10-minute watch where 30 s back on
   time-wasting bring the next step. Same on the phone (which also goes to the home screen).
+- **A pop-up brings only itself forward.** Activating OnTask for a pop-up's keyboard focus made macOS raise the main
+  window too, so two windows came up. When OnTask wasn't in front, its other windows go back behind the app you were
+  using. *Rejected:* not taking focus at all (typing in a check-in or message would need a click first); closing the
+  main window (loses where you were in it).

@@ -85,7 +85,7 @@ fun InterventionWindow(app: App, iv: Intervention, mode: ThemeMode) {
                 onCloseRequest = { app.interventionClosed() }, title = "OnTask — are you on task?", alwaysOnTop = true, resizable = false,
                 state = rememberWindowState(size = size, position = centeredOnActiveScreen(size)),
             ) {
-                LaunchedEffect(Unit) { runCatching { java.awt.Desktop.getDesktop().requestForeground(true) }; window.toFront(); window.requestFocus() }
+                LaunchedEffect(Unit) { bringForwardAlone(window) }
                 OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) { if (iv.reminder) Reminder(app, iv) else if (iv.breakSec > 0) BreakCheck(app, iv) else StepOne(app, iv) } }
             }
         }
@@ -97,7 +97,7 @@ fun InterventionWindow(app: App, iv: Intervention, mode: ThemeMode) {
                 onCloseRequest = { app.interventionClosed() }, title = "OnTask — are you on task?", alwaysOnTop = true, resizable = true,
                 state = rememberWindowState(size = DpSize(560.dp, 640.dp), position = centeredOnActiveScreen(DpSize(560.dp, 640.dp))),
             ) {
-                LaunchedEffect(Unit) { runCatching { java.awt.Desktop.getDesktop().requestForeground(true) }; window.toFront(); window.requestFocus() }
+                LaunchedEffect(Unit) { bringForwardAlone(window) }
                 OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) { StepTwo(app, iv) } }
             }
         }
@@ -106,7 +106,7 @@ fun InterventionWindow(app: App, iv: Intervention, mode: ThemeMode) {
             onCloseRequest = { app.interventionClosed() }, title = "OnTask — reach out?", alwaysOnTop = true,
             state = rememberWindowState(size = DpSize(540.dp, 620.dp), position = centeredOnActiveScreen(DpSize(540.dp, 620.dp))),
         ) {
-            LaunchedEffect(Unit) { runCatching { java.awt.Desktop.getDesktop().requestForeground(true) }; window.toFront(); window.requestFocus() }
+            LaunchedEffect(Unit) { bringForwardAlone(window) }
             OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) { StepThree(app, iv) } }
         }
 
@@ -252,7 +252,7 @@ fun BreakCardWindow(app: App, c: App.BreakCard, mode: ThemeMode) {
         onCloseRequest = { app.breakCardClosed() }, title = "OnTask", alwaysOnTop = true, resizable = false,
         state = rememberWindowState(size = size, position = centeredOnActiveScreen(size)),
     ) {
-        LaunchedEffect(Unit) { runCatching { java.awt.Desktop.getDesktop().requestForeground(true) }; window.toFront(); window.requestFocus() }
+        LaunchedEffect(Unit) { bringForwardAlone(window) }
         OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) {
             Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(

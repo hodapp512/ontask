@@ -266,3 +266,19 @@ fun centeredOnActiveScreen(size: androidx.compose.ui.unit.DpSize): androidx.comp
 /** Dates everywhere read like "Nov 1, 2026" ([weekday]: "Sunday, Nov 1, 2026"). */
 fun fmtDate(d: java.time.LocalDate, weekday: Boolean = false): String =
     d.format(java.time.format.DateTimeFormatter.ofPattern(if (weekday) "EEEE, MMM d, yyyy" else "MMM d, yyyy", java.util.Locale.US))
+
+/**
+ * Brings a pop-up forward with keyboard focus, and only the pop-up: activating OnTask makes macOS raise its other
+ * windows too (the main window), so when OnTask wasn't in front those go back behind the app you were using.
+ */
+suspend fun bringForwardAlone(popup: java.awt.Window) {
+    val wasActive = java.awt.Window.getWindows().any { it.isActive }
+    runCatching { java.awt.Desktop.getDesktop().requestForeground(true) }
+    popup.toFront(); popup.requestFocus()
+    if (wasActive) return
+    // Activation finishes asynchronously, so send the others back again once it has.
+    for (wait in listOf(0L, 150L, 500L)) {
+        kotlinx.coroutines.delay(wait)
+        java.awt.Window.getWindows().filter { it !== popup && it.isShowing && !it.isAlwaysOnTop }.forEach { it.toBack() }
+    }
+}

@@ -155,7 +155,8 @@ nothing under 25 min focused, then 5 min per 25 (at most 10 under an hour, 15 af
      only after a struggling morning: under 60% focused or 30+ min wasted, and the last hour before lunch (breaks and
      away left out) no better than the morning; otherwise a *Something in the way?* link.
   5. **Done**.
-- **Every pop-up stays on top of other windows.** Check-ins can be put off twice a day each (Do this later, or closing
+- **Every pop-up stays on top of other windows**, and only the pop-up comes forward (OnTask's main window stays
+  where it was). Check-ins can be put off twice a day each (Do this later, or closing
   the window = 10 min); after that the window stays until answered.
 - The daily report gets "Morning 64% focused · Afternoon 48%" (split at lunch, or noon) and the midday answers.
 - **Morning check** (work days, with Today's plan): "Working 9:00–5:00 today?" Yes / start later or finish early / day off.
