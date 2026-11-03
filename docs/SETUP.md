@@ -72,7 +72,7 @@ Settings → AI labeling → **Use AI**, then where it runs:
   are then sent to TypeSafe (you'll be told once).
 
 Reading on-screen text needs the Screen Recording permission; without it, AI works from app names, titles and
-addresses. Why decision models instead of chat models: see [docs/DECISIONS.md](docs/DECISIONS.md).
+addresses. Why decision models instead of chat models: see [DECISIONS.md](DECISIONS.md).
 
 ## 3. Firebase (phone app, partner messages, reminders)
 
@@ -151,7 +151,7 @@ In the Mac app: Settings → Accountability partner → project ID `demo-ontask`
 
 ## Android app
 
-Native app for your own phone (sideloaded; see docs/PLATFORMS.md).
+Native app for your own phone (sideloaded; see [PLATFORMS.md](PLATFORMS.md)).
 
 1. Android SDK: `brew install --cask android-commandlinetools`, then
    `sdkmanager --sdk_root=$HOME/Library/Android/sdk --licenses` and

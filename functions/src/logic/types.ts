@@ -1,6 +1,6 @@
 export type Channel = "push" | "text" | "email" | "off";
 
-/** Message types a partner can configure (DESIGN.md: "Partner settings"). */
+/** Message types a partner can configure (docs/DESIGN.md: "Partner settings"). */
 /** "checkin" is the daily report (with the evening check-in when there was one). */
 export const MESSAGE_TYPES = ["binge_alert", "unblock_alert", "checkin", "work_hours_change", "work_unblock"] as const;
 export type MessageType = (typeof MESSAGE_TYPES)[number];

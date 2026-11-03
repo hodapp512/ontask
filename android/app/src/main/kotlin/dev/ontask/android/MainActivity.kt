@@ -60,6 +60,9 @@ class MainActivity : ComponentActivity() {
 
     /** A check-in opened from a notification (PLANNING, MIDDAY, EVENING). */
     private var checkin by mutableStateOf<String?>(null)
+    /** "Help sort these" after a check-in: asked for ([wantSort]), then shown with what's waiting. */
+    private var wantSort by mutableStateOf(false)
+    private var sorting by mutableStateOf<List<dev.ontask.android.ui.SortRow>?>(null)
 
     private fun takeAsk(i: android.content.Intent?) {
         i?.getStringExtra(CHECKIN)?.let { checkin = it }
@@ -96,6 +99,7 @@ class MainActivity : ComponentActivity() {
             if (u == null) Login() else Signed(u)
         }
         ask?.let { (key, label, item) -> AskDialog(key, label, item) { ask = null } }
+        if (wantSort) LaunchedEffect(Unit) { wantSort = false; dev.ontask.android.ui.sortRows().takeIf { it.isNotEmpty() }?.let { sorting = it } }
         if (updating) LaunchedEffect(Unit) {
             updating = false
             if (!Updater.canInstall(this@MainActivity)) Updater.askPermission(this@MainActivity) else Updater.install(this@MainActivity)
@@ -170,7 +174,12 @@ class MainActivity : ComponentActivity() {
         ) { pad ->
             Column(Modifier.padding(pad).verticalScroll(rememberScrollState()).padding(16.dp)) {
                 when {
-                    checkin != null -> dev.ontask.android.ui.CheckinScreen(checkin!!) { checkin = null }
+                    checkin != null -> {
+                        val kind = checkin!!
+                        // Done with the midday or evening check-in: then "Help sort these", if anything is waiting.
+                        dev.ontask.android.ui.CheckinScreen(kind, onSaved = { if (kind == "MIDDAY" || kind == "EVENING") wantSort = true }) { checkin = null }
+                    }
+                    sorting != null -> dev.ontask.android.ui.SortScreen(sorting!!) { sorting = null }
                     person != null -> PersonScreen(u.uid, person!!) { person = null }
                     tab == 0 -> HomeScreen(u.uid, u.displayName ?: "")
                     tab == 1 -> PeopleScreen(u.uid) { person = it }

@@ -45,6 +45,18 @@ class CategoriesTest {
         assertEquals(Category.UNKNOWN, Classifier(emptyList()).classify(Sample(app = "Spotify")).category)
     }
 
+    @Test fun searchesAreJudgedOneByOne() {
+        val brave = dev.ontask.classify.Rule(1, dev.ontask.classify.RuleKind.DOMAIN, "search.brave.com", Category.ENTERTAINMENT, user = true)
+        val c = Classifier(listOf(brave))
+        assertEquals(Category.VARIABLE, c.classify(Sample(app = "Chrome", url = "https://search.brave.com/search?q=excalidraw+or+mermaid")).category)
+        assertEquals(Category.VARIABLE, c.classify(Sample(app = "Chrome", url = "https://www.google.com/search?q=news&sca=1")).category)
+        assertEquals(Category.ENTERTAINMENT, c.classify(Sample(app = "Chrome", url = "https://search.brave.com/settings")).category)
+        assertEquals(Category.WORK_SUPPORT, Classifier(emptyList()).classify(Sample(app = "Chrome", url = "https://docs.google.com/document/d/1")).category)
+        assertEquals("google.com/search?q=excalidraw or mermaid", itemKey("Chrome", "x", "https://www.google.com/search?q=Excalidraw+or++mermaid&oq=x"))
+        assertEquals("duckduckgo.com/search?q=news", itemKey("Chrome", "x", "https://duckduckgo.com/?q=news"))
+        assertEquals("Google search: news", dev.ontask.classify.Pages.label("google.com", "news - Google Search", "https://www.google.com/search?q=news"))
+    }
+
     @Test fun youtubeVariesAndVerdictsAreRemembered() {
         assertEquals(Category.VARIABLE, Classifier(emptyList()).classify(Sample(app = "Safari", url = "https://www.youtube.com/watch?v=abc&t=10")).category)
         assertEquals("youtube.com/watch?v=abc", itemKey("Safari", "x", "https://m.youtube.com/watch?t=1&v=abc"))

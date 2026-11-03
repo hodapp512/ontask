@@ -24,7 +24,36 @@ export function deepShare(totals: Partial<Record<LevelKey, number>>): number | n
 /** Timeline segments: seconds from local midnight, k = D|M|W|A (Firestore forbids nested arrays, so these are maps). */
 /** A timeline stretch: seconds after midnight, level letter (color), category label (c), and what it was made of (t). */
 /** [d]: "phone" for a stretch on the phone. */
-export type Seg = { a: number; b: number; k: string; c?: string; t?: { n: string; s: number }[]; d?: string };
+/** [also]: glances under 15 s drawn as part of this stretch (see [absorbShort]). */
+export type Seg = { a: number; b: number; k: string; c?: string; t?: { n: string; s: number }[]; d?: string; also?: Seg[] };
+
+/**
+ * Glances under [minSec] (switching between windows) are drawn as part of the stretch before them, or after them
+ * when nothing comes just before; the two sides of a glance join up. As on the Mac and the phone.
+ */
+export function absorbShort(segs: Seg[], minSec = 15): Seg[] {
+  const out: Seg[] = [], pending: Seg[] = [];
+  for (const r of [...segs].sort((x, y) => x.a - y.a)) {
+    const last = pending.length === 0 && out.length && r.a - out[out.length - 1].b <= minSec ? out[out.length - 1] : undefined;
+    if (r.b - r.a < minSec) {
+      if (last) out[out.length - 1] = { ...last, b: Math.max(last.b, r.b), also: [...(last.also ?? []), { ...r, also: undefined }, ...(r.also ?? [])] };
+      else pending.push(r);
+      continue;
+    }
+    let cur = r;
+    if (pending.length && cur.a - pending[pending.length - 1].b <= minSec) cur = { ...cur, a: pending[0].a, also: [...pending, ...(cur.also ?? [])] };
+    else out.push(...pending);
+    pending.length = 0;
+    const prev = out[out.length - 1];
+    if (prev && cur.a - prev.b <= minSec && prev.k === cur.k && prev.c === cur.c && prev.d === cur.d) {
+      const t = new Map<string, number>();
+      for (const x of [...(prev.t ?? []), ...(cur.t ?? [])]) t.set(x.n, (t.get(x.n) ?? 0) + x.s);
+      out[out.length - 1] = { ...prev, b: Math.max(prev.b, cur.b), t: [...t].sort((x, y) => y[1] - x[1]).map(([n, s]) => ({ n, s })), also: [...(prev.also ?? []), ...(cur.also ?? [])] };
+    } else out.push(cur);
+  }
+  out.push(...pending);
+  return out;
+}
 /** Whole hours around the data (at least 2 h); the full day when there is none. */
 /**
  * The hours to draw: around the time you were actually at the computer (as on the Mac). Away time doesn't widen it,
@@ -136,7 +165,8 @@ export function segAt(segs: Seg[], frac: number, win: [number, number] = timelin
 export function segDetail(s: Seg, day?: DayClock): string {
   const level = s.c ?? LEVELS.find((l) => l.short === s.k)?.label ?? "";
   const what = (s.t ?? []).map((x) => `${x.n} ${fmtDuration(x.s)}`).join(", ") || "no app recorded";
-  return `${s.d === "phone" ? "📱 " : ""}${level} · ${clockAt(s.a, day)}–${clockAt(s.b, day)} · ${fmtDuration(s.b - s.a)} — ${what}`;
+  const also = (s.also ?? []).flatMap((g) => g.t ?? []).map((x) => `${x.n} ${fmtDuration(x.s)}`).join(", ");
+  return `${s.d === "phone" ? "📱 " : ""}${level} · ${clockAt(s.a, day)}–${clockAt(s.b, day)} · ${fmtDuration(s.b - s.a)} — ${what}${also ? ` (also: ${also})` : ""}`;
 }
 
 /** Dates everywhere read like "Nov 1, 2026" ([weekday]: "Sunday, Nov 1, 2026"). */

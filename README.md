@@ -1,8 +1,19 @@
 # OnTask
 
 A personal macOS productivity tool: blocks distractions with friction, tracks focus and drift, and supports an
-accountability partner through a phone app. Design: [DESIGN.md](DESIGN.md).
-Everything you must do by hand (accounts, secrets, cutover): [SETUP.md](SETUP.md).
+accountability partner through a phone app. All documentation is in [`docs/`](docs/) (see [Docs](#docs)).
+
+## Docs
+
+| File | What |
+|---|---|
+| [DESIGN.md](docs/DESIGN.md) | How OnTask works now. |
+| [FLOWS.md](docs/FLOWS.md) | Diagrams: categories, drift prompts, the daily rhythm, unblocking, partner messages, sync. |
+| [DECISIONS.md](docs/DECISIONS.md) | Why things are the way they are, and what was rejected. |
+| [SETUP.md](docs/SETUP.md) | Everything you must do by hand (accounts, secrets, cutover). |
+| [PLATFORMS.md](docs/PLATFORMS.md) | Android, iPhone and Windows notes. |
+
+Every change updates DESIGN.md, DECISIONS.md and FLOWS.md where it affects them.
 
 ## Status
 
@@ -19,7 +30,7 @@ Everything you must do by hand (accounts, secrets, cutover): [SETUP.md](SETUP.md
 |---|---|
 | `desktop/` | Kotlin + Compose Desktop app (Gradle). Tray icon, SQLite, all Mac-side logic. |
 | `helper/` | Swift helper: active app/title/URL, idle, lock, media, OCR, battery. JSON lines over stdio. |
-| `docs/` | [DECISIONS.md](docs/DECISIONS.md): why things are the way they are. |
+| `docs/` | All documentation (see [Docs](#docs)). |
 | `daemon/` | Root hosts daemon + install/uninstall scripts. |
 | `functions/` | Firebase Cloud Functions (TypeScript): message routing, schedules, pairing, model recommendations. |
 | `firebase/` | Firestore rules, indexes, rules tests (config: `firebase.json` at the repo root). |
@@ -48,7 +59,7 @@ Function → partner message, against the emulators).
   app manages `/etc/hosts`, turn it off first.
 * Uninstalling leaves nothing behind: **Settings → Uninstall OnTask…** removes the helper, OnTask's lines in
   `/etc/hosts` and the login item. If the app is simply deleted, the helper does the same by itself after 24 hours.
-  See [SETUP.md](SETUP.md#uninstalling).
+  See [SETUP.md](docs/SETUP.md#uninstalling).
 * No personal data in the repo: contact details live in your Firebase account, API keys in the macOS Keychain or
   Firebase Secret Manager, project settings in the app's local database / `web/.env.local` (gitignored).
 * Screenshots and OCR text are held in memory only for the length of one classification call.

@@ -19,6 +19,26 @@ import kotlin.test.assertTrue
 class SessionsAndTrackerTest {
     private val min = 60L
 
+    @Test fun glancesUnderFifteenSecondsJoinTheStretchAroundThem() {
+        // 1:46 on Nov 3: Claude, 5 s of the YouTube feed, Claude again → one Claude stretch listing the glance.
+        val claude = Category.CORE_WORK
+        val runs = listOf(
+            Run(0, 100, Level.DEEP, mapOf("Claude" to 100L), claude),
+            Run(100, 105, Level.WASTED, mapOf("YouTube: feed" to 5L), Category.ENTERTAINMENT),
+            Run(105, 300, Level.DEEP, mapOf("Claude" to 195L), claude),
+            Run(300, 400, Level.AWAY),
+            Run(400, 410, Level.WASTED, mapOf("x.com" to 10L), Category.ENTERTAINMENT), // after away: joins the next one
+            Run(410, 500, Level.MIXED, mapOf("Mail" to 90L), Category.WORK_SUPPORT),
+        )
+        val out = Sessions.absorbShort(runs)
+        assertEquals(listOf(0L to 300L, 300L to 400L, 400L to 500L), out.map { it.start to it.end })
+        assertEquals(295L, out[0].activity["Claude"])
+        assertEquals(listOf("YouTube: feed"), out[0].absorbed.flatMap { it.activity.keys })
+        assertEquals(Level.MIXED, out[2].level); assertEquals(listOf("x.com"), out[2].absorbed.flatMap { it.activity.keys })
+        // Nothing to join: a lone glance stays.
+        assertEquals(1, Sessions.absorbShort(listOf(Run(0, 5, Level.WASTED))).size)
+    }
+
     @Test fun deepSessionNeedsTwentyFiveUninterruptedMinutes() {
         val runs = listOf(
             Run(0, 20 * min, Level.DEEP), Run(20 * min, 30 * min, Level.MIXED), // 30 min deep+mixed -> session

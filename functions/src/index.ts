@@ -6,7 +6,7 @@ import { defineSecret } from "firebase-functions/params";
 import { randomBytes } from "node:crypto";
 import { deliverToPartner, releaseDeferred, routeEvent, takeQueuedAlerts, type Link } from "./deliver";
 import { firstName } from "./logic/messages";
-import { fmtDate, ownParts, partnerParts, reportDue, reportHtml, reportText, type CheckinDoc, type ReportDoc } from "./logic/report";
+import { autoSendLine, fmtDate, ownParts, partnerParts, reportDue, reportHtml, reportText, type CheckinDoc, type ReportDoc } from "./logic/report";
 import { bedtimeNight, bedtimePushDue, checkinState, habitsDue, isWorkDay } from "./logic/schedule";
 import { mergeDay, mergeHeat, type DayParts, type DeviceItems, type DeviceReport } from "./logic/merge";
 import { judge, type Cat } from "./logic/judge";
@@ -19,7 +19,7 @@ import { makeLinkCode, normalizeLinkCode } from "./logic/linkcode";
 admin.initializeApp();
 const db = admin.firestore();
 
-// Secrets live in Firebase Secret Manager (see SETUP.md). Nothing secret is in this repo.
+// Secrets live in Firebase Secret Manager (see docs/SETUP.md). Nothing secret is in this repo.
 const TEXTBELT_KEY = defineSecret("TEXTBELT_KEY");
 const SMTP_URL = defineSecret("SMTP_URL");
 const SMTP_FROM = defineSecret("SMTP_FROM");
@@ -45,6 +45,13 @@ export const onEventCreated = onDocumentCreated({ document: "users/{uid}/events/
   }
   const n = await routeEvent(db, senders, uid, { type: ev.type, ts: ev.ts, payload: ev.payload }, now);
   await event.data!.ref.update({ processedAt: now.getTime(), delivered: n });
+  // Messages OnTask sent by itself are listed in your own daily report ("Sent to your partner automatically").
+  const auto = ev.payload?.auto as string | undefined;
+  if (ev.type === "binge_alert" && auto) {
+    const tz = ((await db.doc(`users/${uid}/schedule/current`).get()).get("tz") as string | undefined) ?? "America/Chicago";
+    const at = now.toLocaleTimeString("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" });
+    await db.doc(`users/${uid}/sweepState/${localParts(now, tz).date}`).set({ autoSends: admin.firestore.FieldValue.arrayUnion(autoSendLine(at, auto, ev.payload?.site as string | undefined, n)) }, { merge: true });
+  }
 });
 
 // ---- Per-device reports -> the merged day everyone reads -------------------------------------------------------
@@ -282,7 +289,7 @@ async function dailyReportSweep(uid: string, s: ScheduleDoc, now: Date, date: st
     const email = await admin.auth().getUser(uid).then((u) => u.email).catch(() => undefined);
     if (email) {
       // Yours has the titled rows (only you can read them).
-      const mine = { ...ownParts, report: { ...report, topSites: (items.get("topSites") as ReportDoc["topSites"]) ?? report?.topSites }, checkin, alsoToday, link };
+      const mine = { ...ownParts, report: { ...report, topSites: (items.get("topSites") as ReportDoc["topSites"]) ?? report?.topSites }, checkin, alsoToday, link, autoSends: (state.autoSends as string[] | undefined) ?? [] };
       const r = await senders.email(email, `Your day: ${fmtDate(date)}`, reportText(mine), reportHtml(mine));
       if (!r.ok) console.warn(`report email to ${uid} failed: ${r.detail}`);
     }

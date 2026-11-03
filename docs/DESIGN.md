@@ -3,7 +3,7 @@
 OnTask is a personal productivity tool for Mac + phone. Open source, MIT licensed, public repo.
 
 This file describes how OnTask works now. **Why** each choice was made, and what was rejected, is in
-[docs/DECISIONS.md](docs/DECISIONS.md). Change both together.
+[DECISIONS.md](DECISIONS.md), and diagrams of the main flows are in [FLOWS.md](FLOWS.md). Change them together.
 
 ## Philosophy
 
@@ -63,6 +63,9 @@ This file describes how OnTask works now. **Why** each choice was made, and what
 ### Pages on Varies sites
 - Default Varies sites: YouTube, Vimeo, Reddit, Facebook, LinkedIn, Medium, Substack. Only Varies sites are judged
   page by page.
+- **Searches are judged search by search:** a results page on Google, Bing, DuckDuckGo, Brave Search or Yahoo is
+  Varies whatever rule the search engine has, keyed by what you searched ("Google search: excalidraw or mermaid").
+  A search nobody could place is Unsure, not time-wasting; the site you open from it is classified as usual.
 - **Feeds** (YouTube home/Shorts, Facebook home/Watch/Reels, Reddit front/popular/all, Vimeo home, LinkedIn feed)
   count as Entertainment / News / Social outright.
 - Otherwise, in order: remembered verdict → **source rule** (two matching answers of yours for the same subreddit,
@@ -85,6 +88,9 @@ This file describes how OnTask works now. **Why** each choice was made, and what
 - A site or app no rule covers is **Unclassified**, so OnTask can't tell whether you're on task. AI gets the first
   try; if it can't place it (or AI is off), after 15 s there **"Which category is this?"** pops up, centered, naming
   the site (e.g. griswoldpflugerville.clearcareonline.com) or app, with every category including Varies.
+- At that point (and for a page still Unsure) OnTask keeps **one screenshot of the front window** for *Help sort
+  these* (see Daily rhythm). It stays on the device that took it, is never uploaded, and is deleted once the item is
+  sorted, or after 7 days.
 - The answer becomes a rule for that site or app and fixes its past activity. Not now asks again in 15 minutes;
   Pause asking (shared with the Varies question) holds it.
 
@@ -99,15 +105,16 @@ This file describes how OnTask works now. **Why** each choice was made, and what
 - **Jev** (TypeSafe's cloud model, same System One API) as an option: API key in the Keychain, one-time notice that
   page titles and on-screen text are sent to TypeSafe.
 - Both answer a choice question (your categories, described) with calibrated probabilities. Text only: no
-  screenshots. Diagnostics show calls, speed, failures with reasons, and Jev's estimated cost.
+  screenshots are sent (the ones kept for sorting are only shown to you). Diagnostics show calls, speed, failures with reasons, and Jev's estimated cost.
 - The weekly model-recommendation Cloud Function (Gemini + search) targeted the old chat models and is no longer used
   by the Mac.
 
 ## Interventions (binge ladder)
 
 Active during work hours, and on work days **from your first sit-down until work hours start**
-(prompts only then: no partner messages, unblocking stays relaxed). Drifting = time in a Wasted category; under a
-minute away doesn't break the run.
+(prompts only then: no partner messages, unblocking stays relaxed). Drifting = time in a Wasted category. **Only time
+actually on it counts:** under a minute back at work (or away) pauses the count instead of ending the drift, and that
+minute isn't added to it.
 
 **Breaks are earned.** Focused minutes since your last break add up; time that isn't focused (Mixed or Wasted) is
 taken off minute for minute once a stretch lasts a minute; 5+ min away, a break, or lunch starts it again. Earned:
@@ -118,7 +125,7 @@ nothing under 25 min focused, then 5 min per 25 (at most 10 under an hour, 15 af
 | 1 (break earned) | 1 min of drifting | Centered, takes focus: **"Is this a break? You've focused 40 min, so you've got 5 minutes."** *Yes, 5-min break / I'm working / Back to work* (+ *Lunch*) |
 | 1 (not earned) | 2 min of drifting, or 2nd unblock within 60 min | Centered, takes focus: **"It looks like you're drifting."** + "You've focused 12 min since your last break. 13 min more earns a 5-minute break." *Back to work / I'm working* (+ *Lunch*) |
 | 2 | +3 min, or 3rd unblock within 60 min | Firmer centered window (answerable at once): drift time, your message, today's plan, break totals; *Back to work / It's actually work / Help me get started* |
-| 3 | +5 min, or 4th unblock within 60 min | Work hours: offer to message the partner (user confirms, can edit). Before work hours: the step-2 window again |
+| 3 | +5 min, or 4th unblock within 60 min | Work hours: offer to message the partner ("It's your call. You can edit the message."): *Send, and back to work / Not now, back to work / Help me get started*. Ignored, it's sent automatically (below). Before work hours: the step-2 window again |
 
 - **During a break** there are no drift prompts. It ends quietly after 2 min of focused work, or with **"That's 5
   minutes. Back to work?"** (break totals: last hour and today) → *Back to work / 5 more minutes* (once). Still drifting a minute after a break or lunch → straight to step 2.
@@ -136,7 +143,26 @@ nothing under 25 min focused, then 5 min per 25 (at most 10 under an hour, 15 af
 - Drifting again **within the hour picks up where the last drift left
   off** (second drift at step 2, third at step 3); an hour clear resets it. "I'm working" resets; on a Varies site it
   marks that page or video as Work, elsewhere it creates a rule.
-- Drifting alerts to the partner (binge + work-hours unblocks) are capped **2 before noon and 2 after**, on the server;
+- **Step 3 ignored → your partner is told, never by surprise** (work hours, with a partner):
+  - Step 3 open (or closed with its X) and unanswered while you keep drifting for **1 minute** (time away doesn't
+    count) → a centered **countdown**: "Sending a message to your partner in 10…", one line saying why ("You've been
+    on reddit.com for 12 min and didn't answer the check-in."), the message word for word, *I'm back to work* /
+    *I'm actually on task*.
+  - Closing it or *I'm back to work* only closes the window. When the 10 seconds are up: still on time-wasting →
+    sent; back at work → a **10-minute watch**, where 30 s back on time-wasting sends it at once ("You went back to
+    reddit.com after saying you'd get back to work."); 10 minutes on task → nothing is sent.
+  - *Not now, back to work* on step 3 starts the usual 5-minute check; still there at the end → the same countdown
+    ("…you're still on reddit.com after 5 minutes"), not step 3 again; after switching, the same 10-minute watch.
+  - *I'm actually on task* lists this drift's sites, apps, pages and videos (the longest first; a page can be just
+    this one or the whole site) and files the one you pick as Work, like "It's actually work". Nothing is sent.
+  - The message comes from OnTask: "Dennis has been drifting on reddit.com for 12 min and didn't answer OnTask's
+    check-in." / "…said they'd get back to work but is still on reddit.com 5 minutes later." / "…said they'd get back
+    to work but drifted again on reddit.com."
+  - Afterwards the "Still on X" reminders keep coming every 30 s until you switch, but **at most one message per
+    drift** (yours from step 3 counts). No notice; it's listed in your own daily report ("Sent to your partner
+    automatically: 10:42 AM (you didn't answer the check-in, reddit.com)").
+  - Same on the phone (full screen; the screen being off doesn't count as drifting).
+- Drifting alerts to the partner (binge, automatic or not, + work-hours unblocks) are capped **2 before noon and 2 after**, on the server;
   extras go into the daily report with their times.
 - Messages end with a low-effort prompt (e.g. "No need to reply — but a 👍 helps").
 
@@ -155,6 +181,11 @@ nothing under 25 min focused, then 5 min per 25 (at most 10 under an hour, 15 af
      only after a struggling morning: under 60% focused or 30+ min wasted, and the last hour before lunch (breaks and
      away left out) no better than the morning; otherwise a *Something in the way?* link.
   5. **Done**.
+- **Help sort these** (after the midday and evening check-ins, in their own window, only when something is
+  waiting): sites and apps with no category and pages or videos still Unsure, from both devices, today and
+  yesterday, 30 s or more, the 10 with the most time. Each row: screenshot (click for full size; "📱 picture on your
+  phone" / "💻 on your Mac" when the other device took it), name, title, time, category picker. *Skip for now* (or
+  closing it) leaves them for the next check-in. Same on the phone after a check-in done there.
 - **Every pop-up stays on top of other windows**, and only the pop-up comes forward (OnTask's main window stays
   where it was). Check-ins can be put off twice a day each (Do this later, or closing
   the window = 10 min); after that the window stays until answered.
@@ -170,7 +201,7 @@ nothing under 25 min focused, then 5 min per 25 (at most 10 under an hour, 15 af
   the latest. Decided on the server from the Mac's "last active" time. To each partner over their "Daily report"
   channel (titles per your setting), and to you by email (with titles; on by default). Includes totals, longest
   focused sessions, where the time went, the plan, the check-in or "No reflection today", alerts held back by the cap,
-  and a link to the full day.
+  and a link to the full day. Your own copy also lists messages OnTask sent your partner by itself.
   - If the user has already left the computer, wait for return or prompt on the phone in the evening.
 - Check-ins: escalating phone reminders after work ends until done or the report goes. No "missed check-in" message.
 - **Bedtime** (9:30 PM default): a reminder at bedtime if you're at the computer, then every 15 minutes while you're
@@ -200,7 +231,7 @@ it; today doesn't until it's over). The Mac uploads one small `heat/year` docume
   document per verdict in `verdicts/`. Each pass does a three-way merge per item (last synced copy vs. here vs. there;
   each side keeps its own changes, deletions included); changes from elsewhere are applied as if made here (rules
   relabel history, work-hour changes re-mark today). `schedule/current` is still written by the Mac for the server.
-- Platform notes for Android, iPhone and Windows: `docs/PLATFORMS.md`.
+- Platform notes for Android, iPhone and Windows: [PLATFORMS.md](PLATFORMS.md).
 
 ### Android app
 - Native app (`android/`, sideloaded APK) with everything the web app did on the phone: Home (merged day, plan, heat
@@ -236,7 +267,7 @@ it; today doesn't until it's over). The Mac uploads one small `heat/year` docume
   phone and haven't used the Mac for 5 minutes, a notification opens it on the phone (every 20 minutes until done).
   The phone's answers go to `phoneCheckins/{date}` and the Mac saves them as if done there.
 - **Bedtime on the phone:** while you're using it past bedtime, the Mac's reminder schedule (every 15 minutes,
-  firmer; from the third a full screen that waits 20 s). "Going to bed" just closes it.
+  firmer; from the third a full screen, answerable at once). "Going to bed" just closes it.
 
 ### Work hours on Home
 The Home subtitle shows today's work hours ("Work hours 9:00 AM–5:00 PM", or "Day off"); clicking it changes them
@@ -246,7 +277,9 @@ re-marked as in or out of work hours.
 
 ### Daily report
 Focused / mixed / wasted / away totals; timeline strip colored by level, spanning only the time at the computer (away
-time and stray night-time minutes don't widen it), hover/tap for what you did. On the Mac, click a stretch for a
+time and stray night-time minutes don't widen it), hover/tap for what you did. **Glances under 15 s** (switching
+windows) are drawn as part of the stretch around them, listed under "Also in this stretch" with their own category
+(Mac, phone, partner page); they still count in the totals. On the Mac, click a stretch for a
 pop-up with its time and everything in it, each with a category dropdown (same as Where the time went). Zoom with a
 trackpad pinch, ⌘-scroll or − / + / Reset; move along the day with a two-finger sideways swipe or a drag; up/down
 scrolling scrolls the page; focused sessions of 25+ min (count, longest); distraction events; regular vs. work unblocks; check-ins done/missed; priorities vs. where time went; worst hour; weekly heat map by hour.

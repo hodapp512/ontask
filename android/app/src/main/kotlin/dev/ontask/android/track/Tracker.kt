@@ -45,6 +45,8 @@ class Tracker : AccessibilityService() {
     lateinit var prompts: Prompts; private set
     /** What's in front now, for "I'm working": a rule key (APP|…, DOMAIN|…) or a page's item key. */
     @Volatile private var currentKey: String? = null
+    /** What's been unsorted in front, and since when (for its screenshot). */
+    private var shotSince: Pair<String, Long>? = null
     @Volatile private var pkg: String? = null
     @Volatile private var url: String? = null
     @Volatile private var title: String? = null
@@ -60,6 +62,7 @@ class Tracker : AccessibilityService() {
 
     override fun onServiceConnected() {
         log = DayLog(this)
+        Shots.prune(this)
         prompts = Prompts(this)
         running = this
         Cloud.uid?.let { PhoneRules.start(it) }
@@ -133,6 +136,11 @@ class Tracker : AccessibilityService() {
                 }
             } else if (cat == Category.UNKNOWN) judgeLater(if (domain != null) "DOMAIN|$domain" else "APP|$p", app, null, u, subject, isItem = false)
             val work = PhoneRules.isWork(now)
+            // Still not sorted after 15 s (no category, or a page still Unsure): one screenshot for "Help sort these".
+            val unsorted = cat == Category.UNKNOWN || (cat.variable && item != null)
+            val shotKey = if (item != null) Shots.itemKey(item) else Shots.siteKey(subject)
+            if (!unsorted) shotSince = null else if (shotSince?.first != shotKey) shotSince = shotKey to now
+            else if (now - shotSince!!.second >= 15) Shots.take(this, shotKey)
             log.add(now, TICK_MS / 1000, p, app, subject, t, item, cat, work)
             currentKey = item ?: if (domain != null) "DOMAIN|$domain" else "APP|$p"
             prompts.lastSite = if (cat.level == dev.ontask.Level.WASTED) subject else prompts.lastSite
@@ -166,6 +174,11 @@ class Tracker : AccessibilityService() {
     /** Saves a decision: a rule for an app or site, a verdict for a page or video; today's stretches follow it. */
     fun file(key: String, cat: Category, t: String?, source: Source) {
         synchronized(asked) { asked.add(key) }
+        if (!cat.variable) Shots.delete(this, when {
+            key.startsWith("DOMAIN|") -> Shots.siteKey(key.substringAfter('|'))
+            key.startsWith("APP|") -> Shots.siteKey(appLabel(key.substringAfter('|')))
+            else -> Shots.itemKey(key)
+        })
         if (key.startsWith("APP|") || key.startsWith("DOMAIN|")) {
             val kind = RuleKind.valueOf(key.substringBefore('|')); val pattern = key.substringAfter('|')
             PhoneRules.saveRule(kind, pattern, cat.name)
@@ -175,6 +188,23 @@ class Tracker : AccessibilityService() {
             log.recategorize({ it.item == key }, cat)
         }
     }
+
+    /** A site, app, page or video from this drift, for "I'm actually on task": [pageKey] for a page on a Varies site. */
+    data class DriftItem(val label: String, val seconds: Long, val siteKey: String, val pageKey: String?, val title: String?)
+
+    /** What you were on (time-wasting) in the last [sec] seconds, longest first. */
+    fun driftItems(sec: Long): List<DriftItem> {
+        val since = System.currentTimeMillis() / 1000 - sec
+        return log.snapshot().filter { it.end >= since && it.level == "WASTED" }
+            .groupBy { it.item ?: it.subject }
+            .map { (_, segs) ->
+                val s = segs.first()
+                val site = if ('.' in s.subject && ' ' !in s.subject) "DOMAIN|${s.subject}" else "APP|${s.pkg}"
+                DriftItem(if (s.item != null) "${s.subject}: ${s.title ?: s.item}" else s.subject, segs.sumOf { it.end - it.start }, site, s.item, s.title)
+            }.sortedByDescending { it.seconds }.take(8)
+    }
+
+    fun fileWork(key: String, title: String?) { Category.registry["CORE_WORK"]?.let { file(key, it, title, Source.USER_LABEL) } }
 
     /** "I'm working" from a prompt: what's in front is filed as Work. */
     fun markWork() { val k = currentKey ?: return; Category.registry["CORE_WORK"]?.let { file(k, it, title, Source.USER_LABEL) } }

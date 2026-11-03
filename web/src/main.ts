@@ -23,7 +23,7 @@ async function renderInner() {
   cleanups.forEach((f) => f()); cleanups = [];
   clear(root);
   if (!configured) {
-    root.append(h("main", {}, h("h1", {}, "OnTask"), h("div", { class: "card" }, h("p", {}, "This app isn't connected to a Firebase project yet."), h("p", { class: "muted" }, "Copy web/.env.example to web/.env.local and fill it in (see SETUP.md), or run with the emulators: npm run dev -- --mode emulator."))));
+    root.append(h("main", {}, h("h1", {}, "OnTask"), h("div", { class: "card" }, h("p", {}, "This app isn't connected to a Firebase project yet."), h("p", { class: "muted" }, "Copy web/.env.example to web/.env.local and fill it in (see docs/SETUP.md), or run with the emulators: npm run dev -- --mode emulator."))));
     return;
   }
   if (!current) { root.append(loginView()); return; }

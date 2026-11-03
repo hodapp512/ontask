@@ -54,6 +54,8 @@ class Classifier(userRules: List<Rule>, builtIn: List<Rule> = DefaultRules.all) 
     fun classify(s: Sample): Classification {
         val domain = domainOf(s.url)
         val title = s.title?.lowercase()
+        // A search results page is judged search by search, whatever the search engine's own rule says.
+        if (Pages.isSearch(s.url)) Category.registry[Category.VARIABLE.name]?.let { return Classification(it, Source.RULE) }
         for (r in ordered) {
             val hit = when (r.kind) {
                 RuleKind.TITLE -> title != null && title.contains(r.pattern.lowercase())

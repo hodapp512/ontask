@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deepShare, fmtDuration, timelineSvg, todayKey, ago, firstName, greeting, timelineWindow, segAt, segDetail, timelineTicks, fmtDate, clockAt } from "../src/format";
+import { deepShare, fmtDuration, timelineSvg, todayKey, ago, firstName, greeting, timelineWindow, segAt, segDetail, timelineTicks, fmtDate, clockAt, absorbShort } from "../src/format";
 
 describe("format", () => {
   it("formats durations", () => { expect(fmtDuration(45)).toBe("45s"); expect(fmtDuration(300)).toBe("5m"); expect(fmtDuration(5400)).toBe("1h 30m"); });
@@ -53,4 +53,18 @@ describe("timeline details", () => {
     expect(segAt(segs, 0.55)?.k).toBe("W");
   });
   it("describes it", () => expect(segDetail(segs[1])).toContain("youtube.com 10m"));
+});
+
+describe("absorbShort", () => {
+  it("draws a 5-second glance as part of the stretch around it", () => {
+    const out = absorbShort([
+      { a: 0, b: 100, k: "D", c: "Core work", t: [{ n: "Claude", s: 100 }] },
+      { a: 100, b: 105, k: "W", c: "Entertainment", t: [{ n: "YouTube: feed", s: 5 }] },
+      { a: 105, b: 300, k: "D", c: "Core work", t: [{ n: "Claude", s: 195 }] },
+    ]);
+    expect(out.length).toBe(1);
+    expect(out[0].b).toBe(300);
+    expect(out[0].t).toEqual([{ n: "Claude", s: 295 }]);
+    expect(out[0].also?.[0].t?.[0].n).toBe("YouTube: feed");
+  });
 });

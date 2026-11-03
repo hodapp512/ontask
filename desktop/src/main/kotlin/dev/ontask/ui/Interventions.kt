@@ -56,6 +56,8 @@ fun AppOverlays(app: App) {
     variable?.let { VariableAskWindow(app, it, mode) }
     val unknown by app.unknownAsk.collectAsState()
     unknown?.let { UnknownAskWindow(app, it, mode) }
+    val sort by app.sortWindow.collectAsState()
+    sort?.let { SortWindow(app, it, mode) }
     val bedtime by app.bedtimeNudge.collectAsState()
     bedtime?.let { BedtimeWindow(app, it, mode) }
     val unblockNudge by app.unblockNudge.collectAsState()
@@ -76,6 +78,7 @@ fun AppOverlays(app: App) {
 
 @Composable
 fun InterventionWindow(app: App, iv: Intervention, mode: ThemeMode) {
+    if (iv.countdown != null) { CountdownWindow(app, iv, mode); return }
     // Every prompt's close button only hides it for a moment: it comes back until it's answered.
     when (iv.step) {
         // The first prompt: in the middle of the screen you're using, on top, and it takes the focus so it can't be missed.
@@ -111,6 +114,72 @@ fun InterventionWindow(app: App, iv: Intervention, mode: ThemeMode) {
         }
 
         Step.NONE -> {}
+    }
+}
+
+/**
+ * "Sending a message to your partner in 10…": step 3 went unanswered while you kept drifting (or "Not now" and still
+ * there). It says why and shows the message word for word. Closing it or "I'm back to work" only closes the window:
+ * still on time-wasting when the 10 seconds are up sends it; back at work starts a 10-minute watch. "I'm actually on
+ * task" files what you pick as work and sends nothing.
+ */
+@Composable
+private fun CountdownWindow(app: App, iv: Intervention, mode: ThemeMode) {
+    val size = DpSize(560.dp, 520.dp)
+    Window(
+        onCloseRequest = { app.countdownClosed() }, title = "OnTask — telling your partner", alwaysOnTop = true, resizable = true,
+        state = rememberWindowState(size = size, position = centeredOnActiveScreen(size)),
+    ) {
+        LaunchedEffect(Unit) { bringForwardAlone(window) }
+        OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) { Countdown(app, iv) } }
+    }
+}
+
+@Composable
+private fun Countdown(app: App, iv: Intervention) {
+    var left by remember(iv) { mutableStateOf(app.ladder.cfg.countdownSec) }
+    LaunchedEffect(iv) { while (left > 0) { delay(1000); left-- } }
+    var onTask by remember(iv) { mutableStateOf(false) }
+    val reason = iv.countdown ?: return
+    val site = iv.site ?: "time-wasting sites"
+    Column(Modifier.padding(24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(if (left > 0) "Sending a message to your partner in $left…" else "Sending…", style = MaterialTheme.typography.headlineSmall)
+        Text(dev.ontask.intervene.autoTrigger(reason, site, maxOf(1, iv.driftSec / 60)), style = MaterialTheme.typography.bodyLarge)
+        Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)) {
+            Text(app.autoText(iv), Modifier.fillMaxWidth().padding(12.dp), style = MaterialTheme.typography.bodyMedium)
+        }
+        Text("Back at work when the time is up, nothing goes, unless you're back on time-wasting in the next 10 minutes.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (!onTask) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button({ app.countdownClosed() }) { Text("I'm back to work") }
+            OutlinedButton({ onTask = true }) { Text("I'm actually on task") }
+        } else OnTaskChooser(app, iv)
+    }
+}
+
+/** Which of this drift's sites, apps, pages or videos was work: the longest first; a page or the whole site. */
+@Composable
+private fun OnTaskChooser(app: App, iv: Intervention) {
+    val items = remember(iv) { app.driftItems(iv) }
+    var picked by remember(items) { mutableStateOf(items.firstOrNull()) }
+    var wholeSite by remember(picked) { mutableStateOf(false) }
+    Text("What were you working on?", style = MaterialTheme.typography.titleMedium)
+    if (items.isEmpty()) Text("Nothing time-wasting recorded in this drift.", style = MaterialTheme.typography.bodyMedium)
+    items.forEach { d ->
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            androidx.compose.material3.RadioButton(picked == d, { picked = d })
+            Text(d.name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, maxLines = 2)
+            Text(fmtDuration(d.seconds), style = MaterialTheme.typography.bodySmall)
+        }
+    }
+    picked?.takeIf { it.item != null && it.domain != null }?.let { d ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.material3.RadioButton(!wholeSite, { wholeSite = false }); Text("Just this page or video  ")
+            androidx.compose.material3.RadioButton(wholeSite, { wholeSite = true }); Text("All of ${d.domain}")
+        }
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button({ picked?.let { app.countdownOnTask(it, wholeSite) } ?: app.interventionWork() }) { Text("It's work — don't send") }
     }
 }
 
@@ -228,7 +297,7 @@ private fun StepThree(app: App, iv: Intervention) {
     var help by remember(iv) { mutableStateOf(false) }
     Column(Modifier.padding(24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Want to let your partner know?", style = MaterialTheme.typography.headlineMedium)
-        Text("It's your call — nothing is sent unless you confirm. You can edit the message.", style = MaterialTheme.typography.bodyMedium)
+        Text("It's your call. You can edit the message.", style = MaterialTheme.typography.bodyMedium)
         BreakTotals(iv.breaksHourSec, iv.breaksTodaySec)
         OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth(), minLines = 4)
         if (status.isNotBlank()) Text(status, style = MaterialTheme.typography.bodySmall)

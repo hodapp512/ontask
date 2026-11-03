@@ -5,7 +5,7 @@ import QRCode from "qrcode";
 import { db, fns } from "../firebase";
 import { h } from "../dom";
 import { heatmapEl } from "./heat";
-import { LEVELS, REACTIONS, ago, clock, clockAt, fmtDate, type DayClock, deepShare, firstName, fmtDuration, greeting, segAt, segDetail, timelineSvg, timelineWindow, todayKey, type LevelKey, type Seg } from "../format";
+import { LEVELS, REACTIONS, absorbShort, ago, clock, clockAt, fmtDate, type DayClock, deepShare, firstName, fmtDuration, greeting, segAt, segDetail, timelineSvg, timelineWindow, todayKey, type LevelKey, type Seg } from "../format";
 import { enablePush, pushState } from "../session";
 
 type Cleanup = () => void;
@@ -291,7 +291,8 @@ async function personCard(u: User, linkId: string, l: DocumentData): Promise<HTM
  * stretches, drag to move along the day. Gestures are tracked on the container, which is never redrawn, so a pinch or
  * drag keeps working while the bar inside is redrawn.
  */
-export function timelineEl(segs: Seg[], day?: DayClock): HTMLElement {
+export function timelineEl(raw: Seg[], day?: DayClock): HTMLElement {
+  const segs = absorbShort(raw);
   const detail = h("p", { class: "muted small tl-detail" });
   const base = timelineWindow(segs);
   let win: [number, number] = [base[0], base[1]];

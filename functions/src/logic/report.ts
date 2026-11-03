@@ -61,7 +61,19 @@ export function middayRows(m?: MiddayDoc): [string, string][] {
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 /** [title]: "Here is Dennis's day" or "Your day"; [who]: "Dennis" or "You", for "didn't use the computer today". */
-export interface ReportParts { title: string; who: string; report?: ReportDoc; checkin?: CheckinDoc; alsoToday?: string[]; link: string }
+/** [autoSends]: messages OnTask sent your partner by itself (only in your own copy). */
+export interface ReportParts { title: string; who: string; report?: ReportDoc; checkin?: CheckinDoc; alsoToday?: string[]; link: string; autoSends?: string[] }
+
+const AUTO_REASONS: Record<string, string> = {
+  ignored: "you didn't answer the check-in",
+  still_on: "still on it 5 minutes after Back to work",
+  drifted_again: "back on it after Back to work",
+};
+
+/** "10:42 AM (you didn't answer the check-in, reddit.com)"; [delivered] 0 means it waited for the daily report. */
+export function autoSendLine(at: string, reason: string, site: string | undefined, delivered: number): string {
+  return `${at} (${[AUTO_REASONS[reason] ?? reason, site].filter(Boolean).join(", ")})${delivered === 0 ? " — held for the daily report" : ""}`;
+}
 
 export const partnerParts = (first: string) => ({ title: `Here is ${first}'s day`, who: first });
 export const ownParts = { title: "Your day", who: "You" };
@@ -97,6 +109,7 @@ export function reportText(p: ReportParts): string {
     if (c.note) lines.push(`"${c.note}"`);
   } else lines.push("No reflection today.");
   if (p.alsoToday?.length) lines.push(`Also today: ${p.alsoToday.join(" · ")}`);
+  if (p.autoSends?.length) lines.push(`Sent to your partner automatically: ${p.autoSends.join(" · ")}`);
   lines.push(`Full day: ${p.link}`);
   return lines.join("\n");
 }
@@ -121,6 +134,7 @@ export function reportHtml(p: ReportParts): string {
       ? `<table>${row("Felt", esc(c.feeling ?? "—"))}${c.helped ? row("Helped", esc(c.helped)) : ""}${c.hurt ? row("Hurt", esc(c.hurt)) : ""}${c.change ? row("Tomorrow", esc(c.change)) : ""}</table>${c.note ? `<p style="margin:8px 0 0">“${esc(c.note)}”</p>` : ""}`
       : `<p style="margin:0;color:#667">No reflection today.</p>`),
     p.alsoToday?.length ? `<h3 style="margin:16px 0 4px">Also today</h3><p style="margin:0">${p.alsoToday.map(esc).join("<br>")}</p>` : "",
+    p.autoSends?.length ? `<h3 style="margin:16px 0 4px">Sent to your partner automatically</h3><p style="margin:0">${p.autoSends.map(esc).join("<br>")}</p>` : "",
     `<p style="margin:20px 0"><a href="${p.link}" style="background:#2563eb;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">Open today in OnTask</a></p>`,
   ];
   return `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;color:#123">${parts.join("")}</div>`;

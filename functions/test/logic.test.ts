@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { partnerMessage, textBeltSafe, withClose } from "../src/logic/messages";
 import { decide, driftAllowed, halfDayStart, inQuietHours, localParts } from "../src/logic/routing";
 import { bedtimeNight, bedtimePushDue, checkinState, habitsDue } from "../src/logic/schedule";
-import { fmtDate, ownParts, partnerParts, reportDue, reportHtml, reportText } from "../src/logic/report";
+import { autoSendLine, fmtDate, ownParts, partnerParts, reportDue, reportHtml, reportText } from "../src/logic/report";
 import { buildPrompt, ollamaLibraryUrl, parseCandidates, validateCandidates } from "../src/logic/modelrec";
 import { DEFAULT_PARTNER_PREFS, type PartnerPrefs, type ScheduleDoc } from "../src/logic/types";
 
@@ -125,6 +125,9 @@ describe("daily report", () => {
     expect(t).toContain('"Long day"');
     expect(t).toContain("Also today: Sam unblocked x.com (3:10 PM)");
     expect(reportText({ ...partnerParts("Sam"), report, link: "l" })).toContain("No reflection today.");
+    const own = reportText({ ...ownParts, report, link: "l", autoSends: [autoSendLine("10:42 AM", "ignored", "reddit.com", 1)] });
+    expect(own).toContain("Sent to your partner automatically: 10:42 AM (you didn't answer the check-in, reddit.com)");
+    expect(autoSendLine("3:05 PM", "drifted_again", undefined, 0)).toBe("3:05 PM (back on it after Back to work) — held for the daily report");
     expect(reportText({ ...ownParts, link: "l" })).toContain("You didn't use the computer today.");
   });
   it("includes the morning/afternoon split and the midday answers", () => {

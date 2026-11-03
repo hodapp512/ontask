@@ -12,8 +12,11 @@ import dev.ontask.Level
  */
 data class ItemRef(val subject: String, val itemKey: String? = null, val title: String? = null)
 
-/** [phone]: a stretch on the phone (from its uploaded report), drawn shorter on the timeline. */
-data class Run(val start: Long, val end: Long, val level: Level, val activity: Map<String, Long> = emptyMap(), val category: dev.ontask.Category? = null, val refs: Map<String, ItemRef> = emptyMap(), val phone: Boolean = false) {
+/**
+ * [phone]: a stretch on the phone (from its uploaded report). [absorbed]: glances under 15 s drawn as part of this
+ * stretch on the timeline (see [Sessions.absorbShort]); they keep their own category and still count in the totals.
+ */
+data class Run(val start: Long, val end: Long, val level: Level, val activity: Map<String, Long> = emptyMap(), val category: dev.ontask.Category? = null, val refs: Map<String, ItemRef> = emptyMap(), val phone: Boolean = false, val absorbed: List<Run> = emptyList()) {
     val seconds get() = end - start
     /** The [n] apps or sites that took the most time in this stretch. */
     fun top(n: Int = 3): List<Pair<String, Long>> = activity.entries.sortedByDescending { it.value }.take(n).map { it.key to it.value }
@@ -39,6 +42,35 @@ object Sessions {
             }
             else out.add(r)
         }
+        return out
+    }
+
+    /**
+     * For drawing the timeline: a stretch under [minSec] (switching between windows, not where the time went) becomes
+     * part of the stretch before it, or after it when nothing comes just before; the two sides of a glance join up.
+     */
+    fun absorbShort(runs: List<Run>, minSec: Long = 15): List<Run> {
+        val out = ArrayList<Run>(); val pending = ArrayList<Run>()
+        fun near(a: Run?, b: Run) = a != null && a.level != Level.AWAY && b.start - a.end <= minSec
+        for (r in runs.sortedBy { it.start }) {
+            if (r.level == Level.AWAY) { out.addAll(pending); pending.clear(); out.add(r); continue }
+            val last = out.lastOrNull()?.takeIf { pending.isEmpty() && near(it, r) }
+            if (r.seconds < minSec) {
+                if (last != null) out[out.lastIndex] = last.copy(end = maxOf(last.end, r.end), absorbed = last.absorbed + r.copy(absorbed = emptyList()) + r.absorbed)
+                else pending.add(r)
+                continue
+            }
+            var cur = r
+            if (pending.isNotEmpty() && near(pending.last(), cur)) cur = cur.copy(start = pending.first().start, absorbed = pending.toList() + cur.absorbed)
+            else out.addAll(pending)
+            pending.clear()
+            val prev = out.lastOrNull()
+            if (prev != null && near(prev, cur) && prev.level == cur.level && prev.category == cur.category && prev.phone == cur.phone) {
+                val act = HashMap(prev.activity); cur.activity.forEach { (k, v) -> act.merge(k, v, Long::plus) }
+                out[out.lastIndex] = prev.copy(end = maxOf(prev.end, cur.end), activity = act, refs = prev.refs + cur.refs, absorbed = prev.absorbed + cur.absorbed)
+            } else out.add(cur)
+        }
+        out.addAll(pending)
         return out
     }
 

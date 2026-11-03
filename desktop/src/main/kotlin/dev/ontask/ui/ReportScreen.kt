@@ -219,7 +219,9 @@ fun SummaryCard(r: DailyReport, title: String, app: App? = null, onRelabel: () -
 @Composable
 private fun Timeline(r: DailyReport, app: App?, onRelabel: () -> Unit) {
     val track = MaterialTheme.colorScheme.surfaceVariant
-    val (from0, to0) = timelineWindow(r.timeline.map { (it.start - r.dayStart) to (it.end - r.dayStart) }, r.timeline.map { it.level == Level.AWAY })
+    // Glances under 15 s are drawn as part of the stretch around them (listed in its details).
+    val timeline = remember(r) { dev.ontask.report.Sessions.absorbShort(r.timeline) }
+    val (from0, to0) = timelineWindow(timeline.map { (it.start - r.dayStart) to (it.end - r.dayStart) }, timeline.map { it.level == Level.AWAY })
     // The visible window, in seconds after midnight.
     var view by remember(r.date, from0, to0) { mutableStateOf(from0.toDouble() to to0.toDouble()) }
     val (from, to) = view
@@ -247,7 +249,7 @@ private fun Timeline(r: DailyReport, app: App?, onRelabel: () -> Unit) {
     fun runAt(x: Float): Run? {
         val t = r.dayStart + (from + x / width * span).toLong()
         val slack = (4f / width * span).toLong() // a few pixels, so thin stretches can be hovered too
-        val shown = r.timeline.filter { it.level != Level.AWAY }
+        val shown = timeline.filter { it.level != Level.AWAY }
         return shown.firstOrNull { t >= it.start && t < it.end } ?: shown.filter { t >= it.start - slack && t < it.end + slack }.minByOrNull { minOf(kotlin.math.abs(t - it.start), kotlin.math.abs(t - it.end)) }
     }
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -282,7 +284,7 @@ private fun Timeline(r: DailyReport, app: App?, onRelabel: () -> Unit) {
             ) {
                 drawRoundRect(track, size = size, cornerRadius = CornerRadius(6f))
                 // Away time isn't drawn: the gaps say it. Mac and phone stretches share the one bar.
-                r.timeline.filter { it.level != Level.AWAY }.forEach { run ->
+                timeline.filter { it.level != Level.AWAY }.forEach { run ->
                     val x0 = ((run.start - r.dayStart - from) / span * size.width).toFloat().coerceIn(0f, size.width)
                     val x1 = ((run.end - r.dayStart - from) / span * size.width).toFloat().coerceIn(0f, size.width)
                     if (x1 <= 0f || x0 >= size.width) return@forEach
@@ -302,6 +304,7 @@ private fun Timeline(r: DailyReport, app: App?, onRelabel: () -> Unit) {
                             val top = run.top(3)
                             if (top.isEmpty()) Text("No app recorded", style = MaterialTheme.typography.bodySmall)
                             top.forEach { (n, sec) -> Text("$n — ${fmtDuration(sec)}", style = MaterialTheme.typography.bodySmall, maxLines = 2) }
+                            run.absorbed.flatMap { it.top(1) }.take(3).forEach { (n, sec) -> Text("also: $n ${fmtDuration(sec)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1) }
                         }
                     }
                 }
@@ -343,14 +346,18 @@ private fun RunDetails(run: Run, app: App?, onClose: () -> Unit, onRelabel: () -
                 val items = run.top(Int.MAX_VALUE)
                 if (items.isEmpty()) Text("No app recorded")
                 Column(Modifier.heightIn(max = 380.dp).verticalScroll(androidx.compose.foundation.rememberScrollState())) {
-                    items.forEachIndexed { i, (name, sec) ->
-                        if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    // The stretch's own items, then glances drawn as part of it, each with its own category.
+                    val rows = items.map { run to it } + run.absorbed.flatMap { a -> a.top(Int.MAX_VALUE).map { a to it } }
+                    rows.forEachIndexed { i, (owner, item) ->
+                        val (name, sec) = item
+                        if (i == items.size && i > 0) Text("Also in this stretch", Modifier.padding(top = 8.dp, bottom = 2.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        else if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, maxLines = 2)
+                            Text((if (owner.phone && !run.phone) "📱 " else "") + name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, maxLines = 2)
                             Text(fmtDuration(sec), Modifier.padding(horizontal = 8.dp), style = MaterialTheme.typography.bodySmall)
-                            val ref = run.refs[name]; val cat = run.category ?: Category.UNKNOWN
+                            val ref = owner.refs[name]; val cat = owner.category ?: Category.UNKNOWN
                             if (app != null && ref != null) CategoryPicker(app, ref.subject, cat, onRelabel, item = ref.itemKey?.let { it to ref.title })
-                            else { Dot(levelColor(run.level), 8); Text("  ${dev.ontask.report.runLabel(run)}", style = MaterialTheme.typography.bodySmall) }
+                            else { Dot(levelColor(owner.level), 8); Text("  ${dev.ontask.report.runLabel(owner)}", style = MaterialTheme.typography.bodySmall) }
                         }
                     }
                 }

@@ -35,13 +35,13 @@ private val OBSTACLES = listOf("Distracted / low energy", "Interruptions/meeting
  */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-fun CheckinScreen(kind: String, onDone: () -> Unit) {
+fun CheckinScreen(kind: String, onSaved: () -> Unit = {}, onDone: () -> Unit) {
     val uid = Cloud.uid ?: return
     var plan by remember { mutableStateOf("") }
     LaunchedEffect(Unit) { runCatching { Cloud.db.document("users/$uid/checkins/${dayKey()}").get().await().getString("plan") }.getOrNull()?.let { if (plan.isBlank()) plan = it } }
     fun save(data: Map<String, Any?>) {
         Cloud.db.document("users/$uid/phoneCheckins/${dayKey()}").set(mapOf(kind.lowercase().removeSuffix("_short") to data + ("ts" to System.currentTimeMillis())), SetOptions.merge())
-        onDone()
+        onSaved(); onDone()
     }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         when (kind) {

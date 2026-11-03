@@ -120,8 +120,9 @@ private fun SiteRow(s: Map<String, Any?>, categories: List<Cat>) {
  * says what they are), pinch to zoom, drag to move.
  */
 @Composable
-fun Timeline(segs: List<Map<String, Any?>>, dayStart: Long?, tz: String?, refs: Map<String, Map<String, Any?>> = emptyMap(), categories: List<Cat> = emptyList()) {
-    if (segs.isEmpty()) return
+fun Timeline(raw: List<Map<String, Any?>>, dayStart: Long?, tz: String?, refs: Map<String, Map<String, Any?>> = emptyMap(), categories: List<Cat> = emptyList()) {
+    if (raw.isEmpty()) return
+    val segs = remember(raw) { absorbShort(raw) }
     val active = segs.filter { it["k"] != "A" }
     val from0 = ((active.minOfOrNull { it["a"].num() } ?: 0) / 3600) * 3600
     val to0 = (((active.maxOfOrNull { it["b"].num() } ?: 86_400) + 3599) / 3600 * 3600).coerceAtLeast(from0 + 7200)
@@ -166,8 +167,12 @@ fun Timeline(segs: List<Map<String, Any?>>, dayStart: Long?, tz: String?, refs: 
         picked?.let { s ->
             Text((if (s["d"] == "phone") "📱 " else "") + "${s["c"] ?: Lvl.of(s["k"] as? String).label} · ${clockAt(s["a"].num(), dayStart, tz)}–${clockAt(s["b"].num(), dayStart, tz)}",
                 style = MaterialTheme.typography.bodySmall)
-            @Suppress("UNCHECKED_CAST") (s["t"] as? List<Map<String, Any?>>)?.forEach { x ->
-                val n = x["n"] as? String ?: return@forEach
+            @Suppress("UNCHECKED_CAST") val also = (s["also"] as? List<Map<String, Any?>>).orEmpty()
+            @Suppress("UNCHECKED_CAST") val rows = (s["t"] as? List<Map<String, Any?>>).orEmpty().map { it to false } +
+                also.flatMap { g -> (g["t"] as? List<Map<String, Any?>>).orEmpty().map { it to true } }
+            rows.forEachIndexed { i, (x, glance) ->
+                val n = x["n"] as? String ?: return@forEachIndexed
+                if (glance && (i == 0 || !rows[i - 1].second)) Text("Also in this stretch", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("$n · ${fmtDuration(x["s"].num())}", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
                     refs[n]?.let { ref -> if (categories.isNotEmpty()) RefMenu(ref, categories) }
@@ -178,11 +183,43 @@ fun Timeline(segs: List<Map<String, Any?>>, dayStart: Long?, tz: String?, refs: 
 }
 
 /**
+ * Glances under [minSec] (switching between apps) are drawn as part of the stretch before them, or after them when
+ * nothing comes just before; the two sides of a glance join up. They're kept under "also" for the details.
+ */
+@Suppress("UNCHECKED_CAST")
+fun absorbShort(segs: List<Map<String, Any?>>, minSec: Long = 15): List<Map<String, Any?>> {
+    fun a(m: Map<String, Any?>) = m["a"].num()
+    fun b(m: Map<String, Any?>) = m["b"].num()
+    fun also(m: Map<String, Any?>) = (m["also"] as? List<Map<String, Any?>>).orEmpty()
+    val out = ArrayList<Map<String, Any?>>(); val pending = ArrayList<Map<String, Any?>>()
+    for (r in segs.sortedBy { a(it) }) {
+        val last = out.lastOrNull()?.takeIf { pending.isEmpty() && a(r) - b(it) <= minSec }
+        if (b(r) - a(r) < minSec) {
+            if (last != null) out[out.lastIndex] = last + mapOf("b" to maxOf(b(last), b(r)), "also" to also(last) + (r - "also") + also(r))
+            else pending.add(r)
+            continue
+        }
+        var cur = r
+        if (pending.isNotEmpty() && a(cur) - b(pending.last()) <= minSec) cur = cur + mapOf("a" to a(pending.first()), "also" to pending.toList() + also(cur))
+        else out.addAll(pending)
+        pending.clear()
+        val prev = out.lastOrNull()
+        if (prev != null && a(cur) - b(prev) <= minSec && prev["k"] == cur["k"] && prev["c"] == cur["c"] && prev["d"] == cur["d"]) {
+            val t = LinkedHashMap<String, Long>()
+            ((prev["t"] as? List<Map<String, Any?>>).orEmpty() + (cur["t"] as? List<Map<String, Any?>>).orEmpty()).forEach { x -> (x["n"] as? String)?.let { t.merge(it, x["s"].num(), Long::plus) } }
+            out[out.lastIndex] = prev + mapOf("b" to maxOf(b(prev), b(cur)), "t" to t.entries.sortedByDescending { it.value }.map { mapOf("n" to it.key, "s" to it.value) }, "also" to also(prev) + also(cur))
+        } else out.add(cur)
+    }
+    out.addAll(pending)
+    return out
+}
+
+/**
  * A category menu for one thing in a stretch (on the Mac or this phone): an app or site becomes a rule for every
  * device (the Mac relabels its history); a page or video gets its own verdict.
  */
 @Composable
-private fun RefMenu(ref: Map<String, Any?>, categories: List<Cat>) {
+internal fun RefMenu(ref: Map<String, Any?>, categories: List<Cat>, onPicked: (Cat) -> Unit = {}) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     var open by remember { mutableStateOf(false) }
     var picked by remember { mutableStateOf<String?>(null) }
@@ -193,7 +230,7 @@ private fun RefMenu(ref: Map<String, Any?>, categories: List<Cat>) {
         DropdownMenu(open, { open = false }) {
             categories.filter { itemKey == null || !it.variable }.forEach { c ->
                 DropdownMenuItem({ Text(c.label) }, {
-                    open = false; picked = c.label
+                    open = false; picked = c.label; onPicked(c)
                     val subject = ref["subject"] as? String ?: return@DropdownMenuItem
                     if (itemKey != null) dev.ontask.android.track.PhoneRules.saveVerdict(dev.ontask.android.Cloud.deviceId(ctx), itemKey, ref["title"] as? String, c.id, dev.ontask.Source.USER_LABEL, null)
                     else dev.ontask.android.track.PhoneRules.saveRule(

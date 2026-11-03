@@ -6,6 +6,24 @@ import java.net.URI
 object Pages {
     private data class Parts(val host: String, val path: String)
 
+    private val SEARCH_PATHS = mapOf("google.com" to "/search", "bing.com" to "/search", "search.brave.com" to "/search", "duckduckgo.com" to "", "search.yahoo.com" to "/search")
+
+    /**
+     * What you searched for on a search engine's results page, or null. A search can be work or not, so each one is
+     * judged on its own like a video (whatever site, or rule, the search engine itself has).
+     */
+    fun searchQuery(url: String?): String? = runCatching {
+        val u = URI(url!!.trim())
+        val host = u.host!!.lowercase().removePrefix("www.")
+        val path = (u.path ?: "").trimEnd('/')
+        val want = SEARCH_PATHS[host] ?: return null
+        if (path != want && !(want == "/search" && path.startsWith("/search"))) return null
+        val q = u.rawQuery?.split('&')?.firstOrNull { it.startsWith("q=") || it.startsWith("p=") }?.substringAfter('=') ?: return null
+        java.net.URLDecoder.decode(q, "UTF-8").trim().lowercase().replace(Regex("\\s+"), " ").ifEmpty { null }
+    }.getOrNull()
+
+    fun isSearch(url: String?): Boolean = searchQuery(url) != null
+
     private fun parts(url: String?): Parts? = runCatching {
         val u = URI(url!!.trim())
         Parts(u.host!!.lowercase().removePrefix("www.").removePrefix("m."), (u.path ?: "").trimEnd('/').lowercase())
@@ -63,6 +81,7 @@ object Pages {
     fun label(domain: String?, title: String?, url: String?): String? {
         val site = siteName(domain) ?: return null
         if (isFeed(url)) return "$site: feed"
+        searchQuery(url)?.let { return "$site search: ${it.take(120)}" }
         val t = title?.trim().orEmpty()
             .replace(Regex("""^\(\d+\)\s*"""), "") // unread counts: "(3) Facebook"
             .replace(Regex("""\s*[-|·–—:]\s*(on )?${Regex.escape(site)}$""", RegexOption.IGNORE_CASE), "")
@@ -83,6 +102,7 @@ fun itemKey(app: String?, title: String?, url: String?): String {
         val v = u.rawQuery?.split('&')?.firstOrNull { it.startsWith("v=") }?.removePrefix("v=")
         if (host.endsWith("youtube.com") && v != null) return "youtube.com/watch?v=$v"
         if (host == "youtu.be") return "youtube.com/watch?v=" + u.path.trim('/')
+        Pages.searchQuery(url)?.let { return host + "/search?q=" + it }
         return host + (u.path?.trimEnd('/') ?: "")
     }
     return "${app ?: "?"}|${title ?: ""}"

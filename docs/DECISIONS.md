@@ -414,7 +414,7 @@ when it comes to the front.*
 - **Phone judging goes through a Cloud Function to Jev; the Mac keeps Kev** (local, free, works well).
 - Uploads every 2 minutes in use and at once on lock/away, so the merged day is current all day.
 - Breaks and check-ins are shared across devices; the work day still starts at the first sit-down on the Mac.
-- iPhone and Windows explored only (docs/PLATFORMS.md).
+- iPhone and Windows explored only (PLATFORMS.md).
 - *Step 4 details:* phone steps 2–3 are an activity started by the Accessibility service (allowed without the
   "Display over other apps" permission). "Back to work" on the phone goes to the home screen (no phone blocking
   until v2). Focus since the last break is counted by the Mac only (phone focus is rare); phone breaks are shared.
@@ -474,3 +474,37 @@ when it comes to the front.*
   window too, so two windows came up. When OnTask wasn't in front, its other windows go back behind the app you were
   using. *Rejected:* not taking focus at all (typing in a check-in or message would need a click first); closing the
   main window (loses where you were in it).
+
+## 2026-11-03 · Telling the partner when step 3 is ignored; sorting after check-ins; searches; glances (grilled)
+
+- **Drift counts only time actually on time-wasting.** A 5-second look at the LinkedIn feed during the watch after
+  "Back to work" counted as a 30-second drift, because the clock ran from the first second; a minute back at work now
+  pauses the count. *Rejected:* ending the drift on any switch (window-hopping would reset it).
+- **Step 3 ignored → OnTask tells the partner, but never by surprise.** After 1 minute more of drifting with step 3
+  unanswered (or closed with its X), a 10-second countdown says why and shows the message word for word. Still on
+  time-wasting when it ends → sent; back at work → a 10-minute watch where 30 s back on it sends at once. "Not now,
+  back to work" leads to the same countdown if you're still there after the 5-minute check, not to step 3 again.
+  *Rejected:* sending silently (the user didn't want to hide that a message goes); a 2-minute wait (1 minute is
+  enough to answer); counting "Not now" as an answer that sends nothing.
+- **"I'm actually on task" on the countdown asks which site, app, page or video was work** (this drift's, longest
+  first; a page can be just itself or the whole site), so the right thing is filed. Nothing is sent.
+- **One message per drift, inside the existing caps** (2 a day from the Mac, 2 drift alerts per half-day on the
+  server). Balancing: the partner should be alerted but not badgered. After a send, the 30-second reminders go on
+  until you switch, and nothing more is sent. No notice afterwards; your own daily report lists it.
+- **The message comes from OnTask, about you** ("Dennis has been drifting on reddit.com for 12 min and didn't answer
+  OnTask's check-in."), never a half-typed draft of yours.
+- **Search results pages are Varies, judged search by search** by what you typed. Searches can be work or not
+  ("excalidraw or mermaid in markdown" vs "news"); a rule on the search engine's whole site was wrong either way
+  (Brave Search was Entertainment). Your google.com rule still covers the rest of Google.
+- **Glances under 15 s are drawn as part of the stretch around them** (Mac, phone and partner timelines), listed in
+  its details with their own category; totals are unchanged. They're window-switching, not where the time went.
+  *Rejected:* dropping them (they'd vanish from the details and the category menu).
+- **"Help sort these" after the midday and evening check-ins**, as its own window right after Done (the check-in
+  stays short): Unclassified sites and apps and Unsure pages, both devices, today and yesterday, 30 s+, top 10.
+  Skip for now carries them to the next check-in. *Rejected:* a step inside the check-in (makes it feel long).
+- **Screenshots come back, for you only:** one of the front window per unsorted item after 15 s, kept on the device
+  that took it (the phone through its Accessibility service), deleted when sorted or after 7 days, never uploaded or
+  sent to AI. *Rejected:* uploading them so both devices see every picture (your screens would leave your devices).
+- **All documentation in `docs/`** (README stays at the root), with **`docs/FLOWS.md`**: Mermaid diagrams of the main
+  flows, updated with every change like DESIGN.md and this file. *Rejected:* image diagrams (they go stale).
+

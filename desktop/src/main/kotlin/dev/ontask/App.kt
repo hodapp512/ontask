@@ -257,6 +257,8 @@ class App(val dir: Path = dataDir()) {
         // Focus sessions were removed (2026-11-03): one still running from before ends now.
         runCatching { focus.stop(nowSec()) }
         runCatching { migrateSiteRules() }
+        runCatching { migrateSearchRules() }
+        pruneShots(nowSec())
         Retention.rollup(db, nowSec(), settings.retentionDays)
         if (!prefs.bool("blocklist.seeded", false)) { blocklist.seedDefault(nowSec()); prefs.set("blocklist.seeded", true) }
         tracker.seedTotals(LocalDate.now(), reports.totals(LocalDate.now()))
@@ -326,9 +328,14 @@ class App(val dir: Path = dataDir()) {
         // With a break earned, the first prompt is "Is this a break?" after a minute; otherwise "drifting" after two.
         ladder.cfg = ladder.cfg.copy(step1WastedSec = if (earned > 0) 60 else prefs.int("ladder.step1_sec", 120))
         val strict = blocking.strictNow(now)
+        if (now - lastPartnerCheck >= 60) { lastPartnerCheck = now; hasPartner = cloud.linkInfo()?.partners?.isNotEmpty() == true }
+        ladder.partnerAuto = strict && hasPartner
         val iv = ladder.tick(now, wasted, (strict || beforeWorkAfterSitDown(now)) && !onBreak, unblocks.unblocksInLast(now, ladder.cfg.unblockWindowSec.toLong()))
             ?.let { decorate(it, now) }
-        if (iv != null && prefs.bool("ladder.enabled", true)) { _intervention.value = iv; closedIv = null; if (iv.step.n >= 2) _breakCard.value = null }
+        if (iv?.send != null) { autoSend(iv, now); _intervention.value = null; closedIv = null }
+        else if (iv != null && prefs.bool("ladder.enabled", true)) { _intervention.value = iv; closedIv = null; if (iv.step.n >= 2) _breakCard.value = null }
+        // The countdown's window goes once its 10 seconds are up (sent, or watching you stay on task).
+        if (_intervention.value?.countdown != null && !ladder.countingDown) _intervention.value = null
         // Nothing escalating (and not in the check after "Back to work", whose reminders stay up until you switch).
         if (ladder.step == Step.NONE && !ladder.checking) { _intervention.value = null; closedIv = null }
         // A prompt closed with its window's close button comes back until it's answered.
@@ -362,7 +369,7 @@ class App(val dir: Path = dataDir()) {
         if (live.away || !seg.category.variable || seg.itemCategory != null) return
         val item = dev.ontask.classify.itemKey(seg.app, seg.title, seg.url)
         verdicts.get(item)?.let { tracker.applyVerdict(it); return }
-        synchronized(variableUnsure) { variableUnsure[item] }?.let { maybeAsk(it, now); return }
+        synchronized(variableUnsure) { variableUnsure[item] }?.let { takeShot(itemShotKey(item)); maybeAsk(it, now); return }
         synchronized(variableJudging) { if (!variableJudging.add(item)) return }
         val sample = live.sample ?: dev.ontask.Sample(app = seg.app, title = seg.title, url = seg.url)
         scope.launch(IO) {
@@ -422,6 +429,7 @@ class App(val dir: Path = dataDir()) {
         if (name == null) { unknownSince = null; return }
         if (unknownSince?.first != name) unknownSince = name to now
         val aiPending = ai.enabled && !ai.metadataOnly && lastAi < unknownSince!!.second
+        if (now - unknownSince!!.second >= 15 && !aiPending) takeShot(siteShotKey(name))
         if (now - unknownSince!!.second < 15 || aiPending || aiBusy || _unknownAsk.value != null || _variableAsk.value != null || askPausedUntil > 0) return
         if (now < (unknownNotNow[name] ?: 0)) return
         _unknownAsk.value = UnknownAsk(name)
@@ -464,6 +472,7 @@ class App(val dir: Path = dataDir()) {
     fun answerVariable(item: String, title: String?, cat: Category?, sourceKey: String? = null) {
         if (_variableAsk.value?.item == item) _variableAsk.value = null
         if (cat == null) return
+        deleteShot(itemShotKey(item))
         val key = sourceKey ?: synchronized(variableUnsure) { variableUnsure[item]?.sourceKey }
         verdicts.set(item, title, cat, Source.USER_LABEL, key, nowSec())
         synchronized(variableUnsure) { variableUnsure.remove(item) }
@@ -679,12 +688,82 @@ class App(val dir: Path = dataDir()) {
     fun finishPrompt(p: Prompt, snoozeMin: Int? = null) {
         if (snoozeMin != null && snoozesLeft(p) <= 0) return // snoozed twice: it stays until answered
         _duePrompt.value = null
+        // Done with the midday or evening check-in: then "Help sort these", if anything is waiting.
+        if (snoozeMin == null && (p == Prompt.MIDDAY || p == Prompt.EVENING)) scope.launch(IO) { runCatching { sortItems() }.getOrNull()?.takeIf { it.isNotEmpty() }?.let { _sortItems.value = it } }
         if (snoozeMin != null) {
             snoozeUntil[p] = nowSec() + snoozeMin * 60L
             snoozes.merge(p to LocalDate.now(), 1, Int::plus)
             // Logged only: you're at the Mac and it comes back here, so nothing goes to the phone.
             events.emit("checkin_snoozed", nowSec(), "kind" to p.name.lowercase(), "minutes" to snoozeMin)
         }
+    }
+
+    // ---- Help sort these ------------------------------------------------------------------------------------
+
+    /**
+     * One row of "Help sort these": a site or app with no category, or a page or video still Unsure, with its time
+     * (today and yesterday, so what you skipped last evening is still there) and its screenshot when this Mac has one.
+     */
+    data class SortItem(val name: String, val ref: dev.ontask.report.ItemRef, val seconds: Long, val phone: Boolean, val category: Category, val shot: Path?)
+
+    private val _sortItems = MutableStateFlow<List<SortItem>?>(null)
+    /** Set after the midday or evening check-in when something is waiting: the "Help sort these" window. */
+    val sortWindow: StateFlow<List<SortItem>?> = _sortItems
+    fun sortClosed() { _sortItems.value = null }
+
+    /** Unclassified sites and apps and Unsure pages (Mac and phone), 30 s or more, the 10 with the most time. */
+    fun sortItems(now: Long = nowSec()): List<SortItem> {
+        tracker.flush()
+        val today = LocalDate.now()
+        data class Acc(var name: String, val ref: dev.ontask.report.ItemRef, var sec: Long, var phone: Boolean, val cat: Category)
+        val acc = LinkedHashMap<String, Acc>()
+        for (date in listOf(today.minusDays(1), today)) {
+            val r = dev.ontask.report.withDevices(reports.daily(date), if (cloud.signedIn) runCatching { cloud.otherDevices(date) }.getOrDefault(emptyList()) else emptyList())
+            for (run in r.timeline) {
+                if (run.level == Level.AWAY) continue
+                val cat = run.category ?: Category.UNKNOWN
+                for ((name, sec) in run.activity) {
+                    val ref = run.refs[name] ?: dev.ontask.report.ItemRef(name)
+                    val unsure = cat.variable && ref.itemKey != null && verdicts.get(ref.itemKey) == null
+                    if (cat != Category.UNKNOWN && !unsure) continue
+                    val key = ref.itemKey?.let { itemShotKey(it) } ?: siteShotKey(ref.subject)
+                    val a = acc.getOrPut(key) { Acc(name, ref, 0, run.phone, cat) }
+                    a.sec += sec; if (!run.phone) a.phone = false
+                }
+            }
+        }
+        return acc.entries.filter { it.value.sec >= 30 }.sortedByDescending { it.value.sec }.take(10).map { (key, a) ->
+            SortItem(a.name, a.ref, a.sec, a.phone, a.cat, shotFile(key).takeIf { java.nio.file.Files.exists(it) })
+        }
+    }
+
+    /**
+     * Screenshots for "Help sort these": one of the front window per unsorted site, app, page or video, taken when it's
+     * been Unclassified or Unsure for 15 seconds. They stay on this Mac (never uploaded) until it's sorted, 7 days at most.
+     */
+    private val shotsDir: Path = dir.resolve("shots")
+    private fun siteShotKey(name: String) = "site:" + if ('.' in name && ' ' !in name) dev.ontask.classify.siteDomain(name) else name
+    private fun itemShotKey(item: String) = "item:$item"
+    private fun shotFile(key: String): Path = shotsDir.resolve(java.security.MessageDigest.getInstance("SHA-1").digest(key.toByteArray()).joinToString("") { "%02x".format(it) } + ".jpg")
+    private val shooting = HashSet<String>()
+
+    private fun takeShot(key: String) {
+        val f = shotFile(key)
+        if (java.nio.file.Files.exists(f) || !synchronized(shooting) { shooting.add(key) }) return
+        scope.launch(IO) {
+            try {
+                val b64 = helper.request("window_shot", 10000, mapOf("maxDim" to 1000))?.get("jpeg")?.jsonPrimitive?.contentOrNull ?: return@launch
+                java.nio.file.Files.createDirectories(shotsDir)
+                java.nio.file.Files.write(f, java.util.Base64.getDecoder().decode(b64))
+            } catch (_: Exception) {} finally { synchronized(shooting) { shooting.remove(key) } }
+        }
+    }
+
+    private fun deleteShot(key: String) { runCatching { java.nio.file.Files.deleteIfExists(shotFile(key)) } }
+
+    /** Screenshots older than 7 days go, sorted or not. */
+    private fun pruneShots(now: Long) = runCatching {
+        java.nio.file.Files.list(shotsDir).use { s -> s.filter { java.nio.file.Files.getLastModifiedTime(it).toMillis() / 1000 < now - 7 * 86400 }.forEach { java.nio.file.Files.deleteIfExists(it) } }
     }
 
     // ---- intervention actions ----------------------------------------------------------------------------
@@ -842,12 +921,70 @@ class App(val dir: Path = dataDir()) {
         _bedtime.value = null
     }
 
-    /** Sends the partner message through the daily rate limit; extras are queued into the next check-in. */
-    fun sendPartnerAlert(text: String): Boolean {
+    /**
+     * Sends the partner message through the daily rate limit; extras are queued into the next check-in. [auto]: OnTask
+     * sent it by itself (step 3 ignored); otherwise it's yours from step 3, and nothing more goes for this drift.
+     */
+    fun sendPartnerAlert(text: String, auto: dev.ontask.intervene.AutoReason? = null, site: String? = null): Boolean {
+        if (auto == null) ladder.partnerAnswered()
         val day = java.time.LocalDate.now().toString()
         val ok = alerts.offer(day, text)
-        if (ok) events.emit("binge_alert", nowSec(), "message" to text) else prefs.set("alerts.queued", (prefs.str("alerts.queued", "") + "\n" + text).trim())
+        if (ok) events.emit("binge_alert", nowSec(), "message" to text, "auto" to auto?.name?.lowercase(), "site" to site)
+        else prefs.set("alerts.queued", (prefs.str("alerts.queued", "") + "\n" + text).trim())
         return ok
+    }
+
+    private var hasPartner = false
+    private var lastPartnerCheck = 0L
+
+    /** What the countdown says will go to your partner, word for word. */
+    fun autoText(iv: Intervention): String {
+        val first = prefs.get("cloud.account_name")?.trim()?.split(Regex("\\s+"))?.firstOrNull()?.ifBlank { null } ?: "Your friend"
+        return dev.ontask.intervene.autoMessage(iv.countdown ?: iv.send ?: dev.ontask.intervene.AutoReason.IGNORED, first, iv.site ?: "time-wasting sites", maxOf(1, iv.driftSec / 60))
+    }
+
+    private fun autoSend(iv: Intervention, now: Long) {
+        val d = decorate(iv, now)
+        sendPartnerAlert(autoText(d), auto = iv.send, site = d.site)
+    }
+
+    /** The countdown's X or "I'm back to work": only the window goes; what you do next decides (see [Ladder]). */
+    fun countdownClosed() { if (_intervention.value?.countdown != null) _intervention.value = null }
+
+    /** A site, app, page or video from this drift, for "I'm actually on task" to file as work ([item]: its key). */
+    data class DriftItem(val name: String, val seconds: Long, val domain: String?, val app: String?, val item: String?, val title: String?, val category: Category)
+
+    /** What you were on in the drift that brought the countdown (time-wasting, the last hour at most), longest first. */
+    fun driftItems(iv: Intervention, now: Long = nowSec()): List<DriftItem> = runCatching {
+        db.use { c ->
+            c.prepareStatement(
+                "SELECT app, domain, item, max(title), category, sum(seconds) s, max(url) FROM ticks WHERE end_ts >= ? AND level = 'WASTED' " +
+                    "GROUP BY CASE WHEN domain IS NULL THEN app ELSE domain END, item ORDER BY s DESC LIMIT 8",
+            ).use { ps ->
+                ps.setLong(1, now - minOf(3600L, iv.driftSec + 900))
+                ps.executeQuery().use { rs ->
+                    buildList {
+                        while (rs.next()) {
+                            val app = rs.getString(1); val domain = rs.getString(2); val label = rs.getString(3); val title = rs.getString(4)
+                            val cat = Category.registry[rs.getString(5)] ?: Category.UNKNOWN
+                            // A page or video on a Varies site ("YouTube: feed") is decided by its key.
+                            val key = if (label != null && cat.variable) dev.ontask.classify.itemKey(app, title, rs.getString(7)) else null
+                            add(DriftItem(label ?: domain ?: app ?: "?", rs.getLong(6), domain, app, key, title, cat))
+                        }
+                    }
+                }
+            }
+        }
+    }.getOrDefault(emptyList())
+
+    /**
+     * "I'm actually on task" on the countdown: nothing is sent, and what you picked is filed as work (a page or video
+     * by itself when [wholeSite] is false), like "It's actually work".
+     */
+    fun countdownOnTask(d: DriftItem, wholeSite: Boolean) {
+        if (d.item != null && !wholeSite) answerVariable(d.item, d.title, Category.CORE_WORK)
+        else (d.domain ?: d.app)?.let { reclassify(it, Category.CORE_WORK, d.category) }
+        ladder.workConfirmed(); _intervention.value = null; closedIv = null
     }
 
     fun reloadRules() { classifier = Classifier(ruleStore.userRules()) }
@@ -857,6 +994,7 @@ class App(val dir: Path = dataDir()) {
      * relabels its past activity. Used by the dropdowns here and by corrections sent from the phone.
      */
     fun reclassify(name: String, to: Category, from: Category = Category.UNKNOWN) {
+        if (!to.variable) deleteShot(siteShotKey(name))
         val kind = if ('.' in name && ' ' !in name) dev.ontask.classify.RuleKind.DOMAIN else dev.ontask.classify.RuleKind.APP
         // A site rule covers the whole site: moving "en.m.wikipedia.org" means all of wikipedia.org.
         val pattern = if (kind == dev.ontask.classify.RuleKind.DOMAIN) dev.ontask.classify.siteDomain(name) else name
@@ -870,6 +1008,18 @@ class App(val dir: Path = dataDir()) {
      * Once after upgrading to the four default categories: old default names you kept are renamed, and anything still
      * filed under a retired built-in (Learning, Communication, Social, News, Shopping) is sorted again like a delete.
      */
+    /**
+     * Once (2026-11-03): search results are judged search by search now, so a rule you gave a search engine's own site
+     * (Brave Search was Entertainment) becomes Varies, and its past time is relabeled.
+     */
+    private fun migrateSearchRules() {
+        if (prefs.bool("search.varies", false)) return
+        val engines = setOf("search.brave.com", "brave.com", "bing.com", "duckduckgo.com", "search.yahoo.com")
+        ruleStore.userRules().filter { it.kind == dev.ontask.classify.RuleKind.DOMAIN && it.pattern in engines && !it.category.variable }
+            .forEach { reclassify(it.pattern, Category.VARIABLE, it.category) }
+        prefs.set("search.varies", true)
+    }
+
     private fun migrateCategories() {
         if (prefs.bool("categories.v2", false)) return
         categories.renameOldDefaults()

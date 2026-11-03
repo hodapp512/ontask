@@ -44,13 +44,75 @@ class PromptActivity : ComponentActivity() {
         current = WeakReference(this)
         val step = intent.getIntExtra("step", 2)
         val bedtime = intent.getStringExtra("bedtime")
-        setContent { OnTaskTheme { if (bedtime != null) Bedtime(bedtime) else Screen(step) } }
+        countdown = intent.getStringExtra("countdown") != null
+        setContent {
+            OnTaskTheme {
+                when {
+                    countdown -> Countdown(intent.getStringExtra("trigger").orEmpty(), intent.getStringExtra("message").orEmpty(), intent.getIntExtra("seconds", 10), intent.getLongExtra("driftSec", 600))
+                    bedtime != null -> Bedtime(bedtime)
+                    else -> Screen(step)
+                }
+            }
+        }
     }
+
+    private var countdown = false
+
+    override fun onNewIntent(intent: android.content.Intent) { super.onNewIntent(intent); setIntent(intent); recreate() }
 
     override fun onDestroy() { if (current?.get() === this) current = null; super.onDestroy() }
 
     @Suppress("DEPRECATION")
-    override fun onBackPressed() { Tracker.running?.prompts?.screenClosed(); finish() }
+    override fun onBackPressed() { if (!countdown) Tracker.running?.prompts?.screenClosed(); finish() }
+
+    /**
+     * "Sending a message to your partner in 10…": why, and the message word for word. Closing it or "I'm back to
+     * work" only closes the screen (still on time-wasting when the time's up sends it); "I'm actually on task" files
+     * what you pick as work and sends nothing.
+     */
+    @androidx.compose.runtime.Composable
+    private fun Countdown(trigger: String, message: String, seconds: Int, driftSec: Long) {
+        val p = Tracker.running?.prompts
+        var left by remember { mutableStateOf(seconds) }
+        var onTask by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) { while (left > 0) { delay(1000); left-- }; if (!onTask) { delay(1500); finish() } }
+        Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).verticalScroll(rememberScrollState()).padding(24.dp).padding(top = 48.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text(if (left > 0) "Sending a message to your partner in $left…" else "Sending…", style = MaterialTheme.typography.headlineSmall)
+            Text(trigger, style = MaterialTheme.typography.bodyLarge)
+            androidx.compose.material3.Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)) {
+                Text(message, Modifier.fillMaxWidth().padding(12.dp))
+            }
+            Muted("Back at work when the time is up, nothing goes, unless you're back on time-wasting in the next 10 minutes.")
+            if (!onTask) {
+                Button({ p?.backToWorkFromCountdown(); finish() }, Modifier.fillMaxWidth()) { Text("I'm back to work") }
+                OutlinedButton({ onTask = true }, Modifier.fillMaxWidth()) { Text("I'm actually on task") }
+            } else {
+                val items = remember { Tracker.running?.driftItems(minOf(3600L, driftSec + 900)).orEmpty() }
+                var picked by remember { mutableStateOf(items.firstOrNull()) }
+                var whole by remember { mutableStateOf(false) }
+                Text("What were you working on?", style = MaterialTheme.typography.titleMedium)
+                if (items.isEmpty()) Muted("Nothing time-wasting recorded in this drift.")
+                items.forEach { d ->
+                    androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        androidx.compose.material3.RadioButton(picked == d, { picked = d; whole = false })
+                        Text(d.label, Modifier.weight(1f)); Text(fmtDuration(d.seconds), style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                picked?.takeIf { it.pageKey != null }?.let { d ->
+                    androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        androidx.compose.material3.RadioButton(!whole, { whole = false }); Text("Just this one")
+                        androidx.compose.material3.RadioButton(whole, { whole = true }); Text("All of ${d.siteKey.substringAfter('|')}")
+                    }
+                }
+                Button({
+                    val d = picked
+                    if (d != null) p?.countdownOnTask(if (d.pageKey != null && !whole) d.pageKey else d.siteKey, d.title) else p?.working()
+                    finish()
+                }, Modifier.fillMaxWidth()) { Text("It's work — don't send") }
+            }
+        }
+    }
 
     /** The third and later bedtime reminder: full screen (answerable at once). */
     @androidx.compose.runtime.Composable
@@ -87,6 +149,7 @@ class PromptActivity : ComponentActivity() {
                     var sent by remember { mutableStateOf(false) }
                     OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth(), minLines = 3)
                     OutlinedButton({ p?.messagePartner(text); sent = true }, enabled = !sent) { Text(if (sent) "Sent ✓" else "Message my partner") }
+                    if (step == 3) Muted("It's your call. You can edit the message.")
                 }
             }
         }

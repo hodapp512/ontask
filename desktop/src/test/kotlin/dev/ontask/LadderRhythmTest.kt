@@ -120,6 +120,53 @@ class LadderRhythmTest {
         assertEquals(Step.WINDOW, l.span(480, 500, true).firstOrNull()?.step)
     }
 
+    private fun Ladder.toStep3(): Ladder { partnerAuto = true; span(0, 605, wasted = true); check(step == Step.PARTNER); return this }
+
+    @Test fun ignoringStep3CountsDownThenSends() {
+        val l = Ladder().toStep3()
+        // A minute of drifting with step 3 unanswered brings the countdown; still drifting when it ends sends.
+        val iv = l.span(605, 670, wasted = true)
+        assertEquals(listOf(AutoReason.IGNORED), iv.mapNotNull { it.countdown })
+        assertEquals(AutoReason.IGNORED, l.span(670, 690, wasted = true).firstNotNullOf { it.send })
+        // Afterwards: reminders until you switch, and nothing more is sent.
+        val after = l.span(690, 1400, wasted = true)
+        assertTrue(after.all { it.reminder } && after.isNotEmpty())
+        assertTrue(after.none { it.send != null || it.countdown != null })
+    }
+
+    @Test fun awayWithStep3UpPausesTheMinute() {
+        val l = Ladder().toStep3()
+        assertTrue(l.span(605, 640, wasted = true).none { it.countdown != null })
+        assertTrue(l.span(640, 1000, wasted = false).none { it.countdown != null }) // back at work (or away): no time counts
+        assertTrue(l.span(1000, 1010, wasted = true).none { it.countdown != null })
+    }
+
+    @Test fun backAtWorkWhenTheCountdownEndsWatchesTenMinutes() {
+        val l = Ladder().toStep3()
+        l.span(605, 665, wasted = true)                                   // countdown starts
+        assertTrue(l.span(665, 700, wasted = false).none { it.send != null }) // switched: nothing sent
+        assertEquals(AutoReason.DRIFTED_AGAIN, l.span(900, 960, wasted = true).firstNotNullOf { it.send }) // 30 s back on it
+        val m = Ladder().toStep3()
+        m.span(605, 665, wasted = true); m.span(665, 1300, wasted = false)   // 10 minutes on task
+        assertTrue(m.span(1300, 1400, wasted = true).none { it.send != null || it.countdown != null })
+    }
+
+    @Test fun notNowOnStep3EndsInTheCountdownNotStep3Again() {
+        val l = Ladder().toStep3()
+        l.backToWork(605)
+        val iv = l.span(605, 910, wasted = true)
+        assertEquals(listOf(AutoReason.STILL_ON), iv.mapNotNull { it.countdown })
+        assertTrue(iv.none { it.step == Step.WINDOW && !it.reminder && it.countdown == null })
+        assertEquals(AutoReason.STILL_ON, l.span(910, 925, wasted = true).firstNotNullOf { it.send })
+    }
+
+    @Test fun sendingItYourselfMeansNoAutomaticMessage() {
+        val l = Ladder().toStep3()
+        l.partnerAnswered(); l.backToWork(605)
+        // Still there when the check ends: the firm window and step 3 again, but your partner already knows this drift.
+        assertTrue(l.span(605, 2000, wasted = true).none { it.send != null || it.countdown != null })
+    }
+
     @Test fun unblocksEscalateAndNotActiveResets() {
         val l = Ladder()
         assertNull(l.tick(0, false, true, 1))

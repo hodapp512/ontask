@@ -37,9 +37,15 @@ class Prompts(private val svc: AccessibilityService) {
     fun start(uid: String) {
         if (reg != null) return
         reg = Cloud.db.document("users/$uid/state/breaks").addSnapshotListener { s, _ -> state = s?.data ?: emptyMap() }
+        partnersReg = Cloud.db.collection("links").whereEqualTo("trackedUid", uid).whereEqualTo("status", "active")
+            .addSnapshotListener { s, _ -> hasPartner = (s?.size() ?: 0) > 0 }
     }
 
-    fun stop() { reg?.remove(); reg = null; checkinRegs.forEach { it.remove() } }
+    fun stop() { reg?.remove(); reg = null; partnersReg?.remove(); partnersReg = null; checkinRegs.forEach { it.remove() } }
+
+    /** Someone to tell: step 3 then counts down to an automatic message when it's ignored (as on the Mac). */
+    @Volatile private var hasPartner = false
+    private var partnersReg: ListenerRegistration? = null
 
     @Suppress("UNCHECKED_CAST")
     private val active: Map<String, Any?>? get() = (state["active"] as? Map<String, Any?>)?.takeIf { it["until"].num() > now() }
@@ -56,8 +62,16 @@ class Prompts(private val svc: AccessibilityService) {
         val until = a?.get("until").num()
         if (a != null && until in (lastBreakEnd + 1)..now) { lastBreakEnd = until; ladder.breakOver(now); breakOverNotice(a["kind"] == "LUNCH") }
         ladder.cfg = ladder.cfg.copy(step1WastedSec = if (earnedSec > 0) 60 else 120)
-        val iv = ladder.tick(now, level == Level.WASTED, work && !onBreak && level != null, 0)
-        if (iv != null) { if (iv.reminder) reminderNotification() else show(iv.step) }
+        ladder.partnerAuto = work && hasPartner
+        // The screen off (level null) isn't time-wasting, and it pauses rather than ends things, as away does on the Mac.
+        val iv = ladder.tick(now, level == Level.WASTED, work && !onBreak, 0)
+        when {
+            iv == null -> {}
+            iv.send != null -> autoSend(iv)
+            iv.countdown != null -> countdownScreen(iv)
+            iv.reminder -> reminderNotification()
+            else -> show(iv.step)
+        }
         // Nothing escalating (and not in the check after "Back to work", whose reminders keep coming until you switch).
         if (ladder.step == Step.NONE && !ladder.checking && shownStep != Step.NONE) clear()
         // A full-screen step closed with Back: it comes back after 30 seconds while you're still drifting.
@@ -202,6 +216,9 @@ class Prompts(private val svc: AccessibilityService) {
     /** "Back to work": the phone goes to its home screen, and the ladder checks you switch (reminders every 30 s, 5 min). */
     fun backToWork() { ladder.backToWork(now()); clear(); svc.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME) }
 
+    /** "I'm back to work" on the countdown: just the screen closes and you go home; what you do next decides. */
+    fun backToWorkFromCountdown() { svc.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME) }
+
     /** "I'm working": what you were on counts as work from now on (a rule or verdict, as on the Mac). */
     fun working() { ladder.workConfirmed(); clear(); (svc as? Tracker)?.markWork() }
 
@@ -217,11 +234,39 @@ class Prompts(private val svc: AccessibilityService) {
         ladder.reset(); clear()
     }
 
-    /** Lets your partner know (in work hours): the same alert as the Mac's step 3, through the server. */
-    fun messagePartner(text: String) {
+    /**
+     * Lets your partner know (in work hours): the same alert as the Mac's step 3, through the server (which applies
+     * the caps). [auto]: OnTask sent it by itself; otherwise it's yours, and nothing more goes for this drift.
+     */
+    fun messagePartner(text: String, auto: dev.ontask.intervene.AutoReason? = null, site: String? = null) {
+        if (auto == null) ladder.partnerAnswered()
         val uid = Cloud.uid ?: return
-        Cloud.db.collection("users/$uid/events").add(mapOf("type" to "binge_alert", "ts" to System.currentTimeMillis(), "payload" to mapOf("message" to text)))
+        val payload = buildMap { put("message", text); auto?.let { put("auto", it.name.lowercase()) }; site?.let { put("site", it) } }
+        Cloud.db.collection("users/$uid/events").add(mapOf("type" to "binge_alert", "ts" to System.currentTimeMillis(), "payload" to payload))
     }
+
+    /** What the countdown says will go to your partner, word for word. */
+    fun autoText(reason: dev.ontask.intervene.AutoReason, driftSec: Long): String {
+        val first = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.displayName?.trim()?.split(Regex("\\s+"))?.firstOrNull()?.ifBlank { null } ?: "Your friend"
+        return dev.ontask.intervene.autoMessage(reason, first, lastSite ?: "time-wasting apps", maxOf(1, driftSec / 60))
+    }
+
+    private fun autoSend(iv: dev.ontask.intervene.Intervention) {
+        val reason = iv.send ?: return
+        messagePartner(autoText(reason, iv.driftSec), reason, lastSite)
+    }
+
+    /** "Sending a message to your partner in 10…", full screen; it closes itself when the 10 seconds are up. */
+    private fun countdownScreen(iv: dev.ontask.intervene.Intervention) {
+        val reason = iv.countdown ?: return
+        NotificationManagerCompat.from(svc).cancel(NOTE)
+        svc.startActivity(Intent(svc, PromptActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            .putExtra("countdown", reason.name).putExtra("trigger", dev.ontask.intervene.autoTrigger(reason, lastSite ?: "time-wasting apps", maxOf(1, iv.driftSec / 60)))
+            .putExtra("message", autoText(reason, iv.driftSec)).putExtra("seconds", ladder.cfg.countdownSec).putExtra("driftSec", iv.driftSec))
+    }
+
+    /** "I'm actually on task" on the countdown: what you picked is filed as work, and nothing is sent. */
+    fun countdownOnTask(key: String, title: String?) { ladder.workConfirmed(); clear(); (svc as? Tracker)?.fileWork(key, title) }
 
     companion object {
         const val NOTE = 7002

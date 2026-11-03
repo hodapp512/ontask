@@ -420,7 +420,33 @@ let requestAutomation: AsyncHandler = { req, done in
     }
 }
 
-let asyncHandlers: [String: AsyncHandler] = ["ocr": ocr, "screenshot": screenshot, "request_automation": requestAutomation]
+/// {"cmd":"window_shot","maxDim":1000} -> {"jpeg": base64} of the front app's front window only (not the whole screen),
+/// for "Help sort these". OnTask keeps it on this Mac until the item is sorted, at most 7 days.
+let windowShot: AsyncHandler = { req, done in
+    let maxDim = (req["maxDim"] as? Int) ?? 1000
+    guard CGPreflightScreenCaptureAccess() else { done(.failure(HelperError(message: "screen_recording_denied"))); return }
+    guard let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier else { done(.failure(HelperError(message: "no_front_app"))); return }
+    // The front-most normal window of that app, in on-screen order.
+    let list = (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]) ?? []
+    guard let wid = list.first(where: { ($0[kCGWindowOwnerPID as String] as? Int32) == pid && ($0[kCGWindowLayer as String] as? Int) == 0 })?[kCGWindowNumber as String] as? UInt32 else {
+        done(.failure(HelperError(message: "no_window"))); return
+    }
+    SCShareableContent.getExcludingDesktopWindows(true, onScreenWindowsOnly: true) { content, err in
+        guard let w = content?.windows.first(where: { $0.windowID == wid }) else { done(.failure(HelperError(message: err?.localizedDescription ?? "no_window"))); return }
+        let cfg = SCStreamConfiguration()
+        let scale = min(1.0, Double(maxDim) / max(w.frame.width, w.frame.height))
+        cfg.width = max(1, Int(w.frame.width * scale)); cfg.height = max(1, Int(w.frame.height * scale))
+        cfg.showsCursor = false
+        SCScreenshotManager.captureImage(contentFilter: SCContentFilter(desktopIndependentWindow: w), configuration: cfg) { img, e in
+            guard let img = img, let data = NSBitmapImageRep(cgImage: img).representation(using: .jpeg, properties: [.compressionFactor: 0.7]) else {
+                done(.failure(HelperError(message: e?.localizedDescription ?? "capture_failed"))); return
+            }
+            done(.success(["jpeg": data.base64EncodedString(), "width": img.width, "height": img.height]))
+        }
+    }
+}
+
+let asyncHandlers: [String: AsyncHandler] = ["ocr": ocr, "screenshot": screenshot, "request_automation": requestAutomation, "window_shot": windowShot]
 
 func respond(_ obj: [String: Any]) {
     guard let data = try? JSONSerialization.data(withJSONObject: obj, options: []),
