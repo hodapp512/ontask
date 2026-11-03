@@ -254,6 +254,8 @@ class App(val dir: Path = dataDir()) {
 
     fun start() {
         runCatching { migrateCategories() }
+        // Focus sessions were removed (2026-11-03): one still running from before ends now.
+        runCatching { focus.stop(nowSec()) }
         runCatching { migrateSiteRules() }
         Retention.rollup(db, nowSec(), settings.retentionDays)
         if (!prefs.bool("blocklist.seeded", false)) { blocklist.seedDefault(nowSec()); prefs.set("blocklist.seeded", true) }
