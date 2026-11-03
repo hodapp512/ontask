@@ -24,4 +24,15 @@ class MergeDevicesTest {
         assertEquals(2, m.distractionEvents)
         assertTrue(m.topSubjects.single().phone)
     }
+
+    @Test fun theMacsTimeIsCutWhereThePhoneWasInUse() {
+        val m = { h: Int, mi: Int -> (h * 60 + mi) * 60L }
+        val mac = DailyReport(LocalDate.of(2026, 11, 2), 0, mapOf(Level.DEEP to 540L), mapOf(Level.DEEP to 540L),
+            listOf(Run(m(19, 8), m(19, 17), Level.DEEP, mapOf("gemini.google.com" to 540L))), emptyList(), 0, null, emptyList())
+        val phone = Json.parseToJsonElement("""{"totals":{"DEEP":360},"timeline":[{"a":${m(19, 5)},"b":${m(19, 11)},"k":"D"}]}""").jsonObject
+        val r = withDevices(mac, listOf(phone to null))
+        assertEquals(listOf(m(19, 5) to m(19, 11), m(19, 11) to m(19, 17)), r.timeline.map { it.start to it.end })
+        assertEquals(720L, r.totalsAll[Level.DEEP])                  // 15 minutes, not 18
+        assertEquals(360L, r.timeline[1].activity["gemini.google.com"])
+    }
 }

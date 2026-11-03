@@ -201,6 +201,9 @@ it; today doesn't until it's over). The Mac uploads one small `heat/year` docume
   notice on the phone). Sure (60%+) → a rule or verdict for every device; otherwise a notification asks.
 - The Mac's Home and heat map add the phone's day (rows marked 📱; on the timeline phone stretches share the one bar, 📱 on hover).
 - **Timelines don't draw Away time** (Mac, phone, web): the gaps say it.
+- **No overlaps: while the phone is in use, you're on the phone.** The phone counts only while its screen is on and
+  unlocked; the Mac keeps counting for minutes after the last keypress. So Mac time overlapping phone use is cut from
+  the timeline and the totals (work-hours totals lose the same share), on the server and on the Mac's Home.
 - **Updates without a cable:** `android/release.sh` publishes the APK and `version.json` with the web app
   (`/android/`, no-cache); the phone checks every 6 hours and in Settings → App, downloads, and Android's installer asks
   to confirm. Version = commit count.

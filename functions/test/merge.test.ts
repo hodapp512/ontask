@@ -46,3 +46,26 @@ describe("judging on the phone", () => {
     expect(await judge({ app: "Duolingo" }, cats, "k", answer("Work", 0.4))).toBeNull();
   });
 });
+
+import { clipToPhone, mergeReports as merge2 } from "../src/logic/merge";
+describe("overlaps between the Mac and the phone", () => {
+  it("cuts the Mac's time where the phone was in use, and the totals with it", () => {
+    // Your example: phone 7:05–7:11 (Work adjacent), Mac 7:08–7:17 (gemini.google.com).
+    const m = (h: number, mi: number) => (h * 60 + mi) * 60;
+    const r = clipToPhone([{ a: m(19, 8), b: m(19, 17), k: "D", t: [{ n: "gemini.google.com", s: 540 }] }], [{ a: m(19, 5), b: m(19, 11) }]);
+    expect(r.pieces.map((p) => [p.a, p.b])).toEqual([[m(19, 11), m(19, 17)]]);
+    expect(r.pieces[0].t).toEqual([{ n: "gemini.google.com", s: 360 }]);
+    expect(r.removed).toEqual({ DEEP: 180 });
+    const merged = merge2([
+      { device: { id: "m", kind: "mac" }, date: "d", totals: { DEEP: 540 }, workTotals: { DEEP: 540 }, timeline: [{ a: m(19, 8), b: m(19, 17), k: "D" }] },
+      { device: { id: "p", kind: "phone" }, date: "d", totals: { DEEP: 360 }, workTotals: {}, timeline: [{ a: m(19, 5), b: m(19, 11), k: "D" }] },
+    ])!;
+    expect(merged.totals).toEqual({ DEEP: 720 });                     // 15 minutes, not 18
+    expect(merged.timeline!.map((s) => [s.a, s.b, s.d])).toEqual([[m(19, 5), m(19, 11), "phone"], [m(19, 11), m(19, 17), undefined]]);
+  });
+  it("splits a Mac stretch around a short phone check", () => {
+    const r = clipToPhone([{ a: 0, b: 600, k: "W" }], [{ a: 200, b: 260 }]);
+    expect(r.pieces.map((p) => [p.a, p.b])).toEqual([[0, 200], [260, 600]]);
+    expect(r.removed).toEqual({ WASTED: 60 });
+  });
+});

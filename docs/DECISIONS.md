@@ -428,3 +428,8 @@ when it comes to the front.*
   and authorized from this Mac), and the app installs them through Android's installer after you confirm.
   *Rejected:* GitHub releases (needs a GitHub token and `gh`); wireless adb (still needs the computer); Play Store
   (Accessibility policy review).
+- **Overlapping Mac and phone time: the phone wins.** Attention is on one device at a time, and phone time is the
+  stronger signal (screen on, unlocked, app in front) while the Mac counts until its idle threshold. The overlapped
+  Mac time is cut from the timeline and the totals, so nothing counts twice. *Rejected:* one combined stretch listing
+  both devices (hides which one you were really on). Known gap: "Where the time went" and the heat map still add
+  both devices' time for overlaps.

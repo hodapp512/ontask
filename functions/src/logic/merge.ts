@@ -21,11 +21,40 @@ export interface DeviceReport {
   [k: string]: unknown;
 }
 
+const subtract = (a: Levels, b: Levels): Levels => Object.fromEntries(Object.entries(a).map(([k, v]) => [k, Math.max(0, v - (b[k] ?? 0))]));
 const add = (a: Levels = {}, b: Levels = {}): Levels => {
   const out: Levels = { ...a };
   for (const [k, v] of Object.entries(b)) out[k] = (out[k] ?? 0) + v;
   return out;
 };
+
+type Seg = NonNullable<DeviceReport["timeline"]>[number];
+
+/**
+ * Cuts [mac] stretches where the phone was in use: the phone only counts while its screen is on and unlocked with
+ * an app in front, while the Mac keeps counting for minutes after your last keypress, so during an overlap your
+ * attention was on the phone. Returns the remaining pieces (their per-app seconds scaled to what's left) and the
+ * seconds removed per level.
+ */
+export function clipToPhone(mac: Seg[], phone: { a: number; b: number }[]): { pieces: Seg[]; removed: Record<string, number> } {
+  const busy = [...phone].sort((x, y) => x.a - y.a);
+  const pieces: Seg[] = []; const removed: Record<string, number> = {};
+  const levelOf: Record<string, string> = { D: "DEEP", M: "MIXED", W: "WASTED", A: "AWAY" };
+  for (const s of mac) {
+    let parts: [number, number][] = [[s.a, s.b]];
+    for (const p of busy) {
+      if (p.b <= s.a || p.a >= s.b) continue;
+      parts = parts.flatMap(([a, b]) => (p.b <= a || p.a >= b ? [[a, b]] : [[a, Math.min(b, p.a)], [Math.max(a, p.b), b]].filter(([x, y]) => y > x)) as [number, number][]);
+    }
+    const kept = parts.reduce((n, [a, b]) => n + b - a, 0), len = s.b - s.a;
+    if (s.k !== "A" && kept < len) removed[levelOf[s.k] ?? s.k] = (removed[levelOf[s.k] ?? s.k] ?? 0) + (len - kept);
+    for (const [a, b] of parts) {
+      const f = (b - a) / len;
+      pieces.push({ ...s, a, b, ...(s.t ? { t: s.t.map((x) => ({ n: x.n, s: Math.round(x.s * f) })).filter((x) => x.s > 0) } : {}) });
+    }
+  }
+  return { pieces, removed };
+}
 
 /** Merges per-device reports for one day. Phone stretches on the timeline carry d: "phone". */
 export function mergeReports(parts: DeviceReport[]): DeviceReport | null {
@@ -39,13 +68,27 @@ export function mergeReports(parts: DeviceReport[]): DeviceReport | null {
     const cur = sites.get(key);
     sites.set(key, cur ? { ...cur, seconds: cur.seconds + s.seconds } : { ...s });
   }
+  // Where the phone was in use, the Mac's overlapping time is cut (timeline and totals), so nothing counts twice.
+  const phoneSegs = sorted.filter((p) => p.device?.kind && p.device.kind !== "mac").flatMap((p) => (p.timeline ?? []).filter((x) => x.k !== "A"));
+  const clipped = new Map<DeviceReport, Seg[]>();
+  const removed: Record<string, number> = {};
+  for (const p of sorted) {
+    if (p.device?.kind && p.device.kind !== "mac") continue;
+    const r = clipToPhone(p.timeline ?? [], phoneSegs);
+    clipped.set(p, r.pieces);
+    for (const [k, v] of Object.entries(r.removed)) removed[k] = (removed[k] ?? 0) + v;
+  }
   const worst = sorted.map((p) => p.worstHour).filter((w): w is NonNullable<typeof w> => !!w).sort((a, b) => b.wastedSec - a.wastedSec)[0];
   const { device: _d, ...rest } = base;
   return {
     ...rest,
-    totals: sorted.reduce((t, p) => add(t, p.totals), {} as Levels),
-    workTotals: sorted.reduce((t, p) => add(t, p.workTotals), {} as Levels),
-    timeline: sorted.flatMap((p) => (p.timeline ?? []).map((s) => (p.device?.kind && p.device.kind !== "mac" ? { ...s, d: p.device.kind } : s))).sort((a, b) => a.a - b.a),
+    totals: subtract(sorted.reduce((t, p) => add(t, p.totals), {} as Levels), removed),
+    // Work-hours totals lose the same share of each level as the day's totals.
+    workTotals: (() => {
+      const all = sorted.reduce((t, p) => add(t, p.totals), {} as Levels), work = sorted.reduce((t, p) => add(t, p.workTotals), {} as Levels);
+      return subtract(work, Object.fromEntries(Object.entries(removed).map(([k, v]) => [k, all[k] ? Math.round(v * (work[k] ?? 0) / all[k]) : 0])));
+    })(),
+    timeline: sorted.flatMap((p) => (clipped.get(p) ?? p.timeline ?? []).map((s) => (p.device?.kind && p.device.kind !== "mac" ? { ...s, d: p.device.kind } : s))).sort((a, b) => a.a - b.a),
     deepSessions: sorted.flatMap((p) => p.deepSessions ?? []).sort((a, b) => a.a - b.a),
     distractionEvents: sorted.reduce((n, p) => n + (p.distractionEvents ?? 0), 0),
     ...(worst ? { worstHour: worst } : {}),
