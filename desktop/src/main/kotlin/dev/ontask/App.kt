@@ -104,6 +104,7 @@ class App(val dir: Path = dataDir()) {
     }
 
     val ai = AiService(prefs, db, dir.toFile())
+        .also { a -> Thread { a.kev.deleteOldWeights() }.apply { isDaemon = true }.start() }
     val checkins = Checkins(db)
     val ladder = Ladder()
     val alerts = AlertLimiter(2)
@@ -151,6 +152,15 @@ class App(val dir: Path = dataDir()) {
 
     /** True when blocking can't work: the helper needs installing or fixing (never in developer test mode). */
     fun helperNeeded(): Boolean = blocking.mode == dev.ontask.block.BlockMode.LIVE && _helperHealth.value.let { it != null && it != dev.ontask.block.HelperHealth.OK }
+
+    /** What isn't working right now, one short line each, for Diagnostics, Home and the menu bar. */
+    fun problems(): List<String> = buildList {
+        val reader = helper.status
+        if (reader != "running" && reader != "not started") add("The activity reader isn't running")
+        else if (tracker.live.value.sample?.accessibilityTrusted == false) add("OnTask can't see window titles")
+        if (helperNeeded()) add("Blocking isn't on: the blocking helper ${_helperHealth.value?.problem}")
+        if (ai.enabled) (ai.lastProblem ?: aiError)?.let { add("AI labeling isn't working") }
+    }
 
     fun checkHelper() {
         if (helperBusy) return
@@ -257,7 +267,7 @@ class App(val dir: Path = dataDir()) {
         // Focus sessions were removed (2026-11-03): one still running from before ends now.
         runCatching { focus.stop(nowSec()) }
         runCatching { migrateSiteRules() }
-        runCatching { migrateSearchRules() }
+        runCatching { migrateSearchRules() }.onFailure { System.err.println("search rules migration: $it"); it.printStackTrace() }
         pruneShots(nowSec())
         Retention.rollup(db, nowSec(), settings.retentionDays)
         if (!prefs.bool("blocklist.seeded", false)) { blocklist.seedDefault(nowSec()); prefs.set("blocklist.seeded", true) }
@@ -475,6 +485,7 @@ class App(val dir: Path = dataDir()) {
         deleteShot(itemShotKey(item))
         val key = sourceKey ?: synchronized(variableUnsure) { variableUnsure[item]?.sourceKey }
         verdicts.set(item, title, cat, Source.USER_LABEL, key, nowSec())
+        ai.accuracy.answered(item, cat, nowSec())
         synchronized(variableUnsure) { variableUnsure.remove(item) }
         val seg = tracker.currentSegment()
         if (seg != null && dev.ontask.classify.itemKey(seg.app, seg.title, seg.url) == item) tracker.applyVerdict(cat)
@@ -999,6 +1010,7 @@ class App(val dir: Path = dataDir()) {
         // A site rule covers the whole site: moving "en.m.wikipedia.org" means all of wikipedia.org.
         val pattern = if (kind == dev.ontask.classify.RuleKind.DOMAIN) dev.ontask.classify.siteDomain(name) else name
         ruleStore.label(kind, pattern, to, from, nowSec())
+        ai.accuracy.answered(pattern, to, nowSec())
         ruleStore.relabelHistory(kind, pattern, to)
         reloadRules(); tracker.invalidate()
     }
