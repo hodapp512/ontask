@@ -36,9 +36,35 @@ describe("reports", () => {
     await assertFails(setDoc(doc(as(PARTNER), "users", TRACKED, "reports", "x"), { a: 1 }));
   });
   it("page and video titles are yours only, even with the full report shared", async () => {
-    await assertSucceeds(setDoc(doc(as(TRACKED), "users", TRACKED, "reportItems", "2026-10-30"), { topSites: [] }));
+    await env.withSecurityRulesDisabled(async (ctx) => { await setDoc(doc(ctx.firestore(), "users", TRACKED, "reportItems", "2026-10-30"), { topSites: [] }); });
     await assertSucceeds(getDoc(doc(as(TRACKED), "users", TRACKED, "reportItems", "2026-10-30")));
     await assertFails(getDoc(doc(as(PARTNER), "users", TRACKED, "reportItems", "2026-10-30")));
+  });
+  it("devices upload their own day; only the server writes the merged day", async () => {
+    // Each device writes its own report, titled copy and heat numbers; nobody else can read them.
+    await assertSucceeds(setDoc(doc(as(TRACKED), "users", TRACKED, "deviceReports", "2026-10-30_mac-1"), { date: "2026-10-30" }));
+    await assertSucceeds(setDoc(doc(as(TRACKED), "users", TRACKED, "deviceReportItems", "2026-10-30_mac-1"), { date: "2026-10-30" }));
+    await assertSucceeds(setDoc(doc(as(TRACKED), "users", TRACKED, "deviceHeat", "mac-1"), { days: {} }));
+    await assertFails(getDoc(doc(as(PARTNER), "users", TRACKED, "deviceReports", "2026-10-30_mac-1")));
+    // The merged documents everyone reads are written by the server only (it merges the devices').
+    await assertFails(setDoc(doc(as(TRACKED), "users", TRACKED, "reports", "2026-10-30"), { deepSec: 1 }));
+    await assertFails(setDoc(doc(as(TRACKED), "users", TRACKED, "reportItems", "2026-10-30"), { topSites: [] }));
+    await assertFails(setDoc(doc(as(TRACKED), "users", TRACKED, "heat", "year"), { days: {} }));
+  });
+  it("the year heat map is shared like the report", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => { await setDoc(doc(ctx.firestore(), "users", TRACKED, "heat", "year"), { days: {} }); });
+    await assertSucceeds(getDoc(doc(as(PARTNER), "users", TRACKED, "heat", "year")));
+    await assertFails(getDoc(doc(as(STRANGER), "users", TRACKED, "heat", "year")));
+  });
+});
+
+describe("settings and state shared by your devices", () => {
+  it("are yours only", async () => {
+    for (const [col, id] of [["sync", "rules"], ["verdicts", "abc"], ["state", "breaks"], ["phoneCheckins", "2026-10-30"]]) {
+      await assertSucceeds(setDoc(doc(as(TRACKED), "users", TRACKED, col, id), { x: 1 }));
+      await assertFails(getDoc(doc(as(PARTNER), "users", TRACKED, col, id)));
+      await assertFails(setDoc(doc(as(PARTNER), "users", TRACKED, col, id), { x: 2 }));
+    }
   });
 });
 
