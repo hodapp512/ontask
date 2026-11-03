@@ -154,6 +154,10 @@ object Schema {
         ALTER TABLE verdicts ADD COLUMN source_key TEXT;
         CREATE TABLE source_rules (source_key TEXT PRIMARY KEY, category TEXT NOT NULL, ts INTEGER NOT NULL);
         """,
+        // What the AI has already judged (a page, video or unknown app), sure or not: never asked about twice.
+        """
+        CREATE TABLE ai_tried (item TEXT PRIMARY KEY, category TEXT, ts INTEGER NOT NULL);
+        """,
     )
 
     fun migrate(db: Db) = db.use { c ->

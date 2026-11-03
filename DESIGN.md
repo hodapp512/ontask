@@ -70,7 +70,10 @@ This file describes how OnTask works now. **Why** each choice was made, and what
   (oEmbed channel; page description) → AI with on-screen text → **"I can't tell whether this is work. What is it?"**
   (category buttons, Not now, Pause asking 15 min–1 day; at most once per page and every 2 minutes).
 - Undecided pages are **Unsure** (counted as Mixed). Each page has its own category ("YouTube: Learning Java" →
-  Work) and its own row on Home; its dropdown changes only that page. Catch-up judging of the last week never asks.
+  Work) and its own row on Home; its dropdown changes only that page. Catch-up judging of the last week (pages never judged when
+  seen, e.g. AI off or not running) runs every 3 hours and never asks. **Each page, video or unknown app is judged by
+  the AI once** (`ai_tried`): an answer, sure or not, is never asked for again; only a failed call is retried. Kev
+  stops after 5 idle minutes.
 
 ### Away detection
 - Signals: input idle time (**away after 2 minutes** with no keyboard or mouse; Settings), screen locked/asleep,

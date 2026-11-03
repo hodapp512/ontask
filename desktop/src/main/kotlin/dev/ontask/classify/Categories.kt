@@ -173,7 +173,20 @@ class Verdicts(private val db: Db) {
                 ps.executeQuery().use { rs -> buildList { while (rs.next()) add(dev.ontask.Sample(app = rs.getString(1), title = rs.getString(2), url = rs.getString(3))) } }
             }
         }
-        return rows.filter { !Pages.isFeed(it.url) }.map { itemKey(it.app, it.title, it.url) to it }.distinctBy { it.first }.filter { get(it.first) == null }.take(limit)
+        return rows.filter { !Pages.isFeed(it.url) }.map { itemKey(it.app, it.title, it.url) to it }.distinctBy { it.first }.filter { get(it.first) == null && !tried(it.first) }.take(limit)
+    }
+
+    /** Whether the AI already judged [item] (sure or not): it's never judged again. */
+    fun tried(item: String): Boolean = db.use { c -> c.prepareStatement("SELECT 1 FROM ai_tried WHERE item=?").use { ps -> ps.setString(1, item); ps.executeQuery().use { it.next() } } }
+
+    /** The AI's earlier answer for [item]: null if never judged, (true, null) if judged but unsure. */
+    fun triedAnswer(item: String): Pair<Boolean, String?>? = db.use { c ->
+        c.prepareStatement("SELECT category FROM ai_tried WHERE item=?").use { ps -> ps.setString(1, item); ps.executeQuery().use { rs -> if (rs.next()) true to rs.getString(1) else null } }
+    }
+
+    fun markTried(item: String, category: String?, now: Long) = db.use { c ->
+        c.prepareStatement("INSERT INTO ai_tried(item, category, ts) VALUES (?,?,?) ON CONFLICT(item) DO UPDATE SET category=excluded.category, ts=excluded.ts")
+            .use { it.setString(1, item); it.setString(2, category); it.setLong(3, now); it.executeUpdate() }
     }
 
     @Synchronized

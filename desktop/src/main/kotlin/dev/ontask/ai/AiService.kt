@@ -75,7 +75,12 @@ class AiService(
         return AiResult(d.first, d.second, Source.AI_PAGE)
     }
 
+    /** Whether the last decision on this thread got an answer (sure or not), as opposed to failing or being skipped. */
+    private val answered = ThreadLocal.withInitial { false }
+    fun lastAnswered(): Boolean = answered.get()
+
     private fun decide(state: String, instructions: String): Pair<Category, Double>? {
+        answered.set(false)
         val cats = Category.assignable.filter { !it.variable }
         if (System.currentTimeMillis() < waitUntil || cats.isEmpty()) return null
         // The model reads the option names, so they're the labels you see (as in the test that chose Kev).
@@ -100,6 +105,7 @@ class AiService(
             }
             record(p, d.ms, d.inTokens, true)
             lastProblem = null
+            answered.set(true)
             byLabel[d.choice]?.let { it to d.probability }
         } catch (e: Exception) {
             record(p, System.currentTimeMillis() - t0, null, false, e.message)

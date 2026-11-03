@@ -335,7 +335,8 @@ class App(val dir: Path = dataDir()) {
         if (ai.enabled && !ai.metadataOnly && !live.away && now - lastAi >= prefs.int("ai.interval_sec", 30) && tracker.needsAi() && !aiBusy) { lastAi = now; scope.launch(IO) { aiCycle(live.sample) } }
         variableCheck(now, live)
         unknownCheck(now, live)
-        if (ai.enabled && !ai.metadataOnly && now - lastBackfill >= 120 && !backfillBusy) { lastBackfill = now; backfillBusy = true; scope.launch(IO) { try { judgeEarlier(now) } finally { backfillBusy = false } } }
+        // Catch-up for pages never judged when seen (AI off or not running then): every 3 hours.
+        if (ai.enabled && !ai.metadataOnly && now - lastBackfill >= 3 * 3600 && !backfillBusy) { lastBackfill = now; prefs.set("ai.backfill_ts", now.toString()); backfillBusy = true; scope.launch(IO) { try { judgeEarlier(now) } finally { backfillBusy = false } } }
         checkRegularEnded(now)
         if (ai.kev.running) ai.kev.stopIfIdle()
         if (cloud.configured && now - lastCloud >= 60) { lastCloud = now; scope.launch(IO) { cloud.syncOnce(now) } }
@@ -375,14 +376,22 @@ class App(val dir: Path = dataDir()) {
         val facts = runCatching { pageLookup.lookup(sample.url) }.getOrDefault(emptyMap())
         val key = dev.ontask.classify.Pages.sourceKey(sample.url, facts["Channel"])
         verdicts.ruleFor(key)?.let { verdicts.set(item, title, it, Source.RULE, key, now); return it to key }
-        if (!ai.enabled) return null to key
+        // Each page or video is judged by the AI once: an answer, sure or not, is never asked for again.
+        if (!ai.enabled || verdicts.tried(item)) return null to key
         val plan = priorities.today(now)
-        ai.judgeItem(sample, plan, facts)?.takeIf { it.probability >= ai.threshold }?.let { verdicts.set(item, title, it.category, Source.AI_PAGE, key, now); return it.category to key }
+        val first = ai.judgeItem(sample, plan, facts)
+        var answered = ai.lastAnswered()
+        first?.takeIf { it.probability >= ai.threshold }?.let { verdicts.markTried(item, it.category.name, now); verdicts.set(item, title, it.category, Source.AI_PAGE, key, now); return it.category to key }
         if (readScreen && !ai.metadataOnly) {
             val text = runBlocking { helper.request("ocr", 15000, mapOf("skipIfUnchanged" to false)) }?.get("text")?.jsonPrimitive?.contentOrNull
-            if (!text.isNullOrBlank()) ai.judgeItem(sample, plan, facts, text)?.takeIf { it.probability >= ai.threshold }
-                ?.let { verdicts.set(item, title, it.category, Source.AI_PAGE, key, now); return it.category to key }
+            if (!text.isNullOrBlank()) {
+                val second = ai.judgeItem(sample, plan, facts, text)
+                answered = answered || ai.lastAnswered()
+                second?.takeIf { it.probability >= ai.threshold }?.let { verdicts.markTried(item, it.category.name, now); verdicts.set(item, title, it.category, Source.AI_PAGE, key, now); return it.category to key }
+            }
         }
+        // Unsure: remembered, so it's not judged again (you're asked instead). A failed call (AI not running) is retried.
+        if (answered) verdicts.markTried(item, null, now)
         return null to key
     }
 
@@ -432,9 +441,10 @@ class App(val dir: Path = dataDir()) {
         lastAskTs = nowSec() - 60
     }
 
-    private var lastBackfill = 0L
+    /** When the catch-up last ran (kept across restarts, so restarting OnTask doesn't start it early). */
+    private var lastBackfill = prefs.long("ai.backfill_ts", 0)
     @Volatile private var backfillBusy = false
-    /** Items the catch-up already tried this run (still unsure, or AI failed), so it moves on to others. */
+    /** Items the catch-up already tried this run (AI failed), so it moves on to others; answered ones are in ai_tried. */
     private val backfillTried = HashSet<String>()
 
     /** Catches up on pages and videos from the last week that were never decided, a few at a time, without asking. */
@@ -465,8 +475,14 @@ class App(val dir: Path = dataDir()) {
             val key = listOf(sample.app, sample.bundleId, dev.ontask.classify.domainOf(sample.url), sample.title?.take(40)).joinToString("|")
             val cached = synchronized(aiCache) { if (aiCache.containsKey(key)) aiCache[key] else null }
             if (cached != null) { tracker.applyAi(cached); return }
+            // Judged before (in any run): reuse that answer; unsure then means unsure now (you're asked instead).
+            verdicts.triedAnswer("app:$key")?.let { (_, cat) ->
+                cat?.let { Category.registry[it] }?.let { c -> dev.ontask.ai.AiResult(c, 1.0, Source.METADATA).also { r -> synchronized(aiCache) { aiCache[key] = r }; tracker.applyAi(r) } }
+                return
+            }
             val text = if (ai.metadataOnly) null else helper.request("ocr", 15000, mapOf("skipIfUnchanged" to false))?.get("text")?.jsonPrimitive?.contentOrNull
             val res = ai.classify(sample, text, priorities.today(nowSec()))?.takeIf { it.probability >= ai.threshold }
+            if (ai.lastAnswered()) verdicts.markTried("app:$key", res?.category?.name, nowSec())
             if (res != null) { synchronized(aiCache) { aiCache[key] = res }; tracker.applyAi(res) }
         } catch (e: Exception) {
             aiError = e.message

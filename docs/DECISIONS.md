@@ -452,3 +452,11 @@ when it comes to the front.*
 - **Not away while the microphone or camera is in use**, so a call or meeting without typing isn't lost (and doesn't
   reset the break count) under the shorter threshold. Any app counts (Zoom, Meet, Teams, FaceTime, dictation).
   *Rejected:* a longer threshold for everyone; a list of meeting apps (misses browser calls).
+
+## 2026-11-03 · Kev judges each thing once
+- **Why:** Kev (≈2.6 GB) never shut down: the catch-up re-judged 5 old pages every 2 minutes, and pages it couldn't
+  decide were retried after every restart (568 calls in a day).
+- **Each page, video or unknown app is judged by the AI once** and remembered (`ai_tried`, sure or not); unsure
+  means you're asked instead. Only a failed call (AI not running) is retried — retrying an answer gets the same answer.
+- **The catch-up** (pages never judged when you saw them, so the day isn't left "Unsure") runs **every 3 hours**,
+  remembered across restarts. **Kev stops after 5 idle minutes** (was 10).

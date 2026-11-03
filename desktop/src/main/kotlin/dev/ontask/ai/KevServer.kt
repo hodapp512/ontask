@@ -75,7 +75,7 @@ class KevServer(dataDir: File, private val port: Int = 8011) {
     fun touch() { lastUse = System.currentTimeMillis() }
 
     /** Call periodically; stops the server (freeing its memory) after [idleMs] without use. */
-    @Synchronized fun stopIfIdle(idleMs: Long = 10 * 60_000L) { if (running && System.currentTimeMillis() - lastUse > idleMs) stop() }
+    @Synchronized fun stopIfIdle(idleMs: Long = 5 * 60_000L) { if (running && System.currentTimeMillis() - lastUse > idleMs) stop() }
 
     @Synchronized fun stop() { process?.let { it.descendants().forEach { d -> d.destroy() }; it.destroy() }; process = null; size = null }
 
