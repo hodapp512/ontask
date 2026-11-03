@@ -126,6 +126,22 @@ func browserInfo(bundleId: String) -> BrowserInfo? {
     return BrowserInfo(url: String(parts[0]), title: String(parts[1]))
 }
 
+/**
+ Sends the browser's front tab to [url] (OnTask's "blocked" page). A tab that was open before a site was blocked keeps
+ its live connection, so the hosts file alone can't stop it; this does. Same Automation permission as reading the URL.
+ */
+func leaveTab(_ req: [String: Any]) -> Result<[String: Any], HelperError> {
+    guard let bid = req["bundleId"] as? String, let url = req["url"] as? String else { return .failure(HelperError(message: "bad_request")) }
+    let tab: String
+    if chromiumLike.contains(bid) { tab = "active tab" } else if safariLike.contains(bid) { tab = "current tab" } else { return .failure(HelperError(message: "not_a_browser")) }
+    let escaped = url.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+    let src = "tell application id \"\(bid)\" to if (count of windows) > 0 then set URL of \(tab) of front window to \"\(escaped)\""
+    var err: NSDictionary?
+    NSAppleScript(source: src)?.executeAndReturnError(&err)
+    if let err = err { return .failure(HelperError(message: "applescript_\((err[NSAppleScript.errorNumber] as? Int) ?? 0)")) }
+    return .success(["left": true])
+}
+
 // MARK: - Commands
 
 struct HelperError: Error { let message: String }
@@ -226,6 +242,7 @@ let handlers: [String: Handler] = [
     "permissions": permissions,
     "open_settings": openSettings,
     "sample": sample,
+    "leave_tab": leaveTab,
     // Shows the system Accessibility prompt (once) and adds the app to the Accessibility list.
     "request_accessibility": { _ in
         let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary

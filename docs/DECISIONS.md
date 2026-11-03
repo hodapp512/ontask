@@ -437,3 +437,11 @@ when it comes to the front.*
 - Outside work hours an unblock defaults to **5 minutes**, with 5 / 10 / 15 / 30 minutes / 1 hour (was 30 minutes
   default, up to 2 hours): a short default makes "just a quick look" the easy choice. The wording is "Unblock", not
   "Open". The work-hours "just for a bit" unblock is unchanged (5 minutes default, 15 at most).
+
+## 2026-11-02 · Blocked tabs are sent away
+- **Why:** after a 5-minute Reddit unblock ended, Reddit kept working in Chrome for 15+ minutes: `/etc/hosts` was
+  restored and the DNS cache flushed (as BlockMe did), but Chrome had 9 live connections to Reddit's servers and
+  reuses them without looking the name up again.
+- **Now** the front browser tab on a blocked site is sent to a local "blocked" page within seconds (AppleScript, same
+  permission as reading the URL). *Rejected:* closing tabs (loses your place elsewhere in the window); cutting the
+  connections with the firewall (pf isn't on by default; Reddit's servers are shared CDN addresses).

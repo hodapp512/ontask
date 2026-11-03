@@ -276,9 +276,34 @@ class App(val dir: Path = dataDir()) {
         Runtime.getRuntime().addShutdownHook(Thread { shutdown() })
     }
 
+    /**
+     * A browser tab on a blocked site goes to OnTask's "blocked" page. The hosts file stops new connections, but a tab
+     * that was open when an unblock ran out keeps its live connection (Chrome reuses it without looking the name up
+     * again), so without this the site keeps working.
+     */
+    private fun leaveBlockedTab(now: Long, s: Sample?) {
+        val domain = dev.ontask.classify.domainOf(s?.url) ?: return
+        val bid = s?.bundleId ?: return
+        if (now - lastLeaveTs < 3) return
+        val hit = blocking.currentlyBlocked(now).firstOrNull { b -> domain == b || domain.endsWith(".$b") } ?: return
+        lastLeaveTs = now
+        val page = blockedPage()
+        scope.launch(IO) {
+            helper.request("leave_tab", 5000, mapOf("bundleId" to bid, "url" to page.toUri().toString() + "?site=" + java.net.URLEncoder.encode(hit, "UTF-8")))
+            events.emit("blocked_tab_left", nowSec(), "domain" to hit)
+        }
+    }
+    @Volatile private var lastLeaveTs = 0L
+
+    /** The local page a blocked tab is sent to (written once to the app's folder). */
+    private fun blockedPage(): Path = dir.resolve("blocked.html").also { f ->
+        if (!java.nio.file.Files.exists(f) || java.nio.file.Files.size(f) != BLOCKED_HTML.length.toLong()) java.nio.file.Files.writeString(f, BLOCKED_HTML)
+    }
+
     /** Everything that happens once per tick beyond tracking: interventions, AI, battery, daily rhythm. */
     private fun onTick(now: Long) {
         val live = tracker.live.value
+        if (!live.away) leaveBlockedTab(now, live.sample)
         if (!live.away) lastActiveTs = now
         // Stepping away: sync now, so the server sees the final numbers and when you stopped.
         if (live.away && !wasAway && cloud.configured) { lastCloud = now; scope.launch(IO) { cloud.syncOnce(now, force = true) } }
@@ -873,3 +898,11 @@ class App(val dir: Path = dataDir()) {
         }
     }
 }
+
+/** Shown in a tab that was on a blocked site. */
+private const val BLOCKED_HTML = """<!doctype html><meta charset="utf-8"><title>Blocked · OnTask</title>
+<style>body{font:17px -apple-system,system-ui,sans-serif;background:#f6f8f6;color:#191c1a;display:grid;place-items:center;height:100vh;margin:0}
+main{max-width:460px;text-align:center}h1{font-size:26px;margin:0 0 8px}p{color:#404943}
+@media (prefers-color-scheme:dark){body{background:#121513;color:#e1e3df}p{color:#bfc9c1}}</style>
+<main><h1 id="h">This site is blocked</h1><p>Time's up. Back to what you planned?<br>To use it again, unblock it from OnTask in the menu bar.</p></main>
+<script>var s=new URLSearchParams(location.search).get("site");if(s)document.getElementById("h").textContent=s+" is blocked";</script>"""

@@ -26,6 +26,9 @@ This file describes how OnTask works now. **Why** each choice was made, and what
   - **Not for work:** delay that grows per day (10 s, 30 s, 2 min, then 5 min; resets at 4 AM), 5 / 10 / 15 min,
     corner nudge at start and end (OK / I'm struggling → intervention), partner told every time.
   - The delay screen shows today's unblock count, today's plan, and the user's message (or a random alternative).
+- **A browser tab on a blocked site goes to OnTask's "blocked" page** (checked every tick, front tab, Chrome-family
+  browsers and Safari, via the same Automation permission that reads the address). The hosts file only stops new
+  connections; Chrome keeps reusing a live one, so a tab open when an unblock ends would otherwise keep working.
 - **Unblocking outside work hours:** instant, 5 (default), 10, 15, 30 min or 1 h, ends when work hours start, not
   counted, nobody told. Buttons say "Unblock", not "Open".
 - **Ad and malware blocking:** StevenBlack's hosts list (fakenews-porn variant), refreshed at startup and daily,
