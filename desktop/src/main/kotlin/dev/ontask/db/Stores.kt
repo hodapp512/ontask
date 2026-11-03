@@ -160,7 +160,7 @@ class RuleStore(private val db: Db) {
 
 data class Settings(
     val tickSec: Int = 5,
-    val awayAfterSec: Int = 180,
+    val awayAfterSec: Int = 120,
     val retentionDays: Int = 90,
     val schedule: WorkSchedule = WorkSchedule(),
 )

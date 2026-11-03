@@ -445,3 +445,7 @@ when it comes to the front.*
 - **Now** the front browser tab on a blocked site is sent to a local "blocked" page within seconds (AppleScript, same
   permission as reading the URL). *Rejected:* closing tabs (loses your place elsewhere in the window); cutting the
   connections with the firewall (pf isn't on by default; Reddit's servers are shared CDN addresses).
+
+## 2026-11-03 · Away after 2 minutes
+- Idle time before the Mac counts you as away is **2 minutes** (was 3; still adjustable in Settings). Shorter means
+  less Mac time counted while you're actually on the phone or away, so the timeline and totals are closer to real.
