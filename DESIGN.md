@@ -203,7 +203,12 @@ it; today doesn't until it's over). The Mac uploads one small `heat/year` docume
 - **Timelines don't draw Away time** (Mac, phone, web): the gaps say it.
 - **No overlaps: while the phone is in use, you're on the phone.** The phone counts only while its screen is on and
   unlocked; the Mac keeps counting for minutes after the last keypress. So Mac time overlapping phone use is cut from
-  the timeline and the totals (work-hours totals lose the same share), on the server and on the Mac's Home.
+  the timeline, the totals (work-hours totals lose the same share), "Where the time went" (from the row of that
+  name, the rest in proportion) and the heat map (a negative `deviceHeat/overlap` entry per day), on the server and
+  on the Mac's Home.
+- **Reclassify from the timeline popup, either device's stretches:** each device uploads privately what every
+  timeline name refers to (`refs` in its report copy: the app or site, or the page/video with its key); the popup's
+  menu makes a rule (apps, sites) or a verdict (pages, videos) shared by both devices.
 - **Updates without a cable:** `android/release.sh` publishes the APK and `version.json` with the web app
   (`/android/`, no-cache); the phone checks every 6 hours and in Settings → App, downloads, and Android's installer asks
   to confirm. Version = commit count.
