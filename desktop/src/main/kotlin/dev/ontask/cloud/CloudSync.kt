@@ -213,6 +213,7 @@ class CloudSync(
         c.write("users/$uid/deviceReportItems", "${date}_${deviceId()}", buildJsonObject {
             put("date", date.toString()); put("device", deviceJson())
             put("topSites", sitesJson(r.topSubjects, titles = true)); put("updatedAt", System.currentTimeMillis())
+            put("refs", refsJson(r))
         })
     }
 
@@ -253,6 +254,25 @@ class CloudSync(
         sum
     }.getOrDefault(emptyMap())
     @Volatile private var heatCache: Pair<Long, Map<LocalDate, dev.ontask.report.DayStat>>? = null
+
+    /**
+     * What each name in the day's timeline refers to (the app or site a rule would match, or the page or video), so
+     * another device's timeline popup can change its category. Private: only in your copy, never the partner's.
+     */
+    fun refsJson(r: DailyReport): JsonObject = buildJsonObject {
+        val seen = HashSet<String>()
+        r.timeline.filter { !it.phone }.forEach { run ->
+            run.refs.forEach { (n, ref) ->
+                if (seen.add(n)) put(n, buildJsonObject {
+                    put("subject", ref.subject); ref.itemKey?.let { put("itemKey", it) }; ref.title?.let { put("title", it) }
+                    run.category?.let { put("categoryId", it.name) }
+                })
+                // The partner's copy shows "youtube.com" for "youtube.com – Learning Java": that name means the whole site.
+                val site = n.substringBefore(" – ")
+                if (site != n && seen.add(site)) put(site, buildJsonObject { put("subject", ref.subject) })
+            }
+        }
+    }
 
     private fun deviceJson() = buildJsonObject { put("id", deviceId()); put("kind", "mac"); put("name", hostName()) }
     private fun hostName(): String = runCatching { java.net.InetAddress.getLocalHost().hostName.removeSuffix(".local") }.getOrDefault("Mac")

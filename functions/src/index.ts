@@ -8,7 +8,7 @@ import { deliverToPartner, releaseDeferred, routeEvent, takeQueuedAlerts, type L
 import { firstName } from "./logic/messages";
 import { fmtDate, ownParts, partnerParts, reportDue, reportHtml, reportText, type CheckinDoc, type ReportDoc } from "./logic/report";
 import { bedtimeNight, bedtimePushDue, checkinState, habitsDue, isWorkDay } from "./logic/schedule";
-import { mergeHeat, mergeReports, type DayParts, type DeviceReport } from "./logic/merge";
+import { mergeDay, mergeHeat, type DayParts, type DeviceItems, type DeviceReport } from "./logic/merge";
 import { judge, type Cat } from "./logic/judge";
 import { localParts } from "./logic/routing";
 import { buildPrompt, ollamaLibraryUrl, parseCandidates, validateCandidates, type Recommendation } from "./logic/modelrec";
@@ -49,24 +49,32 @@ export const onEventCreated = onDocumentCreated({ document: "users/{uid}/events/
 
 // ---- Per-device reports -> the merged day everyone reads -------------------------------------------------------
 
-/** A device's day report changed: merge all devices' reports for that day into reports/{date}. */
+/**
+ * A device's day report or private copy changed: merge every device's for that day into reports/{date} (shared),
+ * reportItems/{date} (titled rows and refs, yours only), and the overlap's negative heat numbers (deviceHeat/overlap).
+ */
+async function mergeDayFor(uid: string, date: string) {
+  const [reps, items] = await Promise.all([
+    db.collection(`users/${uid}/deviceReports`).where("date", "==", date).get(),
+    db.collection(`users/${uid}/deviceReportItems`).where("date", "==", date).get(),
+  ]);
+  const m = mergeDay(reps.docs.map((d) => d.data() as DeviceReport), items.docs.map((d) => ({ date, ...(d.data() as object) }) as DeviceItems));
+  const now = Date.now();
+  await Promise.all([
+    m.report ? db.doc(`users/${uid}/reports/${date}`).set(m.report) : Promise.resolve(),
+    db.doc(`users/${uid}/reportItems/${date}`).set({ ...m.items, updatedAt: now }),
+    db.doc(`users/${uid}/deviceHeat/overlap`).set({ days: { [date]: m.overlap ?? { deep: 0, active: 0, workDeep: 0, workActive: 0, offWasted: 0, offActive: 0 } }, updatedAt: now }, { merge: true }),
+  ]);
+}
+
 export const onDeviceReportWritten = onDocumentWritten({ document: "users/{uid}/deviceReports/{id}" }, async (event) => {
   const date = (event.data?.after.get("date") ?? event.data?.before.get("date")) as string | undefined;
-  if (!date) return;
-  const uid = event.params.uid;
-  const all = await db.collection(`users/${uid}/deviceReports`).where("date", "==", date).get();
-  const merged = mergeReports(all.docs.map((d) => d.data() as DeviceReport));
-  if (merged) await db.doc(`users/${uid}/reports/${date}`).set(merged);
+  if (date) await mergeDayFor(event.params.uid, date);
 });
 
-/** The same for the titled rows only you can read (reportItems). */
 export const onDeviceReportItemsWritten = onDocumentWritten({ document: "users/{uid}/deviceReportItems/{id}" }, async (event) => {
   const date = (event.data?.after.get("date") ?? event.data?.before.get("date")) as string | undefined;
-  if (!date) return;
-  const uid = event.params.uid;
-  const all = await db.collection(`users/${uid}/deviceReportItems`).where("date", "==", date).get();
-  const merged = mergeReports(all.docs.map((d) => ({ date, ...(d.data() as object) }) as DeviceReport));
-  if (merged) await db.doc(`users/${uid}/reportItems/${date}`).set({ topSites: merged.topSites ?? [], updatedAt: merged.updatedAt ?? Date.now() });
+  if (date) await mergeDayFor(event.params.uid, date);
 });
 
 /** A device's year of heat numbers changed: recompute the merged heat/year (scores, total, streak). */

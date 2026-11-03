@@ -60,7 +60,8 @@ fun HomeScreen(uid: String, name: String) {
             mac?.let { Muted("💻 ${it["name"] ?: "Mac"} · " + if (it["lastSyncMs"].num() > 0) "updated ${ago(it["lastSyncMs"].num())}" else "not synced yet") }
             val r = report?.data
             if (r == null) Muted("Nothing tracked yet today.")
-            else ReportBody((items?.data?.get("topSites")?.let { r + ("topSites" to it) } ?: r), categoriesOf(s))
+            else ReportBody((items?.data?.get("topSites")?.let { r + ("topSites" to it) } ?: r), categoriesOf(s),
+                @Suppress("UNCHECKED_CAST") ((items?.data?.get("refs") as? Map<String, Map<String, Any?>>) ?: emptyMap()))
         }
         OCard("Today's plan") {
             val plan = checkin?.getString("plan")

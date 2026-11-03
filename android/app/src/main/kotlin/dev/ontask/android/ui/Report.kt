@@ -53,7 +53,7 @@ fun categoriesOf(schedule: Map<String, Any?>?): List<Cat> = ((schedule?.get("cat
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Suppress("UNCHECKED_CAST")
 @Composable
-fun ReportBody(r: Map<String, Any?>, categories: List<Cat> = emptyList()) {
+fun ReportBody(r: Map<String, Any?>, categories: List<Cat> = emptyList(), refs: Map<String, Map<String, Any?>> = emptyMap()) {
     val totals = (r["totals"] as? Map<String, Any?>) ?: emptyMap()
     fun t(l: Lvl) = totals[l.key].num()
     val shown = listOf(Lvl.DEEP, Lvl.MIXED, Lvl.WASTED)
@@ -74,7 +74,7 @@ fun ReportBody(r: Map<String, Any?>, categories: List<Cat> = emptyList()) {
             shown.forEach { l -> Row(verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(9.dp).background(l.color, CircleShape)); Text("  ${l.label} ${fmtDuration(t(l))}", style = MaterialTheme.typography.bodyMedium) } }
         }
         // Away time isn't drawn: the gaps say it.
-        Timeline(((r["timeline"] as? List<Map<String, Any?>>) ?: emptyList()).filter { it["k"] != "A" }, dayStart, tz)
+        Timeline(((r["timeline"] as? List<Map<String, Any?>>) ?: emptyList()).filter { it["k"] != "A" }, dayStart, tz, refs, categories)
         val sites = (r["topSites"] as? List<Map<String, Any?>>) ?: emptyList()
         if (sites.isNotEmpty()) {
             var open by remember { mutableStateOf(false) }
@@ -115,9 +115,12 @@ private fun SiteRow(s: Map<String, Any?>, categories: List<Cat>) {
     }
 }
 
-/** The day's stretches; tap one for what it was, pinch to zoom, drag to move. */
+/**
+ * The day's stretches; tap one for what it was (with a category menu for each app, site, page or video when [refs]
+ * says what they are), pinch to zoom, drag to move.
+ */
 @Composable
-fun Timeline(segs: List<Map<String, Any?>>, dayStart: Long?, tz: String?) {
+fun Timeline(segs: List<Map<String, Any?>>, dayStart: Long?, tz: String?, refs: Map<String, Map<String, Any?>> = emptyMap(), categories: List<Cat> = emptyList()) {
     if (segs.isEmpty()) return
     val active = segs.filter { it["k"] != "A" }
     val from0 = ((active.minOfOrNull { it["a"].num() } ?: 0) / 3600) * 3600
@@ -161,11 +164,43 @@ fun Timeline(segs: List<Map<String, Any?>>, dayStart: Long?, tz: String?) {
             Text(clockAt(win.second.toLong(), dayStart, tz), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         picked?.let { s ->
-            @Suppress("UNCHECKED_CAST") val top = (s["t"] as? List<Map<String, Any?>>)?.joinToString(" · ") { "${it["n"]} ${fmtDuration(it["s"].num())}" }
-            Text(
-                (if (s["d"] == "phone") "📱 " else "") + "${s["c"] ?: Lvl.of(s["k"] as? String).label} · ${clockAt(s["a"].num(), dayStart, tz)}–${clockAt(s["b"].num(), dayStart, tz)}" + (top?.let { "\n$it" } ?: ""),
-                style = MaterialTheme.typography.bodySmall,
-            )
+            Text((if (s["d"] == "phone") "📱 " else "") + "${s["c"] ?: Lvl.of(s["k"] as? String).label} · ${clockAt(s["a"].num(), dayStart, tz)}–${clockAt(s["b"].num(), dayStart, tz)}",
+                style = MaterialTheme.typography.bodySmall)
+            @Suppress("UNCHECKED_CAST") (s["t"] as? List<Map<String, Any?>>)?.forEach { x ->
+                val n = x["n"] as? String ?: return@forEach
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("$n · ${fmtDuration(x["s"].num())}", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                    refs[n]?.let { ref -> if (categories.isNotEmpty()) RefMenu(ref, categories) }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * A category menu for one thing in a stretch (on the Mac or this phone): an app or site becomes a rule for every
+ * device (the Mac relabels its history); a page or video gets its own verdict.
+ */
+@Composable
+private fun RefMenu(ref: Map<String, Any?>, categories: List<Cat>) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var open by remember { mutableStateOf(false) }
+    var picked by remember { mutableStateOf<String?>(null) }
+    val itemKey = ref["itemKey"] as? String
+    val current = categories.firstOrNull { it.id == ref["categoryId"] }?.label ?: "Unclassified"
+    Box {
+        TextButton({ open = true }) { Text((picked ?: current) + " ▾", style = MaterialTheme.typography.bodySmall) }
+        DropdownMenu(open, { open = false }) {
+            categories.filter { itemKey == null || !it.variable }.forEach { c ->
+                DropdownMenuItem({ Text(c.label) }, {
+                    open = false; picked = c.label
+                    val subject = ref["subject"] as? String ?: return@DropdownMenuItem
+                    if (itemKey != null) dev.ontask.android.track.PhoneRules.saveVerdict(dev.ontask.android.Cloud.deviceId(ctx), itemKey, ref["title"] as? String, c.id, dev.ontask.Source.USER_LABEL, null)
+                    else dev.ontask.android.track.PhoneRules.saveRule(
+                        if ('.' in subject && ' ' !in subject) dev.ontask.classify.RuleKind.DOMAIN else dev.ontask.classify.RuleKind.APP,
+                        if ('.' in subject && ' ' !in subject) dev.ontask.classify.siteDomain(subject) else subject, c.id)
+                })
+            }
         }
     }
 }

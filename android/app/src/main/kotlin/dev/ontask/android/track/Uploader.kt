@@ -19,7 +19,7 @@ object Uploader {
         val device = mapOf("id" to deviceId, "kind" to "phone", "name" to "${Build.MANUFACTURER.replaceFirstChar { it.uppercase() }} ${Build.MODEL}")
         val now = System.currentTimeMillis()
         Cloud.db.document("users/$uid/deviceReports/${date}_$deviceId").set(report(segs, log.dayStart, date) + mapOf("device" to device, "updatedAt" to now))
-        Cloud.db.document("users/$uid/deviceReportItems/${date}_$deviceId").set(mapOf("date" to date, "device" to device, "topSites" to sites(segs, titles = true), "updatedAt" to now))
+        Cloud.db.document("users/$uid/deviceReportItems/${date}_$deviceId").set(mapOf("date" to date, "device" to device, "topSites" to sites(segs, titles = true), "refs" to refs(segs), "updatedAt" to now))
         Cloud.db.document("users/$uid/deviceHeat/$deviceId").set(mapOf(
             "device" to device, "updatedAt" to now,
             "days" to log.heat.mapValues { (_, p) -> mapOf("deep" to p.deep, "active" to p.active, "workDeep" to p.workDeep, "workActive" to p.workActive, "offWasted" to p.offWasted, "offActive" to p.offActive) },
@@ -41,6 +41,12 @@ object Uploader {
             "distractionEvents" to runs.count { it.level == "WASTED" && it.end - it.start >= 30 },
             "topSites" to sites(segs, titles = false),
         )
+    }
+
+    /** What each timeline name refers to (the app or site, or the page or video), so any device can reclassify it. */
+    private fun refs(segs: List<Seg>): Map<String, Map<String, Any?>> = segs.associate { s ->
+        val name = s.title?.takeIf { s.item != null }?.let { "${s.subject} – $it" } ?: s.subject
+        name to buildMap { put("subject", s.subject); s.item?.let { put("itemKey", it) }; s.title?.let { put("title", it) }; put("categoryId", s.cat) }
     }
 
     private class Run(val start: Long, var end: Long, val level: String, val cat: String, val top: HashMap<String, Long>)

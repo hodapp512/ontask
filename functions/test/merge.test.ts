@@ -69,3 +69,23 @@ describe("overlaps between the Mac and the phone", () => {
     expect(r.removed).toEqual({ WASTED: 60 });
   });
 });
+
+import { mergeDay, trimSites } from "../src/logic/merge";
+describe("overlap in sites and the heat map", () => {
+  it("takes overlap from the matching row, the rest proportionally", () => {
+    const sites = [{ name: "Claude", seconds: 600 }, { name: "Slack", seconds: 300 }];
+    expect(trimSites(sites, { Claude: 120 }, 180)).toEqual([{ name: "Claude", seconds: 443 }, { name: "Slack", seconds: 277 }]);
+  });
+  it("merges a day: refs from both devices, trimmed rows and negative heat parts", () => {
+    const mac = { device: { id: "m", kind: "mac" }, date: "d", totals: { DEEP: 540 }, workTotals: { DEEP: 540 }, timeline: [{ a: 0, b: 540, k: "D", t: [{ n: "Claude", s: 540 }] }], topSites: [{ name: "Claude", seconds: 540 }] };
+    const phone = { device: { id: "p", kind: "phone" }, date: "d", totals: { WASTED: 180 }, workTotals: {}, timeline: [{ a: 360, b: 540, k: "W", t: [{ n: "Instagram", s: 180 }] }] };
+    const m = mergeDay([mac, phone], [
+      { date: "d", device: { id: "m", kind: "mac" }, topSites: [{ name: "Claude", seconds: 540 }], refs: { Claude: { subject: "Claude" } } },
+      { date: "d", device: { id: "p", kind: "phone" }, topSites: [{ name: "Instagram", seconds: 180 }], refs: { Instagram: { subject: "Instagram", categoryId: "ENTERTAINMENT" } } },
+    ]);
+    expect(m.items.topSites.map((s) => [s.name, s.seconds])).toEqual([["Claude", 360], ["Instagram", 180]]);
+    expect(m.items.refs).toMatchObject({ Claude: { device: "mac" }, Instagram: { device: "phone", categoryId: "ENTERTAINMENT" } });
+    expect(m.overlap).toEqual({ deep: -180, active: -180, workDeep: -180, workActive: -180, offWasted: -0, offActive: -0 });
+    expect(m.report!.topSites!.find((s) => s.name === "Claude")!.seconds).toBe(360);
+  });
+});
