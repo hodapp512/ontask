@@ -45,6 +45,10 @@ class Ladder(var cfg: LadderConfig = LadderConfig()) {
     var step = Step.NONE; private set
     private var wastedSince: Long? = null
     private var lastWasted = 0L
+    /** Time actually on time-wasting in this drift: short visits back to work (under a minute) pause it, not end it. */
+    private var wastedSec = 0L
+    private var lastTick = 0L
+    private var lastTickWasted = false
     /** After "Back to work": until when you have to switch (0 = not checking), the last reminder, and since when you've been off time-wasting. */
     private var checkUntil = 0L
     private var lastRemind = 0L
@@ -61,11 +65,13 @@ class Ladder(var cfg: LadderConfig = LadderConfig()) {
     val checking get() = checkUntil > 0
 
     fun tick(now: Long, wasted: Boolean, active: Boolean, unblocksInWindow: Int): Intervention? {
+        if (wasted && lastTickWasted && wastedSince != null) wastedSec += now - lastTick
+        lastTick = now; lastTickWasted = wasted
         if (!active) { reset(); checkUntil = 0; watchUntil = 0; return null }
         if (checkUntil > 0) {
             if (wasted) {
                 offSince = 0
-                if (now >= checkUntil) { checkUntil = 0; wastedSince = now - cfg.step1WastedSec - cfg.step2ExtraSec; lastWasted = now; step = Step.WINDOW; return Intervention(step, 300, unblocksInWindow) }
+                if (now >= checkUntil) { checkUntil = 0; wastedSince = now; wastedSec = (cfg.step1WastedSec + cfg.step2ExtraSec).toLong(); lastWasted = now; step = Step.WINDOW; return Intervention(step, 300, unblocksInWindow) }
                 if (now - lastRemind >= cfg.remindSec) { lastRemind = now; return Intervention(Step.PROMPT, now - (checkUntil - cfg.checkSec), unblocksInWindow, reminder = true) }
                 return null
             }
@@ -74,12 +80,12 @@ class Ladder(var cfg: LadderConfig = LadderConfig()) {
             if (now - offSince >= cfg.remindSec) { checkUntil = 0; watchUntil = now + cfg.watchSec }
             return null
         }
-        if (wasted) { if (wastedSince == null) wastedSince = now; lastWasted = now }
+        if (wasted) { if (wastedSince == null) { wastedSince = now; wastedSec = 0 }; lastWasted = now }
         else if (wastedSince != null && now - lastWasted >= cfg.wastedBreakSec) { endRun(now); wastedSince = null; afterBreak = false; if (unblocksInWindow < cfg.unblocksStep1) step = Step.NONE }
 
         // Back at work a minute after the break: it's over, and the next drift starts gently again.
         if (afterBreak && wastedSince == null && now - afterBreakTs >= cfg.wastedBreakSec) afterBreak = false
-        val drift = wastedSince?.let { now - it } ?: 0L
+        val drift = if (wastedSince != null) wastedSec else 0L
         var target = 0
         if (drift >= cfg.step1WastedSec) target = 1
         if (drift >= cfg.step1WastedSec + cfg.step2ExtraSec) target = 2
@@ -118,7 +124,7 @@ class Ladder(var cfg: LadderConfig = LadderConfig()) {
     /** "I'm struggling": jump to the partner step. */
     fun struggling(): Intervention? { if (step == Step.PARTNER) return null; step = Step.PARTNER; return Intervention(step, 0, 0) }
 
-    fun reset() { step = Step.NONE; wastedSince = null }
+    fun reset() { step = Step.NONE; wastedSince = null; wastedSec = 0 }
 }
 
 /** Partner binge alerts are rate-limited per day; extras are queued into the next check-in. */

@@ -109,6 +109,17 @@ class LadderRhythmTest {
         assertEquals(Step.WINDOW, l.tick(530, true, true, 0)?.step)
     }
 
+    @Test fun aQuickLookAtTimeWastingDuringTheWatchIsNotADrift() {
+        // 1:57 on Nov 3: 5 s on the LinkedIn feed, then back in Claude. Only time actually on it counts.
+        val l = Ladder()
+        l.span(0, 130, wasted = true); l.backToWork(130); l.span(130, 165, wasted = false)
+        assertTrue(l.span(300, 305, wasted = true).isEmpty())
+        assertTrue(l.span(305, 400, wasted = false).isEmpty())
+        // Short visits add up: three 15-second looks within a minute of each other make 30 s.
+        assertTrue((l.span(400, 415, true) + l.span(415, 440, false) + l.span(440, 455, true) + l.span(455, 480, false)).isEmpty())
+        assertEquals(Step.WINDOW, l.span(480, 500, true).firstOrNull()?.step)
+    }
+
     @Test fun unblocksEscalateAndNotActiveResets() {
         val l = Ladder()
         assertNull(l.tick(0, false, true, 1))
@@ -131,8 +142,9 @@ class LadderRhythmTest {
 
     @Test fun brieflyNotWastedDoesNotResetDrift() {
         val l = Ladder()
-        l.tick(0, true, true, 0); l.tick(30, false, true, 0); l.tick(40, true, true, 0)
-        assertEquals(Step.PROMPT, l.tick(125, true, true, 0)?.step)
+        // 20 s back at work pauses the drift (it isn't reset, and those 20 s don't count): 2 min on it around 145.
+        assertTrue((l.span(0, 60, true) + l.span(60, 80, false) + l.span(80, 135, true)).isEmpty())
+        assertEquals(Step.PROMPT, l.span(135, 160, true).firstOrNull()?.step)
     }
 
     @Test fun alertsAreRateLimitedAndExtrasQueued() {
