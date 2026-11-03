@@ -460,3 +460,13 @@ when it comes to the front.*
   means you're asked instead. Only a failed call (AI not running) is retried — retrying an answer gets the same answer.
 - **The catch-up** (pages never judged when you saw them, so the day isn't left "Unsure") runs **every 3 hours**,
   remembered across restarts. **Kev stops after 5 idle minutes** (was 10).
+
+## 2026-11-03 · No Focus sessions; "Back to work" checks; no waits (grilled)
+- **Focus sessions removed.** In work hours they changed nothing (unblocking is already strict and prompts already
+  run), and "Back to work: 25 min Focus" during a Focus session made no sense. Past records stay unused; it can come
+  back if needed. *Rejected:* a stricter Pomodoro-style sprint; Focus only outside work hours.
+- **No waits on prompts anywhere** (the firm drift window's 30 s, bedtime's 20 s): when OnTask is wrong and you're on
+  task, a countdown just distracts. The unblock delay stays (the user likes that friction).
+- **"Back to work" checks instead of granting 5 minutes of grace:** 5 minutes to switch with a reminder every 30 s
+  while still on time-wasting, then the firmer window; after switching, a 10-minute watch where 30 s back on
+  time-wasting bring the next step. Same on the phone (which also goes to the home screen).

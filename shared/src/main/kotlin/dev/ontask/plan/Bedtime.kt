@@ -8,7 +8,7 @@ import java.time.ZoneId
  * Bedtime reminders. From [bedtimeMin] (minutes after midnight, e.g. 22:30) until [wakeMin] the next morning (5 AM)
  * is "the night". At bedtime, if you're at the computer, one reminder; after that, another every [repeatMin] minutes
  * while you're still at it, whatever you're doing (working late counts too; "I'm working" buys 30 minutes). Each one
- * is firmer: from the third on, the window can't be closed for [lockSec] seconds.
+ * is firmer (from the third on, full screen on the phone). It can always be answered at once.
  */
 class Bedtime(
     val bedtimeMin: Int,
@@ -50,7 +50,7 @@ class Bedtime(
         if (!active || now < s.snoozeUntil) return null
         if (s.count > 0 && now - s.lastTs < repeatMin * 60L) return null
         val level = s.count + 1
-        return Nudge(night, level, minutesPast(night, now), lockSec = if (level >= 3) 20 else 0)
+        return Nudge(night, level, minutesPast(night, now), lockSec = 0) // no waiting: answerable at once
     }
 
     companion object {

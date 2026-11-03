@@ -91,7 +91,7 @@ internal fun PrioritiesCard(app: App, date: LocalDate, short: Boolean, compact: 
 
 /** "What's in the way?" at the midday check-in, each with one suggestion. Other is only recorded. */
 private val OBSTACLES = listOf(
-    "Distracted / low energy" to "Take a 10-minute break away from the screen, then start a 30-minute Focus.",
+    "Distracted / low energy" to "Take a 10-minute break away from the screen, then start the next small step.",
     "Interruptions/meetings" to "Block out a meeting-free hour this afternoon.",
     "Unclear what to do" to "Write the very next physical step at the top of your plan.",
     "Stuck on a problem" to "Write down what you've tried, then ask someone or switch to another task for 25 minutes.",
@@ -101,7 +101,7 @@ private val OBSTACLES = listOf(
 
 /**
  * Midday check-in: the morning in numbers, what got done, what should have, the plan to revise, and, after a
- * struggling morning, what's in the way. Ends by starting a 30-minute Focus.
+ * struggling morning, what's in the way.
  */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
@@ -120,7 +120,6 @@ internal fun MiddayCard(app: App, date: LocalDate, onDone: () -> Unit) {
         val done = gotDone.trim().ifBlank { null }
         app.checkins.save(Checkin(date, "midday", now, null, done, should.trim().ifBlank { null }, chips.joinToString(", ").ifBlank { null }, null, false))
         app.events.emit("checkin_midday", now, "done" to done, "should" to should, "chips" to chips.joinToString(","), "focusPct" to m.pct, "struggling" to m.struggling)
-        if (focus) app.interventionFocus(30)
         onDone()
     }
 
@@ -149,8 +148,7 @@ internal fun MiddayCard(app: App, date: LocalDate, onDone: () -> Unit) {
         }
     } else TextButton({ showChips = true }) { Text("Something in the way?") }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button({ save(focus = true) }) { Text("Done: start 30 min Focus") }
-        OutlinedButton({ save(focus = false) }) { Text("Done") }
+        Button({ save(focus = false) }) { Text("Done") }
     }
 }
 

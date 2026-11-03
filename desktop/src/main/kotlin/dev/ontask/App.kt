@@ -322,12 +322,13 @@ class App(val dir: Path = dataDir()) {
             if (prefs.bool("ladder.enabled", true)) _breakCard.value = breakCard(due, now)
         }
         // With a break earned, the first prompt is "Is this a break?" after a minute; otherwise "drifting" after two.
-        ladder.cfg = ladder.cfg.copy(lockSec = prefs.int("ladder.lock_sec", 30).coerceIn(30, 180), step1WastedSec = if (earned > 0) 60 else prefs.int("ladder.step1_sec", 120))
+        ladder.cfg = ladder.cfg.copy(step1WastedSec = if (earned > 0) 60 else prefs.int("ladder.step1_sec", 120))
         val strict = blocking.strictNow(now)
         val iv = ladder.tick(now, wasted, (strict || beforeWorkAfterSitDown(now)) && !onBreak, unblocks.unblocksInLast(now, ladder.cfg.unblockWindowSec.toLong()))
             ?.let { decorate(it, now) }
         if (iv != null && prefs.bool("ladder.enabled", true)) { _intervention.value = iv; closedIv = null; if (iv.step.n >= 2) _breakCard.value = null }
-        if (ladder.step == Step.NONE) { _intervention.value = null; closedIv = null }
+        // Nothing escalating (and not in the check after "Back to work", whose reminders stay up until you switch).
+        if (ladder.step == Step.NONE && !ladder.checking) { _intervention.value = null; closedIv = null }
         // A prompt closed with its window's close button comes back until it's answered.
         closedIv?.let { (c, at) -> if (now >= at && _intervention.value == null) { closedIv = null; if (ladder.step == c.step) _intervention.value = decorate(c, now) } }
         closedCard?.let { (c, at) -> if (now >= at && _breakCard.value == null) { closedCard = null; _breakCard.value = c } }
@@ -711,12 +712,12 @@ class App(val dir: Path = dataDir()) {
         )
     }
 
-    /** "Back to work: 25 min Focus" (or the 10-minute "just start"): starts Focus, which blocks distractions. */
-    fun interventionFocus(minutes: Int = 25) {
-        val now = nowSec()
-        synchronized(breaks) { breaks.end(now) }
-        focus.start(minutes, now)
-        scope.launch(IO) { blocking.tick(nowSec()) }
+    /**
+     * "Back to work" from any prompt or break card: ends a running break or lunch and starts the ladder's check (5
+     * minutes to switch, a reminder every 30 seconds while still on time-wasting, then a 10-minute watch).
+     */
+    fun backToWork() {
+        synchronized(breaks) { breaks.end(nowSec()) }
         _breakCard.value = null; closedCard = null
         interventionBack()
     }
@@ -754,7 +755,6 @@ class App(val dir: Path = dataDir()) {
 
     /** "5 more minutes" (once per break) or "15 more minutes" of lunch. */
     fun breakMore() { synchronized(breaks) { breaks.extend(nowSec()) }; ladder.reset(); _breakCard.value = null; closedCard = null }
-    /** "just close": no Focus, but drifting on still escalates. */
     fun breakCardDone() { if (_breakCard.value?.due == dev.ontask.intervene.Breaks.Due.LUNCH_CHECK) synchronized(breaks) { breaks.end(nowSec()) }; ladder.breakOver(nowSec()); _breakCard.value = null; closedCard = null }
     fun breakCardClosed() { _breakCard.value?.let { closedCard = it to nowSec() + 30 }; _breakCard.value = null }
 

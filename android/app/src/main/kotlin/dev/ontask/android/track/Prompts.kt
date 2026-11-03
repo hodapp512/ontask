@@ -57,8 +57,9 @@ class Prompts(private val svc: AccessibilityService) {
         if (a != null && until in (lastBreakEnd + 1)..now) { lastBreakEnd = until; ladder.breakOver(now); breakOverNotice(a["kind"] == "LUNCH") }
         ladder.cfg = ladder.cfg.copy(step1WastedSec = if (earnedSec > 0) 60 else 120)
         val iv = ladder.tick(now, level == Level.WASTED, work && !onBreak && level != null, 0)
-        if (iv != null) show(iv.step)
-        if (ladder.step == Step.NONE && shownStep != Step.NONE) clear()
+        if (iv != null) { if (iv.reminder) reminderNotification() else show(iv.step) }
+        // Nothing escalating (and not in the check after "Back to work", whose reminders keep coming until you switch).
+        if (ladder.step == Step.NONE && !ladder.checking && shownStep != Step.NONE) clear()
         // A full-screen step closed with Back: it comes back after 30 seconds while you're still drifting.
         if (shownStep.n >= 2 && activityClosedAt > 0 && now - activityClosedAt >= 30 && level == Level.WASTED) { activityClosedAt = 0; launchScreen(shownStep) }
     }
@@ -76,6 +77,19 @@ class Prompts(private val svc: AccessibilityService) {
 
     private fun action(name: String, label: String) = NotificationCompat.Action(0, label,
         PendingIntent.getBroadcast(svc, name.hashCode(), Intent(svc, PromptActions::class.java).setAction(name), PendingIntent.FLAG_IMMUTABLE))
+
+    /** After "Back to work", every 30 seconds while you're still on something time-wasting. */
+    private fun reminderNotification() {
+        val site = lastSite ?: "it"
+        val n = NotificationCompat.Builder(svc, OnTaskApp.CHANNEL).setSmallIcon(R.drawable.ic_notify).setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER).setOngoing(true)
+            .setContentTitle("Still on $site. Back to work?").setContentText("You said you'd get back to it.")
+            .addAction(action(BACK, "Back to work")).addAction(action(WORKING, "I'm working")).build()
+        runCatching { NotificationManagerCompat.from(svc).notify(NOTE, n) }
+    }
+
+    /** What you're on now (for the reminder's text), set by the tracker. */
+    @Volatile var lastSite: String? = null
 
     private fun stepOneNotification() {
         val earned = earnedSec / 60
@@ -120,7 +134,7 @@ class Prompts(private val svc: AccessibilityService) {
             .setContentTitle(title).setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .addAction(action(BED, "Going to bed")).addAction(action(SNOOZE, "10 more minutes")).setAutoCancel(true).build()
         runCatching { NotificationManagerCompat.from(svc).notify(BED_NOTE, note) }
-        if (n.lockSec > 0) svc.startActivity(Intent(svc, PromptActivity::class.java).putExtra("bedtime", "$title\n$text").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        if (n.level >= 3) svc.startActivity(Intent(svc, PromptActivity::class.java).putExtra("bedtime", "$title\n$text").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
     /** "Going to bed" just closes the reminder (no more tonight); "10 more minutes": the next one in 10. */
@@ -185,7 +199,7 @@ class Prompts(private val svc: AccessibilityService) {
 
     fun clear() { shownStep = Step.NONE; activityClosedAt = 0; NotificationManagerCompat.from(svc).cancel(NOTE); PromptActivity.closeAll() }
 
-    /** "Back to work": a short grace, and the phone goes to its home screen (away from what you were on). */
+    /** "Back to work": the phone goes to its home screen, and the ladder checks you switch (reminders every 30 s, 5 min). */
     fun backToWork() { ladder.backToWork(now()); clear(); svc.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME) }
 
     /** "I'm working": what you were on counts as work from now on (a rule or verdict, as on the Mac). */

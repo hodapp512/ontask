@@ -37,7 +37,7 @@ class BedtimeTest {
         assertEquals(2, b.due(at(26, 22, 46), active = true, state = s1)!!.level) // working late gets reminders too
         assertNull(b.due(at(26, 22, 46), active = false, state = s1))      // gone to bed
         val s2 = s1.copy(count = 2, lastTs = at(26, 22, 46))
-        assertEquals(20, b.due(at(26, 23, 2), active = true, state = s2)!!.lockSec)
+        assertEquals(0, b.due(at(26, 23, 2), active = true, state = s2)!!.lockSec) // never a wait
         assertNull(b.due(at(26, 23, 2), active = true, state = s2.copy(snoozeUntil = at(26, 23, 10))))
     }
 

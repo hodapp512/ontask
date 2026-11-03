@@ -17,10 +17,10 @@ This file describes how OnTask works now. **Why** each choice was made, and what
 
 - **Mechanism:** `/etc/hosts`, written by a small root bash daemon (`daemon/`) that copies OnTask's staged hosts file.
   No tamper monitor; no browser extension for now.
-- **The block list is blocked around the clock.** Work hours and Focus sessions only change how hard unblocking is.
+- **The block list is blocked around the clock.** Work hours only change how hard unblocking is.
 - **Work hours** are built in: weekly template + per-day exceptions, edited in a visual calendar.
   - Removing/shortening work hours → asks for a reason → partner is told. Adding hours never notifies.
-- **Unblocking in work hours or a Focus session** first asks "for work?":
+- **Unblocking in work hours** first asks "for work?":
   - **For work:** purpose (e.g. "Acme customer: onboarding videos"), 15 min / 30 min / 1 h / 2 h / 3 h, no delay,
     partner always told.
   - **Not for work:** delay that grows per day (10 s, 30 s, 2 min, then 5 min; resets at 4 AM), 5 / 10 / 15 min,
@@ -105,7 +105,7 @@ This file describes how OnTask works now. **Why** each choice was made, and what
 
 ## Interventions (binge ladder)
 
-Active during work hours and Focus sessions, and on work days **from your first sit-down until work hours start**
+Active during work hours, and on work days **from your first sit-down until work hours start**
 (prompts only then: no partner messages, unblocking stays relaxed). Drifting = time in a Wasted category; under a
 minute away doesn't break the run.
 
@@ -115,22 +115,25 @@ nothing under 25 min focused, then 5 min per 25 (at most 10 under an hour, 15 af
 
 | Step | Trigger | Response |
 |---|---|---|
-| 1 (break earned) | 1 min of drifting | Centered, takes focus: **"Is this a break? You've focused 40 min, so you've got 5 minutes."** *Yes, 5-min break / I'm working / Back to work: 25 min Focus* (+ *Lunch*) |
-| 1 (not earned) | 2 min of drifting, or 2nd unblock within 60 min | Centered, takes focus: **"It looks like you're drifting."** + "You've focused 12 min since your last break. 13 min more earns a 5-minute break." *Back to work: 25 min Focus / I'm working* (+ *Lunch*) / *just close* |
-| 2 | +3 min, or 3rd unblock within 60 min | Firmer centered window, **can't be closed for 30 s**: drift time, your message, today's plan, break totals; *Back to work: 25 min Focus / It's actually work / Help me get started* |
+| 1 (break earned) | 1 min of drifting | Centered, takes focus: **"Is this a break? You've focused 40 min, so you've got 5 minutes."** *Yes, 5-min break / I'm working / Back to work* (+ *Lunch*) |
+| 1 (not earned) | 2 min of drifting, or 2nd unblock within 60 min | Centered, takes focus: **"It looks like you're drifting."** + "You've focused 12 min since your last break. 13 min more earns a 5-minute break." *Back to work / I'm working* (+ *Lunch*) |
+| 2 | +3 min, or 3rd unblock within 60 min | Firmer centered window (answerable at once): drift time, your message, today's plan, break totals; *Back to work / It's actually work / Help me get started* |
 | 3 | +5 min, or 4th unblock within 60 min | Work hours: offer to message the partner (user confirms, can edit). Before work hours: the step-2 window again |
 
 - **During a break** there are no drift prompts. It ends quietly after 2 min of focused work, or with **"That's 5
-  minutes. Back to work?"** (break totals: last hour and today) → *Back to work: 25 min Focus / 5 more minutes* (once)
-  / *just close*. Still drifting a minute after a break or lunch → straight to step 2.
-- **Lunch** (11:00–2:00, once a day, offered on step 1): no drift prompts; **"Is lunch over?" at 30 min** (*Focus / 15
+  minutes. Back to work?"** (break totals: last hour and today) → *Back to work / 5 more minutes* (once). Still drifting a minute after a break or lunch → straight to step 2.
+- **Lunch** (11:00–2:00, once a day, offered on step 1): no drift prompts; **"Is lunch over?" at 30 min** (*Back to work / 15
   more minutes*), over at 45 min. Working during lunch doesn't end it. Lunch time isn't work time in the totals.
-- **Help me get started** (steps 2–3): pick the smallest next step from today's plan (10-min Focus), *Just start: 10 min
-  Focus*, *Block <site> for 15 minutes*, and in work hours *Message my partner*.
+- **Help me get started** (steps 2–3): today's plan with "pick the smallest next step and start it
+  now", *Block <site> for 15 minutes*, and in work hours *Message my partner*.
 - **Closing any prompt with the window's close button only hides it:** drift prompts and break cards come back after
   30 s, category questions after a minute, until answered.
 - Break and lunch time on time-wasting sites still counts as Wasted (red).
-- "Back to work" gives **5 minutes** of grace. Drifting again **within the hour picks up where the last drift left
+- **"Back to work" checks, it doesn't grant grace:** up to **5 minutes** to switch, with a reminder every 30 s
+  (*"Still on youtube.com. Back to work?"*) while still on time-wasting; still there after 5 minutes → step 2. Once
+  switched (30 s off it), a **10-minute watch**: back on time-wasting, 30 s bring the next step. Same on the phone.
+- **No waits anywhere on prompts** (drift windows, bedtime). The unblock delay in work hours stays.
+- Drifting again **within the hour picks up where the last drift left
   off** (second drift at step 2, third at step 3); an hour clear resets it. "I'm working" resets; on a Varies site it
   marks that page or video as Work, elsewhere it creates a rule.
 - Drifting alerts to the partner (binge + work-hours unblocks) are capped **2 before noon and 2 after**, on the server;
@@ -151,7 +154,7 @@ nothing under 25 min focused, then 5 min per 25 (at most 10 under an hour, 15 af
      problem, Overwhelmed, Other), each with one suggestion (Distracted / low energy: *Start break*, 10 min). Shown
      only after a struggling morning: under 60% focused or 30+ min wasted, and the last hour before lunch (breaks and
      away left out) no better than the morning; otherwise a *Something in the way?* link.
-  5. **Done: start 30 min Focus** / *Done*.
+  5. **Done**.
 - **Every pop-up stays on top of other windows.** Check-ins can be put off twice a day each (Do this later, or closing
   the window = 10 min); after that the window stays until answered.
 - The daily report gets "Morning 64% focused · Afternoon 48%" (split at lunch, or noon) and the midday answers.
@@ -170,7 +173,7 @@ nothing under 25 min focused, then 5 min per 25 (at most 10 under an hour, 15 af
   - If the user has already left the computer, wait for return or prompt on the phone in the evening.
 - Check-ins: escalating phone reminders after work ends until done or the report goes. No "missed check-in" message.
 - **Bedtime** (9:30 PM default): a reminder at bedtime if you're at the computer, then every 15 minutes while you're
-  still at it, work included, firmer each time (the third and later can't be closed for 20 s). An unanswered one
+  still at it, work included, firmer each time (the third and later full screen on the phone; always answerable at once). An unanswered one
   closes after 10 minutes away or at 5 AM. Your phone gets a push at bedtime.
 - **Habit prompts** (e.g. morning prayer): user-defined (add/edit/remove), clock-scheduled, delivered to phone even when away from the computer.
 - A work day with no computer use is reported as "no computer today", not a missed check-in.
@@ -224,7 +227,7 @@ it; today doesn't until it's over). The Mac uploads one small `heat/year` docume
 - **Prompts on the phone** (work hours only; the work day still starts at the Mac): the same ladder (`shared/`).
   Step 1 is a heads-up notification you can't swipe away ("Is this a break?" after 25+ min focus, else "It looks like
   you're drifting"), with Yes break / I'm working / Back to work (goes to the home screen) / Lunch. Steps 2–3 are a
-  full-screen OnTask screen (buttons after 30 s; Back hides it for 30 s; Help me get started; message your partner
+  full-screen OnTask screen (answerable at once; Back hides it for 30 s; Help me get started; message your partner
   in step 3). Started from the Accessibility service, so no "Display over other apps" permission is needed.
 - **One break count:** the Mac publishes focus since the last break, any running break or lunch and break totals in
   `state/breaks`; a break or lunch started on the phone is written there and taken over by the Mac.

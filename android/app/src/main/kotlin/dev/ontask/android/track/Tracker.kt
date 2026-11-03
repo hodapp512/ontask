@@ -135,6 +135,7 @@ class Tracker : AccessibilityService() {
             val work = PhoneRules.isWork(now)
             log.add(now, TICK_MS / 1000, p, app, subject, t, item, cat, work)
             currentKey = item ?: if (domain != null) "DOMAIN|$domain" else "APP|$p"
+            prompts.lastSite = if (cat.level == dev.ontask.Level.WASTED) subject else prompts.lastSite
             prompts.tick(now, cat.level, work)
         } else prompts.tick(now, null, PhoneRules.isWork(now))
         prompts.bedtimeTick(now, power.isInteractive && !keyguard.isKeyguardLocked)

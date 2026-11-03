@@ -90,7 +90,6 @@ fun HomeScreen(app: App) {
     ) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Button({ unblocking = true }) { Text("Unblock…") }
-            FocusButton(app, now) { tick++ }
             AdsButton(app, tick) { tick++ }
         }
         BlockingHelperBanner(app, now)
@@ -128,21 +127,6 @@ private fun AdsButton(app: App, version: Int, changed: () -> Unit) {
     val toggle = { app.adBlock.enabled = !on; scope.launch(Dispatchers.IO) { app.blocking.tick(App.nowSec()) }; changed() }
     if (on) OutlinedButton(toggle) { Text("Disable ad blocking") }
     else Button(toggle, colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)) { Text("Enable ad blocking") }
-}
-
-@Composable
-private fun FocusButton(app: App, now: Long, changed: () -> Unit) {
-    val active = app.focus.active(now)
-    var open by remember { mutableStateOf(false) }
-    Box {
-        OutlinedButton({ open = true }) { Text(if (active != null) "Focus: ${fmtDuration(active.plannedEndTs - now)} left ▾" else "Focus ▾") }
-        DropdownMenu(open, { open = false }) {
-            if (active != null) DropdownMenuItem({ Text("End focus session now") }, { open = false; app.focus.stop(App.nowSec()); app.blocking.tick(App.nowSec()); changed() })
-            else listOf(20, 30, 45, 60, 90).forEach { m ->
-                DropdownMenuItem({ Text("Block distractions for $m minutes") }, { open = false; app.focus.start(m, App.nowSec()); app.blocking.tick(App.nowSec()); changed() })
-            }
-        }
-    }
 }
 
 /** Today's plan (a free-form note, editable inline in the morning, shown as text after) and the evening reflection, which opens in its own window. */

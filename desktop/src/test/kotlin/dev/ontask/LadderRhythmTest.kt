@@ -71,18 +71,42 @@ class LadderRhythmTest {
         assertEquals(Step.PARTNER, run(610)?.step)            // +5 min => 10 min
     }
 
+    /** Ticks every 5 s from [from] to [to]; returns what came up. */
+    private fun Ladder.span(from: Long, to: Long, wasted: Boolean): List<Intervention> = (from until to step 5).mapNotNull { tick(it, wasted, true, 0) }
+
     @Test fun driftingAgainWithinTheHourPicksUpWhereItLeftOff() {
         val l = Ladder()
         l.tick(0, true, true, 0); assertEquals(Step.PROMPT, l.tick(125, true, true, 0)?.step)
         l.backToWork(130)
-        // After the 5-minute grace, a new drift's first prompt is already step 2…
-        l.tick(440, true, true, 0); assertEquals(Step.WINDOW, l.tick(565, true, true, 0)?.step)
-        l.backToWork(570)
-        // …and the next one step 3.
-        l.tick(880, true, true, 0); assertEquals(Step.PARTNER, l.tick(1005, true, true, 0)?.step)
-        l.backToWork(1010)
+        l.span(130, 200, wasted = false)                      // switched back to work: the check is over
+        // Well after the 10-minute watch but within the hour, a new drift's first prompt is already step 2.
+        l.span(1000, 1120, wasted = true); assertEquals(Step.WINDOW, l.tick(1125, true, true, 0)?.step)
+        l.backToWork(1130); l.span(1130, 1200, wasted = false)
         // More than an hour later it starts gently again.
-        l.tick(5000, true, true, 0); assertEquals(Step.PROMPT, l.tick(5125, true, true, 0)?.step)
+        l.span(6000, 6120, wasted = true); assertEquals(Step.PROMPT, l.tick(6125, true, true, 0)?.step)
+    }
+
+    @Test fun backToWorkChecksYouSwitch() {
+        val l = Ladder()
+        l.span(0, 130, wasted = true); assertEquals(Step.PROMPT, l.step)
+        l.backToWork(130)
+        // Still on it: a reminder every 30 seconds…
+        val reminders = l.span(130, 425, wasted = true)
+        assertTrue(reminders.all { it.reminder && it.step == Step.PROMPT }); assertEquals(9, reminders.size)
+        // …and after 5 minutes the firmer window.
+        assertEquals(Step.WINDOW, l.tick(430, true, true, 0)?.step)
+    }
+
+    @Test fun afterSwitchingBackDriftingAgainWithinTenMinutesIsTheNextStep() {
+        val l = Ladder()
+        l.span(0, 130, wasted = true)
+        l.backToWork(130)
+        assertEquals(1, l.span(130, 165, wasted = true).size)   // one reminder (at 160)
+        assertTrue(l.span(165, 200, wasted = false).isEmpty()) // switched: the check ends after 30 s off it
+        assertTrue(!l.checking)
+        // Back on time-wasting 5 minutes later: 30 seconds bring step 2 (the next after step 1), not a fresh nudge.
+        assertTrue(l.span(500, 525, wasted = true).isEmpty())
+        assertEquals(Step.WINDOW, l.tick(530, true, true, 0)?.step)
     }
 
     @Test fun unblocksEscalateAndNotActiveResets() {
@@ -94,18 +118,15 @@ class LadderRhythmTest {
         l.tick(40, false, false, 4); assertEquals(Step.NONE, l.step) // outside work hours/focus
     }
 
-    @Test fun backToWorkGivesGraceAndWorkConfirmedResets() {
+    @Test fun workConfirmedResets() {
         val l = Ladder()
         l.tick(0, true, true, 0); l.tick(130, true, true, 0)
         assertEquals(Step.PROMPT, l.step)
         l.workConfirmed() // "it's work" forgets the drift, so the next one starts gently
         l.tick(140, true, true, 0); l.tick(270, true, true, 0)
         assertEquals(Step.PROMPT, l.step)
-        l.backToWork(270)
-        assertNull(l.tick(400, true, true, 0)); assertNull(l.tick(560, true, true, 0)) // within 5 min grace
-        assertNull(l.tick(571, true, true, 0))        // drift restarts after grace
-        assertEquals(Step.WINDOW, l.tick(700, true, true, 0)?.step) // within the hour: where it left off
-        l.workConfirmed(); assertEquals(Step.NONE, l.step)
+        l.backToWork(270); assertTrue(l.checking)
+        l.workConfirmed(); assertEquals(Step.NONE, l.step); assertTrue(!l.checking)
     }
 
     @Test fun brieflyNotWastedDoesNotResetDrift() {

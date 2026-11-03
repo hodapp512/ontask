@@ -80,28 +80,25 @@ fun InterventionWindow(app: App, iv: Intervention, mode: ThemeMode) {
     when (iv.step) {
         // The first prompt: in the middle of the screen you're using, on top, and it takes the focus so it can't be missed.
         Step.PROMPT -> {
-            val size = DpSize(540.dp, if (iv.breakSec > 0) 260.dp else 300.dp)
+            val size = DpSize(540.dp, if (iv.reminder) 200.dp else if (iv.breakSec > 0) 260.dp else 300.dp)
             Window(
                 onCloseRequest = { app.interventionClosed() }, title = "OnTask — are you on task?", alwaysOnTop = true, resizable = false,
                 state = rememberWindowState(size = size, position = centeredOnActiveScreen(size)),
             ) {
                 LaunchedEffect(Unit) { runCatching { java.awt.Desktop.getDesktop().requestForeground(true) }; window.toFront(); window.requestFocus() }
-                OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) { if (iv.breakSec > 0) BreakCheck(app, iv) else StepOne(app, iv) } }
+                OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) { if (iv.reminder) Reminder(app, iv) else if (iv.breakSec > 0) BreakCheck(app, iv) else StepOne(app, iv) } }
             }
         }
 
         // Before work hours, step 3 is the firmer window again (no partner message then).
         Step.WINDOW, Step.PARTNER.takeIf { !iv.partnerAllowed } -> {
-            val lock = app.ladder.cfg.lockSec
-            var left by remember(iv) { mutableStateOf(lock) }
-            LaunchedEffect(iv) { while (left > 0) { delay(1000); left-- } }
             Window(
-                // Normal-sized window (not full screen). Closing is ignored until the lock runs out.
-                onCloseRequest = { if (left <= 0) app.interventionClosed() }, title = "OnTask — are you on task?", alwaysOnTop = true, resizable = true,
+                // Normal-sized window (not full screen), answerable at once; closing it only hides it for a moment.
+                onCloseRequest = { app.interventionClosed() }, title = "OnTask — are you on task?", alwaysOnTop = true, resizable = true,
                 state = rememberWindowState(size = DpSize(560.dp, 640.dp), position = centeredOnActiveScreen(DpSize(560.dp, 640.dp))),
             ) {
                 LaunchedEffect(Unit) { runCatching { java.awt.Desktop.getDesktop().requestForeground(true) }; window.toFront(); window.requestFocus() }
-                OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) { StepTwo(app, iv, left) } }
+                OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) { StepTwo(app, iv) } }
             }
         }
 
@@ -127,8 +124,23 @@ private fun BreakTotals(hourSec: Long, todaySec: Long) {
     )
 }
 
+/** "Back to work": OnTask then checks you switch (see Ladder.backToWork). */
 @Composable
-private fun FocusButton(app: App, enabled: Boolean = true) = Button({ app.interventionFocus() }, enabled = enabled) { Text("Back to work: 25 min Focus") }
+private fun BackButton(app: App) = Button({ app.backToWork() }) { Text("Back to work") }
+
+/** After "Back to work", every 30 seconds while you're still on something time-wasting. */
+@Composable
+private fun Reminder(app: App, iv: Intervention) {
+    val site = iv.site?.let { remember(it) { dev.ontask.classify.Pages.siteName(it) ?: it } } ?: "it"
+    Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Still on $site. Back to work?", style = MaterialTheme.typography.headlineSmall)
+        Text("You said you'd get back to it. Switch to your work now.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            BackButton(app)
+            OutlinedButton({ app.interventionWork() }) { Text("I'm working") }
+        }
+    }
+}
 
 /** After 25+ minutes of focus, a minute on something time-wasting: "Is this a break?" */
 @Composable
@@ -141,7 +153,7 @@ private fun BreakCheck(app: App, iv: Intervention) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Button({ app.interventionBreak() }) { Text("Yes, $min-min break") }
             OutlinedButton({ app.interventionWork() }) { Text("I'm working") }
-            OutlinedButton({ app.interventionFocus() }) { Text("Back to work: 25 min Focus") }
+            OutlinedButton({ app.backToWork() }) { Text("Back to work") }
             if (iv.lunch) OutlinedButton({ app.interventionLunch() }) { Text("Lunch") }
         }
     }
@@ -158,28 +170,24 @@ private fun StepOne(app: App, iv: Intervention) {
         )
         BreakTotals(iv.breaksHourSec, iv.breaksTodaySec)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            FocusButton(app)
+            BackButton(app)
             OutlinedButton({ app.interventionWork() }) { Text("I'm working") }
             if (iv.lunch) OutlinedButton({ app.interventionLunch() }) { Text("Lunch") }
-            TextButton({ app.interventionBack() }) { Text("just close") }
         }
     }
 }
 
 /**
- * "Help me get started": the smallest next step from today's plan (each starts a 10-minute Focus), a 10-minute
- * "just start", blocking the site for a while, and (in work hours, not on step 3 itself) a message to your partner.
+ * "Help me get started": your plan with "pick the smallest next step and start it now", blocking the site for a
+ * while, and (in work hours, not on step 3 itself) a message to your partner.
  */
 @Composable
 private fun HelpPanel(app: App, iv: Intervention, partner: Boolean) {
     val plan = remember { app.priorities.today(App.nowSec()) }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (plan.isNotEmpty()) {
-            Text("Pick the smallest next step and give it 10 minutes:", style = MaterialTheme.typography.titleSmall)
-            plan.forEach { p -> OutlinedButton({ app.interventionFocus(10) }, Modifier.fillMaxWidth()) { Text(p, maxLines = 2) } }
-        }
+        Text("Pick the smallest next step and start it now.", style = MaterialTheme.typography.titleSmall)
+        if (plan.isNotEmpty()) Text(plan.joinToString("\n"), style = MaterialTheme.typography.bodyMedium)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button({ app.interventionFocus(10) }) { Text("Just start: 10 min Focus") }
             iv.site?.let { site ->
                 val name = remember(site) { dev.ontask.classify.Pages.siteName(site) ?: site }
                 OutlinedButton({ app.interventionBlock(site) }) { Text("Block $name for 15 minutes") }
@@ -190,7 +198,7 @@ private fun HelpPanel(app: App, iv: Intervention, partner: Boolean) {
 }
 
 @Composable
-private fun StepTwo(app: App, iv: Intervention, lockLeft: Int) {
+private fun StepTwo(app: App, iv: Intervention) {
     val priorities = remember { app.priorities.today(App.nowSec()) }
     var help by remember(iv) { mutableStateOf(false) }
     Column(Modifier.padding(24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -202,11 +210,10 @@ private fun StepTwo(app: App, iv: Intervention, lockLeft: Int) {
             Text("Today's plan", style = MaterialTheme.typography.titleSmall)
             Text(priorities.joinToString("\n"))
         }
-        if (lockLeft > 0) Text("You can respond in ${lockLeft}s…", color = MaterialTheme.colorScheme.onSurfaceVariant)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            FocusButton(app, enabled = lockLeft <= 0)
-            OutlinedButton({ app.interventionWork() }, enabled = lockLeft <= 0) { Text("It's actually work") }
-            if (!help) TextButton({ help = true }, enabled = lockLeft <= 0) { Text("Help me get started") }
+            BackButton(app)
+            OutlinedButton({ app.interventionWork() }) { Text("It's actually work") }
+            if (!help) TextButton({ help = true }) { Text("Help me get started") }
         }
         if (help) HelpPanel(app, iv, partner = iv.partnerAllowed)
     }
@@ -228,9 +235,9 @@ private fun StepThree(app: App, iv: Intervention) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Button({
                 status = if (app.sendPartnerAlert(text)) "Sent." else "You've already sent today's alerts — this will go in your next check-in instead."
-                app.interventionFocus()
-            }) { Text("Send and start 25 min Focus") }
-            OutlinedButton({ app.interventionFocus() }) { Text("Not now: 25 min Focus") }
+                app.backToWork()
+            }) { Text("Send, and back to work") }
+            OutlinedButton({ app.backToWork() }) { Text("Not now, back to work") }
             if (!help) TextButton({ help = true }) { Text("Help me get started") }
         }
         if (help) HelpPanel(app, iv, partner = false)
@@ -259,9 +266,8 @@ fun BreakCardWindow(app: App, c: App.BreakCard, mode: ThemeMode) {
                 if (c.due == Breaks.Due.LUNCH_CHECK) Text("You've had ${c.minutes} minutes.", style = MaterialTheme.typography.bodyLarge)
                 if (c.due == Breaks.Due.BREAK_OVER) BreakTotals(c.breaksHourSec, c.breaksTodaySec)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FocusButton(app)
+                    BackButton(app)
                     if (c.canExtend) OutlinedButton({ app.breakMore() }) { Text(if (c.due == Breaks.Due.LUNCH_CHECK) "15 more minutes" else "5 more minutes") }
-                    if (c.due != Breaks.Due.LUNCH_CHECK) TextButton({ app.breakCardDone() }) { Text("just close") }
                 }
             }
         } }

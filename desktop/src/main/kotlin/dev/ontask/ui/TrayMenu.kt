@@ -99,13 +99,11 @@ fun ApplicationScope.OnTaskTray(app: App, open: (Dest?) -> Unit) {
     val deep = live.totals[Level.DEEP] ?: 0
     val wasted = live.totals[Level.WASTED] ?: 0
     val svc = app.blocking
-    val focus = remember(now, version) { app.focus.active(now) }
     val blocked = remember(now, version) { svc.currentlyBlocked(now) }
     val openCount = remember(now, version) { svc.unblocks.active(now).size }
     val adOn = remember(version) { app.adBlock.enabled }
     val status = when {
         app.helperNeeded() -> "Blocking isn't on: the blocking helper ${app.helperHealth.value?.problem}"
-        focus != null -> "Focus session: ${fmtDuration(focus.plannedEndTs - now)} left, blocking ${blocked.size} sites"
         svc.strictNow(now) -> "Work hours: blocking ${blocked.size} sites"
         else -> null
     }?.let { it + if (svc.mode == BlockMode.DRY_RUN) " (test mode)" else "" }
@@ -128,16 +126,6 @@ fun ApplicationScope.OnTaskTray(app: App, open: (Dest?) -> Unit) {
             }
             Separator()
             Item("Show OnTask", onClick = { open(null) })
-            Separator()
-            if (focus != null) {
-                Item("Focus session ends at ${fmtHm(focus.plannedEndTs)} (${fmtDuration(focus.plannedEndTs - now)} left)", enabled = false, onClick = {})
-                Item("End Focus session now", onClick = { app.focus.stop(App.nowSec()); retick(); changed() })
-            } else {
-                Item("Start a Focus session:", enabled = false, onClick = {})
-                listOf(20, 30, 45, 60, 90).forEach { m ->
-                    Item("    $m minutes", onClick = { app.focus.start(m, App.nowSec()); retick(); changed() })
-                }
-            }
             Separator()
             Item("Unblock a site…", enabled = blocked.isNotEmpty(), onClick = { changed(); picking = true })
             Item("Add site to block…", onClick = { adding = true })
@@ -245,7 +233,7 @@ internal fun AddSitesWindow(app: App, onClose: () -> Unit) {
     ) {
         OnTaskTheme(remember { themeOf(app) }) { Surface(Modifier.fillMaxSize()) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Blocked during work hours and Focus sessions.", style = MaterialTheme.typography.bodyMedium)
+                Text("Blocked around the clock; unblocking is harder in work hours.", style = MaterialTheme.typography.bodyMedium)
                 OutlinedTextField(text, { text = it; msg = null }, label = { Text("Sites, one per line (e.g. reddit.com)") }, modifier = Modifier.fillMaxWidth().heightIn(min = 140.dp))
                 msg?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
