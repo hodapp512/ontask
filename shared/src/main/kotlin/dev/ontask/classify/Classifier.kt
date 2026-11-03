@@ -37,7 +37,7 @@ fun domainOf(url: String?): String? {
 }
 
 fun isAway(s: Sample, awayAfterSec: Int): Boolean =
-    s.locked || s.asleep || (s.idleSec >= awayAfterSec && !s.mediaPlaying)
+    s.locked || s.asleep || (s.idleSec >= awayAfterSec && !s.mediaPlaying && !s.callActive)
 
 /**
  * Rules are evaluated user-first, then built-in; within each, title keyword beats domain beats app

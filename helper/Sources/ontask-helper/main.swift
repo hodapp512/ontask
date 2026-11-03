@@ -8,6 +8,8 @@
 
 import AppKit
 import ApplicationServices
+import CoreAudio
+import CoreMediaIO
 import CoreGraphics
 import Foundation
 import IOKit.pwr_mgt
@@ -48,6 +50,43 @@ func mediaPlaying() -> Bool {
         return false
     }
     return ((dict["PreventUserIdleDisplaySleep"] as? Int) ?? 0) > 0
+}
+
+/// True while any app is using a microphone or camera (a call or meeting): then you're at the computer even without
+/// touching it. Only asks whether a device is running; nothing is recorded.
+func callActive() -> Bool { microphoneInUse() || cameraInUse() }
+
+func microphoneInUse() -> Bool {
+    var addr = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDevices, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+    var size: UInt32 = 0
+    guard AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size) == noErr else { return false }
+    var ids = [AudioDeviceID](repeating: 0, count: Int(size) / MemoryLayout<AudioDeviceID>.size)
+    guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size, &ids) == noErr else { return false }
+    for id in ids {
+        // Only devices with input streams (microphones).
+        var streams = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyStreams, mScope: kAudioObjectPropertyScopeInput, mElement: kAudioObjectPropertyElementMain)
+        var n: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(id, &streams, 0, nil, &n) == noErr, n > 0 else { continue }
+        var running = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyDeviceIsRunningSomewhere, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+        var on: UInt32 = 0; var len = UInt32(MemoryLayout<UInt32>.size)
+        if AudioObjectGetPropertyData(id, &running, 0, nil, &len, &on) == noErr, on != 0 { return true }
+    }
+    return false
+}
+
+func cameraInUse() -> Bool {
+    var addr = CMIOObjectPropertyAddress(mSelector: CMIOObjectPropertySelector(kCMIOHardwarePropertyDevices), mScope: CMIOObjectPropertyScope(kCMIOObjectPropertyScopeGlobal), mElement: CMIOObjectPropertyElement(kCMIOObjectPropertyElementMain))
+    var size: UInt32 = 0
+    guard CMIOObjectGetPropertyDataSize(CMIOObjectID(kCMIOObjectSystemObject), &addr, 0, nil, &size) == noErr else { return false }
+    var ids = [CMIOObjectID](repeating: 0, count: Int(size) / MemoryLayout<CMIOObjectID>.size)
+    var used: UInt32 = 0
+    guard CMIOObjectGetPropertyData(CMIOObjectID(kCMIOObjectSystemObject), &addr, 0, nil, size, &used, &ids) == noErr else { return false }
+    for id in ids {
+        var running = CMIOObjectPropertyAddress(mSelector: CMIOObjectPropertySelector(kCMIODevicePropertyDeviceIsRunningSomewhere), mScope: CMIOObjectPropertyScope(kCMIOObjectPropertyScopeGlobal), mElement: CMIOObjectPropertyElement(kCMIOObjectPropertyElementMain))
+        var on: UInt32 = 0; var got: UInt32 = 0
+        if CMIOObjectGetPropertyData(id, &running, 0, nil, UInt32(MemoryLayout<UInt32>.size), &got, &on) == noErr, on != 0 { return true }
+    }
+    return false
 }
 
 func accessibilityTrusted() -> Bool { AXIsProcessTrusted() }
@@ -154,6 +193,7 @@ func sample(_ req: [String: Any]) -> Result<[String: Any], HelperError> {
         "locked": locked,
         "asleep": systemAsleep || screensAsleep,
         "mediaPlaying": mediaPlaying(),
+        "callActive": callActive(),
         "accessibilityTrusted": accessibilityTrusted(),
     ]
     if let app = NSWorkspace.shared.frontmostApplication {

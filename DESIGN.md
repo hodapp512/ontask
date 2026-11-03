@@ -74,7 +74,8 @@ This file describes how OnTask works now. **Why** each choice was made, and what
 
 ### Away detection
 - Signals: input idle time (**away after 2 minutes** with no keyboard or mouse; Settings), screen locked/asleep,
-  media playing (watching a video with no input ≠ away).
+  media playing (watching a video with no input ≠ away), microphone or camera in use (a call or meeting ≠ away; the
+  helper only asks whether a device is running, nothing is recorded).
 - On return after >10 min away during work hours: one-tap prompt — *Meeting / Break / Off-computer work / On my phone*. Off-computer work counts as work; On my phone counts as distracted.
 
 ### Unclassified sites and apps

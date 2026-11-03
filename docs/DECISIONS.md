@@ -449,3 +449,6 @@ when it comes to the front.*
 ## 2026-11-03 · Away after 2 minutes
 - Idle time before the Mac counts you as away is **2 minutes** (was 3; still adjustable in Settings). Shorter means
   less Mac time counted while you're actually on the phone or away, so the timeline and totals are closer to real.
+- **Not away while the microphone or camera is in use**, so a call or meeting without typing isn't lost (and doesn't
+  reset the break count) under the shorter threshold. Any app counts (Zoom, Meet, Teams, FaceTime, dictation).
+  *Rejected:* a longer threshold for everyone; a list of meeting apps (misses browser calls).

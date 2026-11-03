@@ -62,6 +62,8 @@ data class Sample(
     val locked: Boolean = false,
     val asleep: Boolean = false,
     val mediaPlaying: Boolean = false,
+    /** A microphone or camera is in use (a call or meeting): at the computer, even without touching it. */
+    val callActive: Boolean = false,
     val accessibilityTrusted: Boolean = false,
     val browserError: String? = null,
 )

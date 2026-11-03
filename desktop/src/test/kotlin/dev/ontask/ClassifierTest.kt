@@ -59,6 +59,7 @@ class ClassifierTest {
         assertEquals(true, isAway(Sample(idleSec = 500.0), 180))
         assertEquals(false, isAway(Sample(idleSec = 500.0, mediaPlaying = true), 180)) // watching a video
         assertEquals(false, isAway(Sample(idleSec = 10.0), 180))
+        assertEquals(false, isAway(Sample(idleSec = 500.0, callActive = true), 120)) // on a call, not typing
         assertEquals(true, isAway(Sample(locked = true), 180))
         assertEquals(true, isAway(Sample(asleep = true, mediaPlaying = true), 180))
     }
