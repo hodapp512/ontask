@@ -141,7 +141,8 @@ export function reportBody(r: DocumentData, edit?: { uid: string; categories: Ca
   const share = deepShare(totals);
   const bar = h("div", { class: "bar" }); bar.innerHTML = shown.map((l) => `<div style="width:${((totals[l.key] ?? 0) / sum) * 100}%;background:${l.color}"></div>`).join("");
   const day: DayClock | undefined = typeof r.dayStart === "number" && r.tz ? { start: r.dayStart, tz: r.tz } : undefined;
-  const tl = timelineEl((r.timeline ?? []) as Seg[], day);
+  // Away time isn't drawn (the gaps say it); Mac and phone stretches share the one bar.
+  const tl = timelineEl(((r.timeline ?? []) as Seg[]).filter((s) => s.k !== "A"), day);
   const sessions = (r.deepSessions ?? []).length;
   return h("div", { class: "stack" },
     h("div", { class: "row between" },

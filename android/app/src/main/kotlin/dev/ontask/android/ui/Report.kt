@@ -73,7 +73,8 @@ fun ReportBody(r: Map<String, Any?>, categories: List<Cat> = emptyList()) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             shown.forEach { l -> Row(verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(9.dp).background(l.color, CircleShape)); Text("  ${l.label} ${fmtDuration(t(l))}", style = MaterialTheme.typography.bodyMedium) } }
         }
-        Timeline((r["timeline"] as? List<Map<String, Any?>>) ?: emptyList(), dayStart, tz)
+        // Away time isn't drawn: the gaps say it.
+        Timeline(((r["timeline"] as? List<Map<String, Any?>>) ?: emptyList()).filter { it["k"] != "A" }, dayStart, tz)
         val sites = (r["topSites"] as? List<Map<String, Any?>>) ?: emptyList()
         if (sites.isNotEmpty()) {
             var open by remember { mutableStateOf(false) }
@@ -150,7 +151,7 @@ fun Timeline(segs: List<Map<String, Any?>>, dayStart: Long?, tz: String?) {
                 val x0 = ((s["a"].num() - a) / span * size.width).toFloat(); val x1 = ((s["b"].num() - a) / span * size.width).toFloat()
                 if (x1 < 0 || x0 > size.width) return@forEach
                 val dim = picked != null && picked !== s
-                drawRect(Lvl.of(s["k"] as? String).color.copy(alpha = if (dim) 0.5f else 1f), Offset(x0, if (s["d"] == "phone") size.height * 0.35f else 0f), Size(maxOf(x1 - x0, 1.5f), if (s["d"] == "phone") size.height * 0.65f else size.height))
+                drawRect(Lvl.of(s["k"] as? String).color.copy(alpha = if (dim) 0.5f else 1f), Offset(x0, 0f), Size(maxOf(x1 - x0, 1.5f), size.height))
             }
         }
         Row(Modifier.fillMaxWidth()) {

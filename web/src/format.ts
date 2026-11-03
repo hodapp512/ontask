@@ -23,7 +23,8 @@ export function deepShare(totals: Partial<Record<LevelKey, number>>): number | n
 
 /** Timeline segments: seconds from local midnight, k = D|M|W|A (Firestore forbids nested arrays, so these are maps). */
 /** A timeline stretch: seconds after midnight, level letter (color), category label (c), and what it was made of (t). */
-export type Seg = { a: number; b: number; k: string; c?: string; t?: { n: string; s: number }[] };
+/** [d]: "phone" for a stretch on the phone. */
+export type Seg = { a: number; b: number; k: string; c?: string; t?: { n: string; s: number }[]; d?: string };
 /** Whole hours around the data (at least 2 h); the full day when there is none. */
 /**
  * The hours to draw: around the time you were actually at the computer (as on the Mac). Away time doesn't widen it,
@@ -134,8 +135,8 @@ export function segAt(segs: Seg[], frac: number, win: [number, number] = timelin
 /** "Entertainment / News / Social · 2:10 PM–2:40 PM · 30m — youtube.com – Funny Cat Video 25m". */
 export function segDetail(s: Seg, day?: DayClock): string {
   const level = s.c ?? LEVELS.find((l) => l.short === s.k)?.label ?? "";
-  const what = (s.t ?? []).map((x) => `${x.n} ${fmtDuration(x.s)}`).join(", ") || (s.k === "A" ? "away from the computer" : "no app recorded");
-  return `${level} · ${clockAt(s.a, day)}–${clockAt(s.b, day)} · ${fmtDuration(s.b - s.a)} — ${what}`;
+  const what = (s.t ?? []).map((x) => `${x.n} ${fmtDuration(x.s)}`).join(", ") || "no app recorded";
+  return `${s.d === "phone" ? "📱 " : ""}${level} · ${clockAt(s.a, day)}–${clockAt(s.b, day)} · ${fmtDuration(s.b - s.a)} — ${what}`;
 }
 
 /** Dates everywhere read like "Nov 1, 2026" ([weekday]: "Sunday, Nov 1, 2026"). */

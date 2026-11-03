@@ -48,6 +48,7 @@ fun SettingsScreen(uid: String, notificationsOn: Boolean, onEnableNotifications:
             OutlinedButton(onSignOut) { Text("Sign out") }
         }
         TrackingCard()
+        UpdateCard()
         OCard("Notifications on this phone") {
             Muted(if (notificationsOn) "On ✓" else "Off")
             if (!notificationsOn) Button(onEnableNotifications) { Text("Turn on notifications") }
@@ -120,5 +121,28 @@ private fun TrackingCard() {
             Muted("Apps and pages your rules don't cover are judged by Jev: their name and title (never your screen) go through OnTask's server to Jev. Without this, OnTask asks you instead.")
             Button({ prefs.edit().putBoolean("jev.ok", true).apply(); jev = true }) { Text("OK, use Jev") }
         } else Muted("Unknown apps and pages are judged by Jev ✓")
+    }
+}
+
+/** This app's version, and installing a newer one without a cable. */
+@Composable
+private fun UpdateCard() {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    val (code, name) = remember { dev.ontask.android.Updater.installed(ctx) }
+    var newer by remember { mutableStateOf<dev.ontask.android.Updater.Release?>(null) }
+    var status by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) { newer = dev.ontask.android.Updater.check(ctx); if (newer == null) status = "Up to date." }
+    OCard("App") {
+        Muted("Version $name ($code)")
+        newer?.let { r ->
+            Text("Version ${r.name} is available" + (r.notes?.let { ": $it" } ?: "."))
+            Button({
+                if (!dev.ontask.android.Updater.canInstall(ctx)) dev.ontask.android.Updater.askPermission(ctx)
+                else scope.launch { status = "Downloading…"; status = dev.ontask.android.Updater.install(ctx)?.let { "Couldn't install: $it" } ?: "Confirm the install on the next screen." }
+            }) { Text("Install update") }
+            if (!dev.ontask.android.Updater.canInstall(ctx)) Muted("The first time, allow OnTask to install apps, then come back and tap Install update.")
+        }
+        status?.let { Muted(it) }
     }
 }

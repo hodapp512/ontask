@@ -50,6 +50,7 @@ class Tracker : AccessibilityService() {
     @Volatile private var title: String? = null
     private var lastRead = 0L
     private var lastUpload = 0L
+    private var lastUpdateCheck = 0L
     private val asked = HashSet<String>()
     private val judging = HashSet<String>()
     private var lastAsk = 0L
@@ -138,6 +139,8 @@ class Tracker : AccessibilityService() {
         } else prompts.tick(now, null, PhoneRules.isWork(now))
         prompts.bedtimeTick(now, power.isInteractive && !keyguard.isKeyguardLocked)
         prompts.checkinTick(power.isInteractive && !keyguard.isKeyguardLocked)
+        // A new version (published with the web app) is offered by notification, checked every 6 hours.
+        if (now - lastUpdateCheck >= 6 * 3600) { lastUpdateCheck = now; dev.ontask.android.Updater.check(this)?.let { dev.ontask.android.Updater.notify(this, it) } }
         if (now - lastUpload >= 120) { lastUpload = now; log.save(); runCatching { Uploader.upload(log, Cloud.deviceId(this)) } }
     }
 

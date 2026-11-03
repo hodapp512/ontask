@@ -20,8 +20,10 @@ android {
         applicationId = "dev.ontask.android"
         minSdk = 29
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        // Each commit is a newer version, so the app can tell an update from what it has.
+        val commits = providers.exec { commandLine("git", "rev-list", "--count", "HEAD") }.standardOutput.asText.get().trim().toInt()
+        versionCode = commits
+        versionName = "0.1.$commits"
     }
     signingConfigs {
         create("release") {
@@ -63,5 +65,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.activity:activity-compose:1.12.4")
+    // Play Services sign-in brings an old Fragment that breaks permission requests; a current one replaces it.
+    implementation("androidx.fragment:fragment:1.9.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
 }

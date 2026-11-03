@@ -163,3 +163,6 @@ Native app for your own phone (sideloaded; see docs/PLATFORMS.md).
 3. Firebase config (not in the repo):
    `firebase apps:sdkconfig ANDROID <appId> --out android/app/google-services.json`.
 4. Build and install over USB (USB debugging on): `cd android && ./gradlew installDebug`.
+5. Updates without a cable: commit, then `android/release.sh "what's new"`. It publishes the APK and
+   `version.json` under https://ontask-ed2df.web.app/android/; the phone checks every 6 hours (and in Settings → App)
+   and installs it after you confirm. The first time, Android asks you to allow OnTask to install apps.

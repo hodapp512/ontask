@@ -247,7 +247,8 @@ private fun Timeline(r: DailyReport, app: App?, onRelabel: () -> Unit) {
     fun runAt(x: Float): Run? {
         val t = r.dayStart + (from + x / width * span).toLong()
         val slack = (4f / width * span).toLong() // a few pixels, so thin stretches can be hovered too
-        return r.timeline.firstOrNull { t >= it.start && t < it.end } ?: r.timeline.filter { t >= it.start - slack && t < it.end + slack }.minByOrNull { minOf(kotlin.math.abs(t - it.start), kotlin.math.abs(t - it.end)) }
+        val shown = r.timeline.filter { it.level != Level.AWAY }
+        return shown.firstOrNull { t >= it.start && t < it.end } ?: shown.filter { t >= it.start - slack && t < it.end + slack }.minByOrNull { minOf(kotlin.math.abs(t - it.start), kotlin.math.abs(t - it.end)) }
     }
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         androidx.compose.foundation.layout.Box {
@@ -280,14 +281,13 @@ private fun Timeline(r: DailyReport, app: App?, onRelabel: () -> Unit) {
                     },
             ) {
                 drawRoundRect(track, size = size, cornerRadius = CornerRadius(6f))
-                r.timeline.forEach { run ->
+                // Away time isn't drawn: the gaps say it. Mac and phone stretches share the one bar.
+                r.timeline.filter { it.level != Level.AWAY }.forEach { run ->
                     val x0 = ((run.start - r.dayStart - from) / span * size.width).toFloat().coerceIn(0f, size.width)
                     val x1 = ((run.end - r.dayStart - from) / span * size.width).toFloat().coerceIn(0f, size.width)
                     if (x1 <= 0f || x0 >= size.width) return@forEach
                     val on = hover?.first == run
-                    // Phone stretches are drawn shorter, so the two devices can be told apart.
-                    val top = if (run.phone) size.height * 0.35f else 0f
-                    drawRect(levelColor(run.level).copy(alpha = if (hover == null || on) 1f else 0.55f), Offset(x0, top), Size(maxOf(x1 - x0, 1.5f), size.height - top))
+                    drawRect(levelColor(run.level).copy(alpha = if (hover == null || on) 1f else 0.55f), Offset(x0, 0f), Size(maxOf(x1 - x0, 1.5f), size.height))
                 }
             }
             hover?.let { (run, x) ->
@@ -300,7 +300,7 @@ private fun Timeline(r: DailyReport, app: App?, onRelabel: () -> Unit) {
                             }
                             Text("${clockRange(run.start, run.end)} · ${fmtDuration(run.seconds)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             val top = run.top(3)
-                            if (top.isEmpty()) Text(if (run.level == Level.AWAY) "Away from the computer" else "No app recorded", style = MaterialTheme.typography.bodySmall)
+                            if (top.isEmpty()) Text("No app recorded", style = MaterialTheme.typography.bodySmall)
                             top.forEach { (n, sec) -> Text("$n — ${fmtDuration(sec)}", style = MaterialTheme.typography.bodySmall, maxLines = 2) }
                         }
                     }

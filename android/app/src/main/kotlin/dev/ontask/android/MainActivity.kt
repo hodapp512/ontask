@@ -55,11 +55,15 @@ class MainActivity : ComponentActivity() {
     private var ask by mutableStateOf<Triple<String, String, Boolean>?>(null)
 
     override fun onNewIntent(intent: android.content.Intent) { super.onNewIntent(intent); takeAsk(intent) }
+    /** Opened from "OnTask update available": go straight to installing it. */
+    private var updating by mutableStateOf(false)
+
     /** A check-in opened from a notification (PLANNING, MIDDAY, EVENING). */
     private var checkin by mutableStateOf<String?>(null)
 
     private fun takeAsk(i: android.content.Intent?) {
         i?.getStringExtra(CHECKIN)?.let { checkin = it }
+        if (i?.getBooleanExtra(UPDATE, false) == true) updating = true
         if (i?.getStringExtra("type") == "evening_checkin_phone") checkin = "EVENING"
         val key = i?.getStringExtra(ASK_KEY) ?: return
         ask = Triple(key, i.getStringExtra(ASK_LABEL) ?: key, i.getBooleanExtra(ASK_ITEM, false))
@@ -77,6 +81,7 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val ASK_KEY = "ask.key"; const val ASK_LABEL = "ask.label"; const val ASK_ITEM = "ask.item"
         const val CHECKIN = "checkin"
+        const val UPDATE = "update"
     }
 
     @Composable
@@ -91,6 +96,10 @@ class MainActivity : ComponentActivity() {
             if (u == null) Login() else Signed(u)
         }
         ask?.let { (key, label, item) -> AskDialog(key, label, item) { ask = null } }
+        if (updating) LaunchedEffect(Unit) {
+            updating = false
+            if (!Updater.canInstall(this@MainActivity)) Updater.askPermission(this@MainActivity) else Updater.install(this@MainActivity)
+        }
     }
 
     /** "Which category is this?" for something the phone couldn't sort: the answer is saved for every device. */
