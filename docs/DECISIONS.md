@@ -565,3 +565,11 @@ when it comes to the front.*
   after a non-zero exit, so the menu-bar Quit never reopened it since that feature arrived (Oct 30).
 - **The evening check-in shows today's plan** at the top, so you can reflect against what you meant to do.
 
+
+## 2026-11-03 · Phone updates asked about when the app opens
+
+- **No notification for a new phone version.** Opening OnTask checks for one and asks: Install or Later (Later asks
+  again the next time it's opened). Settings → App still shows it. *Rejected:* the notification every 6 hours (an
+  interruption for something that can wait until you open the app).
+- **A phone check-in already done closes itself.** Opening the phone's check-in (from an old notification, or one
+  done on the Mac meanwhile) now checks both devices' records and closes if that check-in is done.

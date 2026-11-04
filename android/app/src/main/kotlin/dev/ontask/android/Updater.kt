@@ -7,8 +7,6 @@ import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.provider.Settings
-import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -17,7 +15,7 @@ import java.net.URL
 
 /**
  * Updates without a cable: new builds are published with the web app (ontask-ed2df.web.app/android/), and this
- * checks android/version.json, offers the update, downloads the APK and hands it to Android's installer (which asks
+ * checks android/version.json when the app is opened (no notification), offers the update, downloads the APK and hands it to Android's installer (which asks
  * you to confirm). The first time, Android asks you to allow OnTask to install apps.
  */
 object Updater {
@@ -34,15 +32,6 @@ object Updater {
             val j = JSONObject(c.inputStream.bufferedReader().readText())
             Release(j.getLong("versionCode"), j.getString("versionName"), j.optString("notes").ifBlank { null })
         }.getOrNull()?.takeIf { it.code > installed(ctx).first }
-    }
-
-    fun notify(ctx: Context, r: Release) {
-        val open = PendingIntent.getActivity(ctx, 7005, Intent(ctx, MainActivity::class.java).putExtra(MainActivity.UPDATE, true)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        val n = NotificationCompat.Builder(ctx, OnTaskApp.CHANNEL).setSmallIcon(R.drawable.ic_notify)
-            .setContentTitle("OnTask update available").setContentText("Version ${r.name}" + (r.notes?.let { ": $it" } ?: "") + ". Tap to install.")
-            .setContentIntent(open).setAutoCancel(true).build()
-        runCatching { NotificationManagerCompat.from(ctx).notify(7005, n) }
     }
 
     /** Whether Android lets OnTask install updates; if not, [askPermission] opens the switch for it. */

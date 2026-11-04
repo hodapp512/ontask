@@ -39,6 +39,20 @@ fun CheckinScreen(kind: String, onSaved: () -> Unit = {}, onDone: () -> Unit) {
     val uid = Cloud.uid ?: return
     var plan by remember { mutableStateOf("") }
     LaunchedEffect(Unit) { runCatching { Cloud.db.document("users/$uid/checkins/${dayKey()}").get().await().getString("plan") }.getOrNull()?.let { if (plan.isBlank()) plan = it } }
+    // Already done, on the Mac or on this phone (an old notification, or done meanwhile): close instead of asking again.
+    androidx.compose.runtime.DisposableEffect(kind) {
+        val key = kind.lowercase().removeSuffix("_short")
+        fun macDone(d: Map<String, Any?>) = when (key) {
+            "planning" -> !(d["plan"] as? String).isNullOrBlank()
+            "midday" -> d["midday"] != null
+            else -> d["evening"] == true
+        }
+        val regs = listOf(
+            Cloud.db.document("users/$uid/checkins/${dayKey()}").addSnapshotListener { s, _ -> if (macDone(s?.data ?: emptyMap())) onDone() },
+            Cloud.db.document("users/$uid/phoneCheckins/${dayKey()}").addSnapshotListener { s, _ -> if (s?.get(key) != null) onDone() },
+        )
+        onDispose { regs.forEach { it.remove() } }
+    }
     fun save(data: Map<String, Any?>) {
         Cloud.db.document("users/$uid/phoneCheckins/${dayKey()}").set(mapOf(kind.lowercase().removeSuffix("_short") to data + ("ts" to System.currentTimeMillis())), SetOptions.merge())
         onSaved(); onDone()

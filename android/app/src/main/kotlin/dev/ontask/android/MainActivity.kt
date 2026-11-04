@@ -46,6 +46,7 @@ import dev.ontask.android.ui.OnTaskTheme
 import dev.ontask.android.ui.PeopleScreen
 import dev.ontask.android.ui.PersonScreen
 import dev.ontask.android.ui.SettingsScreen
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -55,8 +56,9 @@ class MainActivity : ComponentActivity() {
     private var ask by mutableStateOf<Triple<String, String, Boolean>?>(null)
 
     override fun onNewIntent(intent: android.content.Intent) { super.onNewIntent(intent); takeAsk(intent) }
-    /** Opened from "OnTask update available": go straight to installing it. */
-    private var updating by mutableStateOf(false)
+    /** A newer version, found when the app is opened: asked about once per opening ("Later" waits for the next). */
+    private var update by mutableStateOf<Updater.Release?>(null)
+    private var updateAsked = false
 
     /** A check-in opened from a notification (PLANNING, MIDDAY, EVENING). */
     private var checkin by mutableStateOf<String?>(null)
@@ -66,7 +68,6 @@ class MainActivity : ComponentActivity() {
 
     private fun takeAsk(i: android.content.Intent?) {
         i?.getStringExtra(CHECKIN)?.let { checkin = it }
-        if (i?.getBooleanExtra(UPDATE, false) == true) updating = true
         if (i?.getStringExtra("type") == "evening_checkin_phone") checkin = "EVENING"
         val key = i?.getStringExtra(ASK_KEY) ?: return
         ask = Triple(key, i.getStringExtra(ASK_LABEL) ?: key, i.getBooleanExtra(ASK_ITEM, false))
@@ -79,12 +80,22 @@ class MainActivity : ComponentActivity() {
         notifGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
         takeAsk(intent)
         setContent { OnTaskTheme { Root() } }
+        // Updates used to be a notification; clear one left over from an older version.
+        runCatching { androidx.core.app.NotificationManagerCompat.from(this).cancel(7005) }
     }
+
+    override fun onStart() {
+        super.onStart()
+        if (updateAsked) return
+        updateAsked = true
+        lifecycleScope.launch { Updater.check(this@MainActivity)?.let { update = it } }
+    }
+
+    override fun onStop() { super.onStop(); if (update == null) updateAsked = false }
 
     companion object {
         const val ASK_KEY = "ask.key"; const val ASK_LABEL = "ask.label"; const val ASK_ITEM = "ask.item"
         const val CHECKIN = "checkin"
-        const val UPDATE = "update"
     }
 
     @Composable
@@ -100,10 +111,36 @@ class MainActivity : ComponentActivity() {
         }
         ask?.let { (key, label, item) -> AskDialog(key, label, item) { ask = null } }
         if (wantSort) LaunchedEffect(Unit) { wantSort = false; dev.ontask.android.ui.sortRows().takeIf { it.isNotEmpty() }?.let { sorting = it } }
-        if (updating) LaunchedEffect(Unit) {
-            updating = false
-            if (!Updater.canInstall(this@MainActivity)) Updater.askPermission(this@MainActivity) else Updater.install(this@MainActivity)
-        }
+        update?.let { r -> UpdateDialog(r) { update = null } }
+    }
+
+    /** "Version 0.1.106 is available": Install now, or Later (asked again the next time the app is opened). */
+    @Composable
+    private fun UpdateDialog(r: Updater.Release, onDone: () -> Unit) {
+        val scope = rememberCoroutineScope()
+        var status by remember { mutableStateOf<String?>(null) }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = onDone,
+            title = { Text("OnTask update") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Version ${r.name} is available" + (r.notes?.let { ": $it" } ?: "."))
+                    if (!Updater.canInstall(this@MainActivity)) Muted("The first time, allow OnTask to install apps, then come back and tap Install.")
+                    status?.let { Muted(it) }
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.Button({
+                    if (!Updater.canInstall(this@MainActivity)) Updater.askPermission(this@MainActivity)
+                    else scope.launch {
+                        status = "Downloading…"
+                        val err = Updater.install(this@MainActivity)
+                        if (err == null) onDone() else status = "Couldn't install: $err"
+                    }
+                }) { Text("Install") }
+            },
+            dismissButton = { androidx.compose.material3.TextButton(onDone) { Text("Later") } },
+        )
     }
 
     /** "Which category is this?" for something the phone couldn't sort: the answer is saved for every device. */
