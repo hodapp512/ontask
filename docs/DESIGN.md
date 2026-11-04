@@ -193,7 +193,7 @@ nothing under 25 min focused, then 5 min per 25 (at most 10 under an hour, 15 af
   row in place ("Add your task" until you type, lined up with the tasks; Enter adds it and opens the next). Past 5,
   "More than 5 is hard to finish — maybe save some for tomorrow." (no limit). Click a task's text to edit it in place, with
   the cursor where you clicked: Enter, clicking anywhere else or another task saves it; Escape puts it back. The
-  circled × is always there and removes the task (even mid-edit). Dragging ⋮⋮ reorders (on the phone, press and
+  red circled × (drawn, not a text character) is always there and removes the task (even mid-edit). Dragging ⋮⋮ reorders (on the phone, press and
   hold ⋮⋮). Finished tasks stay, struck through.
   - The morning plan shows the previous plan day ("Yesterday", or "Friday" on a Monday) with what got done; each
     unfinished task has *Add to today*. Yesterday's "change for tomorrow" is shown as a hint. *Start my day* starts

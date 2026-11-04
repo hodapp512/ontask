@@ -142,10 +142,7 @@ private fun PlanRow(date: String, items: List<PlanItem>, item: PlanItem, index: 
             item.text, Modifier.weight(1f).padding(start = 6.dp).alpha(if (item.done) 0.6f else 1f).plainClick { toggle() },
             style = MaterialTheme.typography.bodyLarge.copy(textDecoration = if (item.done) TextDecoration.LineThrough else null),
         )
-        if (editable) Box(
-            Modifier.padding(horizontal = 8.dp).size(24.dp).border(1.dp, MaterialTheme.colorScheme.outline, CircleShape).clip(CircleShape).plainClick { put(all.filter { it.id != item.id }) },
-            contentAlignment = Alignment.Center,
-        ) { Text("×", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        if (editable) DeleteIcon(Modifier.padding(horizontal = 8.dp).size(24.dp).clip(CircleShape).plainClick { put(all.filter { it.id != item.id }) })
     }
 }
 
@@ -225,5 +222,20 @@ fun YesterdayPlan(carry: Boolean = false) {
                 }
             }
         }
+    }
+}
+
+/** A red circle with an × drawn in it (lines, not a text character, so it sits exactly in the middle). */
+@Composable
+fun DeleteIcon(modifier: Modifier) {
+    val red = MaterialTheme.colorScheme.error
+    androidx.compose.foundation.Canvas(modifier) {
+        val w = 1.4.dp.toPx()
+        val r = size.minDimension / 2 - w / 2
+        drawCircle(red, r, style = androidx.compose.ui.graphics.drawscope.Stroke(w))
+        val a = r * 0.42f
+        val c = center
+        drawLine(red, androidx.compose.ui.geometry.Offset(c.x - a, c.y - a), androidx.compose.ui.geometry.Offset(c.x + a, c.y + a), w, androidx.compose.ui.graphics.StrokeCap.Round)
+        drawLine(red, androidx.compose.ui.geometry.Offset(c.x + a, c.y - a), androidx.compose.ui.geometry.Offset(c.x - a, c.y + a), w, androidx.compose.ui.graphics.StrokeCap.Round)
     }
 }

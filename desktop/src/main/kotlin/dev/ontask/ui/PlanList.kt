@@ -174,10 +174,22 @@ private fun InlineText(item: PlanItem, modifier: Modifier, onSave: (String) -> U
 /** × in a small circle: removes the task. */
 @Composable
 private fun DeleteButton(onClick: () -> Unit) {
-    androidx.compose.foundation.layout.Box(
-        Modifier.padding(horizontal = 6.dp).size(20.dp).border(1.dp, MaterialTheme.colorScheme.outline, CircleShape).clip(CircleShape).plainClick(onClick),
-        contentAlignment = Alignment.Center,
-    ) { Text("×", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    DeleteIcon(Modifier.padding(horizontal = 6.dp).size(20.dp).clip(CircleShape).plainClick(onClick))
+}
+
+/** A red circle with an × drawn in it (lines, not a text character, so it sits exactly in the middle). */
+@Composable
+fun DeleteIcon(modifier: Modifier) {
+    val red = MaterialTheme.colorScheme.error
+    androidx.compose.foundation.Canvas(modifier) {
+        val w = 1.4.dp.toPx()
+        val r = size.minDimension / 2 - w / 2
+        drawCircle(red, r, style = androidx.compose.ui.graphics.drawscope.Stroke(w))
+        val a = r * 0.42f
+        val c = center
+        drawLine(red, androidx.compose.ui.geometry.Offset(c.x - a, c.y - a), androidx.compose.ui.geometry.Offset(c.x + a, c.y + a), w, androidx.compose.ui.graphics.StrokeCap.Round)
+        drawLine(red, androidx.compose.ui.geometry.Offset(c.x + a, c.y - a), androidx.compose.ui.geometry.Offset(c.x - a, c.y + a), w, androidx.compose.ui.graphics.StrokeCap.Round)
+    }
 }
 
 /** The task being added: Enter adds it and opens a fresh one; clicking away adds what's typed and closes. */

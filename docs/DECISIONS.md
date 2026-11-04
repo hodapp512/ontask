@@ -615,3 +615,5 @@ when it comes to the front.*
   arrows, so the arrows don't move between Today and other days and sit nearer than the old 140 dp version.
 - **The new-task row lines up with the tasks and says "Add your task"** (was "Add your most important tasks
   here"); the gap under "Today's plan" is 5 px smaller.
+- **The delete mark is a drawn red circle with an ×**, centered exactly (the text "×" in an outlined circle sat
+  off-center and looked odd).
