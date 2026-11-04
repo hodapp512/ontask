@@ -636,3 +636,8 @@ when it comes to the front.*
   looked good in a browser but broke in IntelliJ's dark Markdown preview (clipped text, light text on pale boxes), so
   it was taken back out. Kept: readable state names in the drift diagram. *Rejected:* `%%{init}%%` themes and
   classDef colors, which depend on the viewer's theme and fonts.
+- **The main window stays back for every pop-up, including the category question** (which never takes focus, so
+  clicking it made macOS raise and focus the main window, and the old guard took that as you opening it). Now: while a
+  pop-up is up or just closed, OnTask coming forward sends the main window back; when the last pop-up closes, the
+  front goes back to the app you were in. Left alone: opening OnTask yourself, Cmd-Tab with no pop-up, and pop-ups
+  that appear while you're using the main window.

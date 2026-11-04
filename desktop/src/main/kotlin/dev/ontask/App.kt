@@ -95,6 +95,7 @@ class App(val dir: Path = dataDir()) {
         lastActive = { lastActiveTs.takeIf { it > 0 } }, plan = { priorities.forDate(it) }, halves = { dayHalves(it) }, heat = { heatYear() }, settingsSync = settingsSync, hooks = listOf(::syncBreaks, ::syncPlans, ::syncCheckins)) }
     /** Last moment you were at the Mac (not Away), for the daily report's "you've wrapped up" rule. */
     @Volatile private var lastActiveTs = 0L
+    @Volatile var lastOtherBundle: String? = null; private set
     private var wasAway = false
     val updates = dev.ontask.cloud.UpdateCheck()
     @Volatile var updateAvailable: dev.ontask.cloud.UpdateInfo? = null; private set
@@ -323,6 +324,8 @@ class App(val dir: Path = dataDir()) {
         val live = tracker.live.value
         if (!live.away) leaveBlockedTab(now, live.sample)
         if (!live.away) lastActiveTs = now
+        // The app you were in before any OnTask pop-up, to give the front back to when it closes.
+        live.sample?.bundleId?.takeIf { it.isNotBlank() && it != "dev.ontask.app" }?.let { lastOtherBundle = it }
         // Stepping away: sync now, so the server sees the final numbers and when you stopped.
         if (live.away && !wasAway && cloud.configured) { lastCloud = now; scope.launch(IO) { cloud.syncOnce(now, force = true) } }
         wasAway = live.away

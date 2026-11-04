@@ -293,9 +293,19 @@ suspend fun bringForwardAlone(popup: java.awt.Window) {
 object KeepMainBack {
     @Volatile var main: java.awt.Window? = null
     @Volatile private var allowUntil = 0L
+    /** The last app you were in other than OnTask (bundle id), to give the front back to when pop-ups close. */
+    @Volatile var lastOtherApp: () -> String? = { null }
+    private var popupsBefore = 0
+    /** When the main window was last the focused one with no pop-up up, and whether it was when the pop-ups came. */
+    private var mainFocusedAt = 0L
+    private var mainWasFront = false
+    @Volatile private var popupGoneAt = 0L
 
     /** The main window is being opened on purpose (menu bar, Dock, Spotlight): let it come forward. */
     fun allowMain() { allowUntil = System.currentTimeMillis() + 3000 }
+
+    /** OnTask's pop-ups showing now: every window but the main one (tiny helper windows aside). */
+    private fun popups() = java.awt.Window.getWindows().count { it !== main && it.isShowing && it.width > 60 && it.height > 60 }
 
     fun install() = runCatching {
         java.awt.Desktop.getDesktop().addAppEventListener(object : java.awt.desktop.AppForegroundListener {
@@ -305,13 +315,39 @@ object KeepMainBack {
             }
             override fun appMovedToBackground(e: java.awt.desktop.AppForegroundEvent) {}
         })
+        // When the last pop-up closes (answered, or closed with its X), macOS would make the main window the front
+        // one: send it back and give the front to the app you were in.
+        javax.swing.Timer(300) {
+            val n = popups(); val now = System.currentTimeMillis()
+            if (n == 0 && main?.isActive == true) mainFocusedAt = now
+            if (popupsBefore == 0 && n > 0) mainWasFront = now - mainFocusedAt < 700
+            if (popupsBefore > 0 && n == 0) { popupGoneAt = now; if (!mainWasFront) afterPopups() }
+            popupsBefore = n
+        }.start()
     }
 
+    private fun allowed() = System.currentTimeMillis() < allowUntil
+
+    /**
+     * OnTask came to the front. If that happened through a pop-up (one is showing, or one just closed), the main
+     * window goes back behind the app you were using, even if macOS made it the focused window. Otherwise (Cmd-Tab,
+     * clicking the main window itself) it's left alone.
+     */
     private fun pushBack() {
         val m = main ?: return
-        if (System.currentTimeMillis() < allowUntil || !m.isShowing) return
-        val active = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().activeWindow
-        if (active != null && active !== m) m.toBack()
+        if (allowed() || !m.isShowing) return
+        if (popups() == 0 && System.currentTimeMillis() - popupGoneAt > 2000) return
+        if (mainWasFront) return
+        m.toBack()
+    }
+
+    private fun afterPopups() {
+        val m = main ?: return
+        if (allowed()) return
+        // Only if OnTask is in front now (a pop-up you clicked made it so); otherwise nothing to undo.
+        if (java.awt.Window.getWindows().none { it.isActive || it.isFocused }) return
+        if (m.isShowing) m.toBack()
+        lastOtherApp()?.takeIf { it.isNotBlank() && it != "dev.ontask.app" }?.let { id -> runCatching { ProcessBuilder("open", "-b", id).start() } }
     }
 }
 

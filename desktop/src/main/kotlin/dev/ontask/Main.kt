@@ -66,6 +66,7 @@ fun main() {
         // Opening OnTask again (Finder, Dock, Spotlight) while it runs in the menu bar shows the window.
         LaunchedEffect(Unit) {
             runCatching { java.awt.Desktop.getDesktop().addAppEventListener(java.awt.desktop.AppReopenedListener { dev.ontask.ui.KeepMainBack.allowMain(); Nav.open(null); visible = true }) }
+            dev.ontask.ui.KeepMainBack.lastOtherApp = { app.lastOtherBundle }
             dev.ontask.ui.KeepMainBack.install()
         }
         AppOverlays(app)
