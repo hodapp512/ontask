@@ -613,3 +613,5 @@ when it comes to the front.*
   Tasks are 5 px apart, with a little more room under "Today's plan" and less above *+ Add task*.
 - **Date arrows: fixed again, closer.** The date button is a fixed 130 dp (just fits "Sep 30, 2026") with narrow
   arrows, so the arrows don't move between Today and other days and sit nearer than the old 140 dp version.
+- **The new-task row lines up with the tasks and says "Add your task"** (was "Add your most important tasks
+  here"); the gap under "Today's plan" is 5 px smaller.

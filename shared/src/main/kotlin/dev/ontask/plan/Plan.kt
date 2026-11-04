@@ -9,7 +9,7 @@ data class PlanItem(val id: String, val text: String, val done: Boolean = false)
 
 object Plan {
     const val SOFT_MAX = 5
-    const val ADD_HINT = "Add your most important tasks here"
+    const val ADD_HINT = "Add your task"
     const val TOO_MANY = "More than 5 is hard to finish — maybe save some for tomorrow."
 
     fun newId(): String = java.util.UUID.randomUUID().toString().take(8)

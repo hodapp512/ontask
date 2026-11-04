@@ -185,6 +185,8 @@ private fun DeleteButton(onClick: () -> Unit) {
 private fun NewRow(app: App, date: LocalDate, onEnd: () -> Unit) {
     var round by remember { mutableStateOf(0) }
     Row(Modifier.fillMaxWidth().height(ROW_DP.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        // An invisible handle, so the new task lines up with the others.
+        Text("⋮⋮", Modifier.padding(end = 4.dp).alpha(0f), style = MaterialTheme.typography.bodySmall)
         Checkbox(false, null, Modifier.size(28.dp).alpha(0.4f))
         key(round) {
             TaskField("", Modifier.weight(1f).padding(start = 6.dp), placeholder = Plan.ADD_HINT,

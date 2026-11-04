@@ -144,7 +144,7 @@ private fun TodayCard(app: App, date: LocalDate, onReflect: () -> Unit) {
             Text("Today's plan", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             if (!planned && any) Button({ app.checkins.save(dev.ontask.plan.Checkin(date, "planning", App.nowSec(), null, null, null, null, null, false)); app.finishPlanning() }) { Text("Start my day") }
         }
-        androidx.compose.foundation.layout.Spacer(Modifier.size(10.dp))
+        androidx.compose.foundation.layout.Spacer(Modifier.size(5.dp))
         PlanList(app, date, editable = true)
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Row(verticalAlignment = Alignment.CenterVertically) {

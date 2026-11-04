@@ -100,6 +100,7 @@ fun PlanList(date: String = dayKey(), editable: Boolean = false, empty: String? 
             }
             if (editable) {
                 if (adding) Row(Modifier.fillMaxWidth().height(40.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("⋮⋮", Modifier.padding(end = 4.dp).alpha(0f)) // lines up with the tasks' handles
                     Checkbox(false, null, Modifier.size(36.dp).alpha(0.4f))
                     var round by remember { mutableStateOf(0) }
                     val all by rememberUpdatedState(items)
