@@ -551,3 +551,10 @@ when it comes to the front.*
 - **No pop-up brings the main window forward,** not only drift prompts: whenever OnTask comes to the front through a
   pop-up, the main window goes back behind the app you were using.
 
+## 2026-11-03 · Timeline glances unlisted; date arrows
+
+- **Glances under 15 s aren't listed in a stretch's hover or details** (the "also: …" lines and "Also in this
+  stretch" are gone). They were in passing; listing them was clutter nobody asked for. They still count in totals.
+- **The date arrows on Home sit right next to the date**: the date button is sized to its text, so the arrows move a
+  little when the date gets longer. *Rejected:* a fixed width (kept them still, but too far apart).
+

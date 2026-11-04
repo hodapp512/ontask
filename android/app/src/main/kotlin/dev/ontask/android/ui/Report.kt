@@ -167,12 +167,9 @@ fun Timeline(raw: List<Map<String, Any?>>, dayStart: Long?, tz: String?, refs: M
         picked?.let { s ->
             Text((if (s["d"] == "phone") "📱 " else "") + "${s["c"] ?: Lvl.of(s["k"] as? String).label} · ${clockAt(s["a"].num(), dayStart, tz)}–${clockAt(s["b"].num(), dayStart, tz)}",
                 style = MaterialTheme.typography.bodySmall)
-            @Suppress("UNCHECKED_CAST") val also = (s["also"] as? List<Map<String, Any?>>).orEmpty()
-            @Suppress("UNCHECKED_CAST") val rows = (s["t"] as? List<Map<String, Any?>>).orEmpty().map { it to false } +
-                also.flatMap { g -> (g["t"] as? List<Map<String, Any?>>).orEmpty().map { it to true } }
-            rows.forEachIndexed { i, (x, glance) ->
-                val n = x["n"] as? String ?: return@forEachIndexed
-                if (glance && (i == 0 || !rows[i - 1].second)) Text("Also in this stretch", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            // Glances drawn as part of this stretch aren't listed: they were in passing.
+            @Suppress("UNCHECKED_CAST") (s["t"] as? List<Map<String, Any?>>)?.forEach { x ->
+                val n = x["n"] as? String ?: return@forEach
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("$n · ${fmtDuration(x["s"].num())}", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
                     refs[n]?.let { ref -> if (categories.isNotEmpty()) RefMenu(ref, categories) }

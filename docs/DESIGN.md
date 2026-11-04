@@ -299,8 +299,8 @@ re-marked as in or out of work hours.
 ### Daily report
 Focused / mixed / wasted / away totals; timeline strip colored by level, spanning only the time at the computer (away
 time and stray night-time minutes don't widen it), hover/tap for what you did. **Glances under 15 s** (switching
-windows) are drawn as part of the stretch around them, listed under "Also in this stretch" with their own category
-(Mac, phone, partner page); they still count in the totals. On the Mac, click a stretch for a
+windows) are drawn as part of the stretch around them and not listed in its hover or details (Mac, phone, partner
+page); they still count in the totals and in Where the time went. On the Mac, click a stretch for a
 pop-up with its time and everything in it, each with a category dropdown (same as Where the time went). Zoom with a
 trackpad pinch, ⌘-scroll or − / + / Reset; move along the day with a two-finger sideways swipe or a drag; up/down
 scrolling scrolls the page; focused sessions of 25+ min (count, longest); distraction events; regular vs. work unblocks; check-ins done/missed; priorities vs. where time went; worst hour; weekly heat map by hour.

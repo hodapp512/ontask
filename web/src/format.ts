@@ -165,8 +165,7 @@ export function segAt(segs: Seg[], frac: number, win: [number, number] = timelin
 export function segDetail(s: Seg, day?: DayClock): string {
   const level = s.c ?? LEVELS.find((l) => l.short === s.k)?.label ?? "";
   const what = (s.t ?? []).map((x) => `${x.n} ${fmtDuration(x.s)}`).join(", ") || "no app recorded";
-  const also = (s.also ?? []).flatMap((g) => g.t ?? []).map((x) => `${x.n} ${fmtDuration(x.s)}`).join(", ");
-  return `${s.d === "phone" ? "📱 " : ""}${level} · ${clockAt(s.a, day)}–${clockAt(s.b, day)} · ${fmtDuration(s.b - s.a)} — ${what}${also ? ` (also: ${also})` : ""}`;
+  return `${s.d === "phone" ? "📱 " : ""}${level} · ${clockAt(s.a, day)}–${clockAt(s.b, day)} · ${fmtDuration(s.b - s.a)} — ${what}`;
 }
 
 /** Dates everywhere read like "Nov 1, 2026" ([weekday]: "Sunday, Nov 1, 2026"). */

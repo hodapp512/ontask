@@ -76,10 +76,10 @@ fun DateBar(date: LocalDate, onDate: (LocalDate) -> Unit, onRefresh: () -> Unit)
     Row(verticalAlignment = Alignment.CenterVertically) {
         // Narrow arrow buttons, so they sit close to the date.
         val arrow = PaddingValues(horizontal = 4.dp)
-        TextButton({ onDate(date.minusDays(1)) }, Modifier.widthIn(min = 32.dp), contentPadding = arrow) { Text("◀") }
-        // A fixed width, so the arrows stay put whatever the date ("Today" or "Nov 30, 2026").
-        TextButton({ picking = true }, Modifier.width(140.dp), contentPadding = arrow) { Text(if (date == LocalDate.now()) "📅 Today" else "📅 " + fmtDate(date), maxLines = 1) }
-        TextButton({ onDate(date.plusDays(1)) }, Modifier.widthIn(min = 32.dp), enabled = date < LocalDate.now(), contentPadding = arrow) { Text("▶") }
+        TextButton({ onDate(date.minusDays(1)) }, Modifier.widthIn(min = 28.dp), contentPadding = arrow) { Text("◀") }
+        // Sized to the date, so the arrows sit right next to it (they move a little as the date gets longer).
+        TextButton({ picking = true }, contentPadding = arrow) { Text(if (date == LocalDate.now()) "📅 Today" else "📅 " + fmtDate(date), maxLines = 1) }
+        TextButton({ onDate(date.plusDays(1)) }, Modifier.widthIn(min = 28.dp), enabled = date < LocalDate.now(), contentPadding = arrow) { Text("▶") }
     }
     if (picking) {
         val state = rememberDatePickerState(
@@ -320,7 +320,6 @@ private fun Timeline(r: DailyReport, app: App?, onRelabel: () -> Unit) {
                             val top = run.top(3)
                             if (top.isEmpty()) Text("No app recorded", style = MaterialTheme.typography.bodySmall)
                             top.forEach { (n, sec) -> Text("$n — ${fmtDuration(sec)}", style = MaterialTheme.typography.bodySmall, maxLines = 2) }
-                            run.absorbed.flatMap { it.top(1) }.take(3).forEach { (n, sec) -> Text("also: $n ${fmtDuration(sec)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1) }
                         }
                     }
                 }
@@ -362,18 +361,15 @@ private fun RunDetails(run: Run, app: App?, onClose: () -> Unit, onRelabel: () -
                 val items = run.top(Int.MAX_VALUE)
                 if (items.isEmpty()) Text("No app recorded")
                 Column(Modifier.heightIn(max = 380.dp).verticalScroll(androidx.compose.foundation.rememberScrollState())) {
-                    // The stretch's own items, then glances drawn as part of it, each with its own category.
-                    val rows = items.map { run to it } + run.absorbed.flatMap { a -> a.top(Int.MAX_VALUE).map { a to it } }
-                    rows.forEachIndexed { i, (owner, item) ->
-                        val (name, sec) = item
-                        if (i == items.size && i > 0) Text("Also in this stretch", Modifier.padding(top = 8.dp, bottom = 2.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        else if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    // Glances drawn as part of this stretch aren't listed: they were in passing.
+                    items.forEachIndexed { i, (name, sec) ->
+                        if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text((if (owner.phone && !run.phone) "📱 " else "") + name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, maxLines = 2)
+                            Text(name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, maxLines = 2)
                             Text(fmtDuration(sec), Modifier.padding(horizontal = 8.dp), style = MaterialTheme.typography.bodySmall)
-                            val ref = owner.refs[name]; val cat = owner.category ?: Category.UNKNOWN
+                            val ref = run.refs[name]; val cat = run.category ?: Category.UNKNOWN
                             if (app != null && ref != null) CategoryPicker(app, ref.subject, cat, onRelabel, item = ref.itemKey?.let { it to ref.title })
-                            else { Dot(levelColor(owner.level), 8); Text("  ${dev.ontask.report.runLabel(owner)}", style = MaterialTheme.typography.bodySmall) }
+                            else { Dot(levelColor(run.level), 8); Text("  ${dev.ontask.report.runLabel(run)}", style = MaterialTheme.typography.bodySmall) }
                         }
                     }
                 }
