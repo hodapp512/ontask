@@ -251,6 +251,21 @@ nothing under 25 min focused, then 5 min per 25 (at most 10 under an hour, 15 af
 
 ## Reports & diagnostics
 
+### Your patterns
+
+A card on Home above the heat map (Mac and phone), for you only, inspired by Marinara's daily distribution.
+- **Focused | Wasted | Screen time** (green, red, blue; Screen time = everything but Away). Focused by default.
+- **Numbers** for that metric: Today · This week (from Monday) · This month (from the 1st) · Since <first day>, each
+  with its daily average.
+- **Bars** over the whole day (12a–12a, work hours lightly shaded): each is the average minutes per day in that slot.
+  Ranges: This week · Last 7 days · This month · Last 30 days (default) · 6 months · Year. Slots: 15 min (Mac only),
+  30 min, 1 hr (default), 2 hr. Every day in the range counts, empty ones as zero, but not before the first tracked
+  day; today counts only for slots that have started. Hover (Mac) or tap (phone) a bar: "9–10 AM · 18 min focused on
+  average · on 14 of 21 days".
+- Data: the merged `reports/{date}` timelines (both devices, overlaps once; stretches under a minute were dropped when
+  uploaded). The Mac fetches only the `timeline` field of every day, at most every 2 minutes. The metric, range and
+  slot size are remembered on each device. Math in `shared/…/report/Patterns.kt`.
+
 ### Focus over the year (heat map)
 At the bottom of Home (Mac and phone) and in the partner's view: 52 weeks of squares, weeks as columns starting
 Sunday, shaded by **effective focus** = focused time (whole day, so evening work counts) × (0.5 + 0.5 × work-hours

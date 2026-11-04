@@ -241,7 +241,7 @@ flowchart LR
     MS <--> SYNC
     PS <--> SYNC
     MST --> PH[Phone reads breaks, due check-in, work hours]
-    RD --> VIEW[Home on Mac and phone,<br/>partner view]
+    RD --> VIEW[Home on Mac and phone,<br/>Your patterns, partner view]
 ```
 
 - Raw activity and screenshots never leave the device; only day reports, settings, verdicts and events do.

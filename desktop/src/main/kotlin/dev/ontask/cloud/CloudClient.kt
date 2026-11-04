@@ -166,6 +166,18 @@ class CloudClient(private val cfg: CloudConfig, private val keychain: Keychain? 
         return (json.parseToJsonElement(r.body()) as JsonArray).mapNotNull { (it.jsonObject["document"] as? JsonObject)?.get("fields") as? JsonObject }.map { FsValue.decodeFields(it) }
     }
 
+    /** Every document in [parent]/[collectionId] (up to 2,000), only [fields]: document id to fields. */
+    fun listFields(parent: String, collectionId: String, fields: List<String>): List<Pair<String, JsonObject>> {
+        val sel = fields.joinToString(",") { """{"fieldPath":"$it"}""" }
+        val q = """{"structuredQuery":{"select":{"fields":[$sel]},"from":[{"collectionId":"$collectionId"}],"limit":2000}}"""
+        val r = send(HttpRequest.newBuilder(URI.create("${cfg.firestoreBase}/$parent:runQuery")).header("Content-Type", "application/json").header("Authorization", "Bearer ${token()}").POST(HttpRequest.BodyPublishers.ofString(q)).build())
+        if (r.statusCode() !in 200..299) throw CloudException("Query ${r.statusCode()}: ${r.body().take(300)}", r.statusCode())
+        return (json.parseToJsonElement(r.body()) as JsonArray).mapNotNull { e ->
+            val d = e.jsonObject["document"] as? JsonObject ?: return@mapNotNull null
+            d["name"]!!.jsonPrimitive.content.substringAfterLast('/') to ((d["fields"] as? JsonObject)?.let { FsValue.decodeFields(it) } ?: JsonObject(emptyMap()))
+        }
+    }
+
     /** Documents in [parent]/[collectionId] whose integer [field] > [after], oldest first (up to 200). */
     fun queryAfter(parent: String, collectionId: String, field: String, after: Long): List<JsonObject> {
         val q = """{"structuredQuery":{"from":[{"collectionId":"$collectionId"}],"where":{"fieldFilter":{"field":{"fieldPath":"$field"},"op":"GREATER_THAN","value":{"integerValue":"$after"}}},"orderBy":[{"field":{"fieldPath":"$field"},"direction":"ASCENDING"}],"limit":200}}"""

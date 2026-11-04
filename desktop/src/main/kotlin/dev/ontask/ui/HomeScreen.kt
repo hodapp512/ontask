@@ -105,6 +105,7 @@ fun HomeScreen(app: App) {
             } ?: Text("Loading…")
         }
         summary()
+        PatternsCard(app, today, tick)
         HeatMapCard(app, today, tick) { d -> date = d; followToday = d == LocalDate.now() }
     }
     if (unblocking) UnblockPickerWindow(app, app.blocking.currentlyBlocked(App.nowSec())) { unblocking = false; tick++ }

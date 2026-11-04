@@ -623,6 +623,31 @@ class App(val dir: Path = dataDir()) {
         }
     }
 
+    // ---- Your patterns ---------------------------------------------------------------------------------------
+
+    /** Every merged day's timeline (both devices), by date; refreshed at most every 2 minutes. */
+    @Volatile private var patternCache: Pair<Long, Map<LocalDate, List<dev.ontask.report.Patterns.Seg>>>? = null
+
+    fun patternDays(): Map<LocalDate, List<dev.ontask.report.Patterns.Seg>> {
+        patternCache?.let { (at, m) -> if (System.currentTimeMillis() - at < 120_000) return m }
+        val c = cloud.client()?.takeIf { it.signedIn } ?: return patternCache?.second ?: emptyMap()
+        val m = runCatching {
+            val uid = c.ensureUid()
+            c.listFields("users/$uid", "reports", listOf("timeline")).mapNotNull { (id, f) ->
+                val d = runCatching { LocalDate.parse(id) }.getOrNull() ?: return@mapNotNull null
+                val segs = (f["timeline"] as? kotlinx.serialization.json.JsonArray)?.mapNotNull { e ->
+                    val o = e as? kotlinx.serialization.json.JsonObject ?: return@mapNotNull null
+                    fun n(k: String) = (o[k] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toDoubleOrNull()?.toInt()
+                    val k = (o["k"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.firstOrNull() ?: return@mapNotNull null
+                    dev.ontask.report.Patterns.Seg(n("a") ?: return@mapNotNull null, n("b") ?: return@mapNotNull null, k)
+                } ?: emptyList()
+                d to segs
+            }.toMap()
+        }.getOrElse { return patternCache?.second ?: emptyMap() }
+        patternCache = System.currentTimeMillis() to m
+        return m
+    }
+
     /** The day was started from Home: the morning plan's window closes. */
     fun finishPlanning() = finishPromptIf(Prompt.PLANNING, Prompt.PLANNING_SHORT)
     private fun finishPromptIf(vararg p: Prompt) { if (_duePrompt.value in p) _duePrompt.value = null }

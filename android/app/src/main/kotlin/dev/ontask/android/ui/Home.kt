@@ -71,6 +71,7 @@ fun HomeScreen(uid: String, name: String) {
                 Row(Modifier.fillMaxWidth()) { Text("Evening check-in", Modifier.weight(1f)); Muted(if (done) "Done ✓" else "Around ${clock(ranges.last().second)}") }
             }
         }
+        PatternsCard(uid, ranges)
         HeatCard(heat?.data)
     }
 }

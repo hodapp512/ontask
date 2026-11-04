@@ -617,3 +617,16 @@ when it comes to the front.*
   here"); the gap under "Today's plan" is 5 px smaller.
 - **The delete mark is a drawn red circle with an ×**, centered exactly (the text "×" in an outlined circle sat
   off-center and looked odd).
+
+## 2026-11-04 · Your patterns (grilled)
+
+- **A "Your patterns" card above the heat map** on Mac and phone, after Marinara's daily distribution: when in the day
+  you're focused, wasting time, or on a screen at all.
+- **Focused | Wasted | Screen time**, one at a time. Screen time was added so total use can be seen too.
+- **Ranges are buttons, not a calendar/rolling switch:** This week · Last 7 days · This month · Last 30 days · 6
+  months · Year. *Rejected:* one Calendar | Rolling switch (an extra control to understand).
+- **Every day counts toward the average, including empty ones,** but the range starts no earlier than the first
+  tracked day (so Year equals Week for now). Today counts only for slots already started.
+- **Default slot 1 hr**; 15 min only on the Mac (96 bars are too thin on a phone).
+- **Numbers stay calendar-based** (Today, This week, This month, Since the start), independent of the range buttons.
+- **Both devices, from the merged day**, so overlaps count once. Just for you; partners don't see it.
