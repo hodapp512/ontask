@@ -630,3 +630,5 @@ when it comes to the front.*
 - **Default slot 1 hr**; 15 min only on the Mac (96 bars are too thin on a phone).
 - **Numbers stay calendar-based** (Today, This week, This month, Since the start), independent of the range buttons.
 - **Both devices, from the merged day**, so overlaps count once. Just for you; partners don't see it.
+- **Nudge windows fit their content** (height sized to what's in them) instead of a fixed height plus a guess for
+  the plan: the guess was short and hid the reminder's *Back to work / I'm working* buttons.

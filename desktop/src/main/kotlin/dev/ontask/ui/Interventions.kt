@@ -86,7 +86,7 @@ fun InterventionWindow(app: App, iv: Intervention, mode: ThemeMode) {
             val size = DpSize(540.dp, ((if (iv.reminder) 200 else if (iv.breakSec > 0) 260 else 300) + planHeight(app)).dp)
             Window(
                 onCloseRequest = { app.interventionClosed() }, title = "OnTask — are you on task?", alwaysOnTop = true, resizable = false,
-                state = rememberWindowState(size = size, position = centeredOnActiveScreen(size)),
+                state = rememberWindowState(size = DpSize(540.dp, androidx.compose.ui.unit.Dp.Unspecified), position = centeredOnActiveScreen(size)),
             ) {
                 LaunchedEffect(Unit) { bringForwardAlone(window) }
                 OnTaskTheme(mode) { Surface(Modifier.fillMaxSize().clearFocusOnTap()) { if (iv.reminder) Reminder(app, iv) else if (iv.breakSec > 0) BreakCheck(app, iv) else StepOne(app, iv) } }
@@ -207,8 +207,8 @@ private fun PlanBox(app: App) {
     }
 }
 
-/** Extra window height for today's plan in a fixed-size nudge. */
-private fun planHeight(app: App) = app.priorities.itemsToday(App.nowSec()).size.let { if (it == 0) 0 else 36 + 30 * it }
+/** Roughly how much taller today's plan makes a nudge (only to center it: the window fits its content). */
+private fun planHeight(app: App) = app.priorities.itemsToday(App.nowSec()).size.let { if (it == 0) 0 else 50 + 35 * it }
 
 /** "Back to work": OnTask then checks you switch (see Ladder.backToWork). */
 @Composable
@@ -334,7 +334,7 @@ fun BreakCardWindow(app: App, c: App.BreakCard, mode: ThemeMode) {
     val size = DpSize(500.dp, (240 + planHeight(app)).dp)
     Window(
         onCloseRequest = { app.breakCardClosed() }, title = "OnTask", alwaysOnTop = true, resizable = false,
-        state = rememberWindowState(size = size, position = centeredOnActiveScreen(size)),
+        state = rememberWindowState(size = DpSize(500.dp, androidx.compose.ui.unit.Dp.Unspecified), position = centeredOnActiveScreen(size)),
     ) {
         LaunchedEffect(Unit) { bringForwardAlone(window) }
         OnTaskTheme(mode) { Surface(Modifier.fillMaxSize().clearFocusOnTap()) {
