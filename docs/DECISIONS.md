@@ -632,3 +632,6 @@ when it comes to the front.*
 - **Both devices, from the merged day**, so overlaps count once. Just for you; partners don't see it.
 - **Nudge windows fit their content** (height sized to what's in them) instead of a fixed height plus a guess for
   the plan: the guess was short and hid the reminder's *Back to work / I'm working* buttons.
+- **FLOWS.md diagrams are styled:** a shared light theme, rounded boxes, questions as white pills (not big
+  diamonds), and colors by meaning (green on track, amber nudge, red drifting, blue partner/server, gray quiet), with
+  a legend. Every diagram carries the same `%%{init}%%` line and classDefs; keep them when adding one.
