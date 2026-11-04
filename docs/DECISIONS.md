@@ -648,3 +648,7 @@ when it comes to the front.*
   prompt; a 12:40 prompt had no way to say so).
 - **"Still at lunch":** for 30 minutes after lunch runs out (45 min), every drift prompt and the "Lunch is over" card
   offer it: 15 more minutes, as often as needed (Mac).
+- **Buttons come before today's plan in the small pop-ups** (Are you on task?, the reminder, Is this a break?, break
+  over), and those windows have a height that fits the plan and scroll if needed. Sizing a window to its content ran
+  before the plan was drawn, so the window came out short and the button row, which can't be half-shown, vanished.
+  Checked on screen with `./gradlew previewWindows`.

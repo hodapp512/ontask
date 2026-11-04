@@ -134,3 +134,12 @@ compose.desktop {
         }
     }
 }
+
+// Opens real prompt windows on screen and captures them (./gradlew previewWindows -Pwhich=step1|reminder|break),
+// to check layout before shipping: headless renders can't show window sizing problems.
+tasks.register<JavaExec>("previewWindows") {
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("dev.ontask.PreviewWindowsKt")
+    systemProperty("ontask.noCloud", "true")
+    args(project.findProperty("which")?.toString() ?: "step1")
+}

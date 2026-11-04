@@ -86,7 +86,7 @@ fun InterventionWindow(app: App, iv: Intervention, mode: ThemeMode) {
             val size = DpSize(540.dp, ((if (iv.reminder) 200 else if (iv.breakSec > 0) 260 else 300) + planHeight(app)).dp)
             Window(
                 onCloseRequest = { app.interventionClosed() }, title = "OnTask — are you on task?", alwaysOnTop = true, resizable = false,
-                state = rememberWindowState(size = DpSize(540.dp, androidx.compose.ui.unit.Dp.Unspecified), position = centeredOnActiveScreen(size)),
+                state = rememberWindowState(size = size, position = centeredOnActiveScreen(size)),
             ) {
                 LaunchedEffect(Unit) { bringForwardAlone(window) }
                 OnTaskTheme(mode) { Surface(Modifier.fillMaxSize().clearFocusOnTap()) { if (iv.reminder) Reminder(app, iv) else if (iv.breakSec > 0) BreakCheck(app, iv) else StepOne(app, iv) } }
@@ -208,7 +208,7 @@ private fun PlanBox(app: App) {
     }
 }
 
-/** Roughly how much taller today's plan makes a nudge (only to center it: the window fits its content). */
+/** How much taller today's plan makes a small nudge window (its label, 35 dp a task, padding). */
 private fun planHeight(app: App) = app.priorities.itemsToday(App.nowSec()).size.let { if (it == 0) 0 else 50 + 35 * it }
 
 /** "Back to work": OnTask then checks you switch (see Ladder.backToWork). */
@@ -219,15 +219,15 @@ private fun BackButton(app: App) = Button({ app.backToWork() }) { Text("Back to 
 @Composable
 private fun Reminder(app: App, iv: Intervention) {
     val site = iv.site?.let { remember(it) { dev.ontask.classify.Pages.siteName(it) ?: it } } ?: "it"
-    Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Still on $site. Back to work?", style = MaterialTheme.typography.headlineSmall)
         Text("You said you'd get back to it. Switch to your work now.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        PlanBox(app)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             BackButton(app)
             OutlinedButton({ app.interventionWork() }) { Text("I'm working") }
             if (iv.lunch) OutlinedButton({ app.interventionLunch() }) { Text(if (iv.stillLunch) "Still at lunch" else "I'm at lunch") }
         }
+        PlanBox(app)
     }
 }
 
@@ -235,23 +235,23 @@ private fun Reminder(app: App, iv: Intervention) {
 @Composable
 private fun BreakCheck(app: App, iv: Intervention) {
     val min = iv.breakSec / 60
-    Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Is this a break?", style = MaterialTheme.typography.headlineSmall)
         Text("You've focused ${fmtDuration(iv.focusedSec)}, so you've got $min minutes.", style = MaterialTheme.typography.bodyLarge)
         BreakTotals(iv.breaksHourSec, iv.breaksTodaySec)
-        PlanBox(app)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Button({ app.interventionBreak() }) { Text("Yes, $min-min break") }
             OutlinedButton({ app.interventionWork() }) { Text("I'm working") }
             OutlinedButton({ app.backToWork() }) { Text("Back to work") }
             if (iv.lunch) OutlinedButton({ app.interventionLunch() }) { Text(if (iv.stillLunch) "Still at lunch" else "Lunch") }
         }
+        PlanBox(app)
     }
 }
 
 @Composable
 private fun StepOne(app: App, iv: Intervention) {
-    Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Are you on task?", style = MaterialTheme.typography.headlineSmall)
         Text("Is this what you meant to be doing right now?", style = MaterialTheme.typography.bodyLarge)
         if (iv.toEarnSec > 0) Text(
@@ -259,12 +259,13 @@ private fun StepOne(app: App, iv: Intervention) {
             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         BreakTotals(iv.breaksHourSec, iv.breaksTodaySec)
-        PlanBox(app)
+        // The buttons come before the plan, so a long plan can never push them out of the window.
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             BackButton(app)
             OutlinedButton({ app.interventionWork() }) { Text("I'm working") }
             if (iv.lunch) OutlinedButton({ app.interventionLunch() }) { Text(if (iv.stillLunch) "Still at lunch" else "Lunch") }
         }
+        PlanBox(app)
     }
 }
 
@@ -338,11 +339,11 @@ fun BreakCardWindow(app: App, c: App.BreakCard, mode: ThemeMode) {
     val size = DpSize(500.dp, (240 + planHeight(app)).dp)
     Window(
         onCloseRequest = { app.breakCardClosed() }, title = "OnTask", alwaysOnTop = true, resizable = false,
-        state = rememberWindowState(size = DpSize(500.dp, androidx.compose.ui.unit.Dp.Unspecified), position = centeredOnActiveScreen(size)),
+        state = rememberWindowState(size = size, position = centeredOnActiveScreen(size)),
     ) {
         LaunchedEffect(Unit) { bringForwardAlone(window) }
         OnTaskTheme(mode) { Surface(Modifier.fillMaxSize().clearFocusOnTap()) {
-            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
                     when (c.due) {
                         Breaks.Due.BREAK_OVER -> "That's ${c.minutes} minutes. Back to work?"
@@ -353,11 +354,11 @@ fun BreakCardWindow(app: App, c: App.BreakCard, mode: ThemeMode) {
                 )
                 if (c.due == Breaks.Due.LUNCH_CHECK) Text("You've had ${c.minutes} minutes.", style = MaterialTheme.typography.bodyLarge)
                 if (c.due == Breaks.Due.BREAK_OVER) BreakTotals(c.breaksHourSec, c.breaksTodaySec)
-                PlanBox(app)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     BackButton(app)
                     if (c.canExtend) OutlinedButton({ app.breakMore() }) { Text(if (c.due == Breaks.Due.BREAK_OVER) "5 more minutes" else "15 more minutes") }
                 }
+                PlanBox(app)
             }
         } }
     }
