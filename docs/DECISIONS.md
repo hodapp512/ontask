@@ -558,3 +558,10 @@ when it comes to the front.*
 - **The date arrows on Home sit right next to the date**: the date button is sized to its text, so the arrows move a
   little when the date gets longer. *Rejected:* a fixed width (kept them still, but too far apart).
 
+## 2026-11-03 · Menu-bar Quit reopens; today's plan in the evening check-in
+
+- **Quit from the menu bar now brings OnTask back** (with "reopen" on), like Cmd-Q and the Dock already did.
+  Compose's `application` exited with code 0 before OnTask's own exit code (75) was set, and launchd only restarts
+  after a non-zero exit, so the menu-bar Quit never reopened it since that feature arrived (Oct 30).
+- **The evening check-in shows today's plan** at the top, so you can reflect against what you meant to do.
+

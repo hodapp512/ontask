@@ -213,6 +213,7 @@ nothing under 25 min focused, then 5 min per 25 (at most 10 under an hour, 15 af
 - The daily report gets "Morning 64% focused · Afternoon 48%" (split at lunch, or noon) and the midday answers.
 - **Morning check** (work days, with Today's plan): "Working 9:00–5:00 today?" Yes / start later or finish early / day off.
 - **Evening check-in + reflection** (one prompt) **30 minutes before work hours end** (15–60, in Settings):
+  - Today's plan is shown at the top, for reference (Mac and phone).
   1. Rate today: Rough / Meh / Okay / Good / Great
   2. What helped / what hurt (one line each)
   3. Optional change for tomorrow

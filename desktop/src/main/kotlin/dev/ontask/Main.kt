@@ -48,7 +48,9 @@ fun main() {
             app.shutdown(); response.cancelQuit(); kotlin.system.exitProcess(exitCode())
         }
     }
-    application {
+    // exitProcessOnExit = false: the menu bar's Quit ends here too, so it reaches exitProcess(exitCode()) below
+    // (Compose's default exits with 0 first, and launchd only brings OnTask back after a non-zero exit).
+    application(exitProcessOnExit = false) {
         var visible by remember { mutableStateOf(showWindow) }
         // Sized from the screen (about 80% × 85% of the usable area) and centered; kept while OnTask runs so a resize sticks.
         val windowState = remember {

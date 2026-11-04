@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import dev.ontask.App
 import dev.ontask.plan.Checkin
 import dev.ontask.plan.CheckinDraft
@@ -166,9 +167,17 @@ internal fun EveningCard(app: App, date: LocalDate, onDone: () -> Unit) {
     val struggles = remember { app.prefs.str("alerts.queued", "").lines().filter { it.isNotBlank() } }
     if (!edited && existing?.message != null) draft = existing.message
     var step by remember { mutableStateOf(if (existing?.sent == true) 3 else 1) }
+    val plan = remember { app.priorities.forDate(date).joinToString("\n").trim() }
 
     SectionCard("Evening reflection", "How the day felt, what helped and hurt, one change for tomorrow, and a note for your partner.") {
         if (step == 3 && existing?.sent == true) { Text("Today's check-in is done. ✔ It goes out with your daily report."); return@SectionCard }
+        // Today's goals, for reference while you reflect.
+        androidx.compose.material3.Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Today's plan", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(plan.ifEmpty { "No plan was set today." }, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
         Text("1. How did today feel?", style = MaterialTheme.typography.titleSmall)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { CheckinDraft.FEELINGS.forEach { (r, label) -> FilterChip(rating == r, { rating = r }, label = { Text(label) }) } }
         Text("2. What helped and what hurt?", style = MaterialTheme.typography.titleSmall)

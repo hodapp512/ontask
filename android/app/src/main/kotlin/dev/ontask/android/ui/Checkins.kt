@@ -68,6 +68,8 @@ fun CheckinScreen(kind: String, onSaved: () -> Unit = {}, onDone: () -> Unit) {
             }
             else -> {
                 Text("Wrapping up", style = MaterialTheme.typography.headlineMedium)
+                // Today's goals, for reference while you reflect.
+                OCard("Today's plan") { Text(plan.ifBlank { "No plan was set today." }) }
                 var rating by remember { mutableStateOf<Int?>(null) }
                 var helped by remember { mutableStateOf("") }; var hurt by remember { mutableStateOf("") }
                 var change by remember { mutableStateOf("") }; var note by remember { mutableStateOf("") }
