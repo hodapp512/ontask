@@ -77,8 +77,9 @@ fun DateBar(date: LocalDate, onDate: (LocalDate) -> Unit, onRefresh: () -> Unit)
         // Narrow arrow buttons, so they sit close to the date.
         val arrow = PaddingValues(horizontal = 4.dp)
         TextButton({ onDate(date.minusDays(1)) }, Modifier.widthIn(min = 28.dp), contentPadding = arrow) { Text("◀") }
-        // Sized to the date, so the arrows sit right next to it (they move a little as the date gets longer).
-        TextButton({ picking = true }, contentPadding = arrow) { Text(if (date == LocalDate.now()) "📅 Today" else "📅 " + fmtDate(date), maxLines = 1) }
+        // Fixed width, just wide enough for the longest date ("Sep 30, 2026"), so the arrows stay put from day to day
+        // without sitting far from the date.
+        TextButton({ picking = true }, Modifier.width(130.dp), contentPadding = arrow) { Text(if (date == LocalDate.now()) "📅 Today" else "📅 " + fmtDate(date), maxLines = 1) }
         TextButton({ onDate(date.plusDays(1)) }, Modifier.widthIn(min = 28.dp), enabled = date < LocalDate.now(), contentPadding = arrow) { Text("▶") }
     }
     if (picking) {

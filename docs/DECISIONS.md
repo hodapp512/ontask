@@ -611,3 +611,5 @@ when it comes to the front.*
   the saved sign-in. A test app had synced its sample plan over the real one.
 - **Editing puts the cursor where you click**, and the × (now in a circle) stays visible and usable while editing.
   Tasks are 5 px apart, with a little more room under "Today's plan" and less above *+ Add task*.
+- **Date arrows: fixed again, closer.** The date button is a fixed 130 dp (just fits "Sep 30, 2026") with narrow
+  arrows, so the arrows don't move between Today and other days and sit nearer than the old 140 dp version.
