@@ -83,7 +83,7 @@ fun InterventionWindow(app: App, iv: Intervention, mode: ThemeMode) {
     when (iv.step) {
         // The first prompt: in the middle of the screen you're using, on top, and it takes the focus so it can't be missed.
         Step.PROMPT -> {
-            val size = DpSize(540.dp, if (iv.reminder) 200.dp else if (iv.breakSec > 0) 260.dp else 300.dp)
+            val size = DpSize(540.dp, ((if (iv.reminder) 200 else if (iv.breakSec > 0) 260 else 300) + planHeight(app)).dp)
             Window(
                 onCloseRequest = { app.interventionClosed() }, title = "OnTask — are you on task?", alwaysOnTop = true, resizable = false,
                 state = rememberWindowState(size = size, position = centeredOnActiveScreen(size)),
@@ -150,6 +150,7 @@ private fun Countdown(app: App, iv: Intervention) {
         }
         Text("Back at work when the time is up, nothing goes, unless you're back on time-wasting in the next 10 minutes.",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        PlanBox(app)
         if (!onTask) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Button({ app.countdownClosed() }) { Text("I'm back to work") }
             OutlinedButton({ onTask = true }) { Text("I'm actually on task") }
@@ -193,6 +194,22 @@ private fun BreakTotals(hourSec: Long, todaySec: Long) {
     )
 }
 
+/** Today's plan in a nudge: check off tasks right here (nothing when there's no plan). */
+@Composable
+private fun PlanBox(app: App) {
+    val v by app.priorities.version.collectAsState()
+    if (remember(v) { app.priorities.itemsToday(App.nowSec()).isEmpty() }) return
+    Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Text("Today's plan", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            PlanList(app)
+        }
+    }
+}
+
+/** Extra window height for today's plan in a fixed-size nudge. */
+private fun planHeight(app: App) = app.priorities.itemsToday(App.nowSec()).size.let { if (it == 0) 0 else 40 + 40 * it }
+
 /** "Back to work": OnTask then checks you switch (see Ladder.backToWork). */
 @Composable
 private fun BackButton(app: App) = Button({ app.backToWork() }) { Text("Back to work") }
@@ -204,6 +221,7 @@ private fun Reminder(app: App, iv: Intervention) {
     Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Still on $site. Back to work?", style = MaterialTheme.typography.headlineSmall)
         Text("You said you'd get back to it. Switch to your work now.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        PlanBox(app)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             BackButton(app)
             OutlinedButton({ app.interventionWork() }) { Text("I'm working") }
@@ -219,6 +237,7 @@ private fun BreakCheck(app: App, iv: Intervention) {
         Text("Is this a break?", style = MaterialTheme.typography.headlineSmall)
         Text("You've focused ${fmtDuration(iv.focusedSec)}, so you've got $min minutes.", style = MaterialTheme.typography.bodyLarge)
         BreakTotals(iv.breaksHourSec, iv.breaksTodaySec)
+        PlanBox(app)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Button({ app.interventionBreak() }) { Text("Yes, $min-min break") }
             OutlinedButton({ app.interventionWork() }) { Text("I'm working") }
@@ -238,6 +257,7 @@ private fun StepOne(app: App, iv: Intervention) {
             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         BreakTotals(iv.breaksHourSec, iv.breaksTodaySec)
+        PlanBox(app)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             BackButton(app)
             OutlinedButton({ app.interventionWork() }) { Text("I'm working") }
@@ -252,10 +272,8 @@ private fun StepOne(app: App, iv: Intervention) {
  */
 @Composable
 private fun HelpPanel(app: App, iv: Intervention, partner: Boolean) {
-    val plan = remember { app.priorities.today(App.nowSec()) }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("Pick the smallest next step and start it now.", style = MaterialTheme.typography.titleSmall)
-        if (plan.isNotEmpty()) Text(plan.joinToString("\n"), style = MaterialTheme.typography.bodyMedium)
+        Text("Pick the smallest next step in your plan and start it now.", style = MaterialTheme.typography.titleSmall)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             iv.site?.let { site ->
                 val name = remember(site) { dev.ontask.classify.Pages.siteName(site) ?: site }
@@ -268,17 +286,13 @@ private fun HelpPanel(app: App, iv: Intervention, partner: Boolean) {
 
 @Composable
 private fun StepTwo(app: App, iv: Intervention) {
-    val priorities = remember { app.priorities.today(App.nowSec()) }
     var help by remember(iv) { mutableStateOf(false) }
     Column(Modifier.padding(24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Time to come back", style = MaterialTheme.typography.headlineMedium)
         Text(app.unblockMessage(), style = MaterialTheme.typography.titleMedium)
         Text("You've been off track for ${iv.driftSec / 60} min. Unblocks in the last hour: ${iv.unblocks}.", style = MaterialTheme.typography.bodyLarge)
         BreakTotals(iv.breaksHourSec, iv.breaksTodaySec)
-        if (priorities.isNotEmpty() && !help) {
-            Text("Today's plan", style = MaterialTheme.typography.titleSmall)
-            Text(priorities.joinToString("\n"))
-        }
+        PlanBox(app)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             BackButton(app)
             OutlinedButton({ app.interventionWork() }) { Text("It's actually work") }
@@ -299,6 +313,7 @@ private fun StepThree(app: App, iv: Intervention) {
         Text("Want to let your partner know?", style = MaterialTheme.typography.headlineMedium)
         Text("It's your call. You can edit the message.", style = MaterialTheme.typography.bodyMedium)
         BreakTotals(iv.breaksHourSec, iv.breaksTodaySec)
+        PlanBox(app)
         OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth(), minLines = 4)
         if (status.isNotBlank()) Text(status, style = MaterialTheme.typography.bodySmall)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -316,7 +331,7 @@ private fun StepThree(app: App, iv: Intervention) {
 /** When a break or lunch runs out (or lunch reaches 30 minutes): centered, takes the focus, comes back if closed. */
 @Composable
 fun BreakCardWindow(app: App, c: App.BreakCard, mode: ThemeMode) {
-    val size = DpSize(500.dp, 240.dp)
+    val size = DpSize(500.dp, (240 + planHeight(app)).dp)
     Window(
         onCloseRequest = { app.breakCardClosed() }, title = "OnTask", alwaysOnTop = true, resizable = false,
         state = rememberWindowState(size = size, position = centeredOnActiveScreen(size)),
@@ -334,6 +349,7 @@ fun BreakCardWindow(app: App, c: App.BreakCard, mode: ThemeMode) {
                 )
                 if (c.due == Breaks.Due.LUNCH_CHECK) Text("You've had ${c.minutes} minutes.", style = MaterialTheme.typography.bodyLarge)
                 if (c.due == Breaks.Due.BREAK_OVER) BreakTotals(c.breaksHourSec, c.breaksTodaySec)
+                PlanBox(app)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     BackButton(app)
                     if (c.canExtend) OutlinedButton({ app.breakMore() }) { Text(if (c.due == Breaks.Due.LUNCH_CHECK) "15 more minutes" else "5 more minutes") }

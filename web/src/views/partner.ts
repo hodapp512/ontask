@@ -34,11 +34,12 @@ export async function personView(u: User, linkId: string): Promise<HTMLElement> 
   let reportCard: HTMLElement;
   if (link.share === "report") {
     const body = h("div", {});
-    let day = new Date(); let stop: (() => void) | undefined;
+    const planSlot = h("div", {});
+    let day = new Date(); let stop: (() => void) | undefined; let stopPlan: (() => void) | undefined;
     const label = h("strong", { class: "grow", style: "text-align:center" });
     const next = h("button", { class: "icon-btn", "aria-label": "Next day" }, "→") as HTMLButtonElement;
     const show = () => {
-      stop?.();
+      stop?.(); stopPlan?.();
       const key = todayKey(day), today = key === todayKey();
       label.textContent = today ? "Today" : fmtDate(day, true);
       next.disabled = today;
@@ -46,12 +47,14 @@ export async function personView(u: User, linkId: string): Promise<HTMLElement> 
       stop = onSnapshot(doc(db, "users", tracked, "reports", key), (s) => {
         body.replaceChildren(s.exists() ? reportBody(s.data()) : h("p", { class: "muted" }, today ? `${link.trackedName ?? "They"} hasn't been at the computer yet today.` : "No report for this day."));
       }, () => body.replaceChildren(h("p", { class: "muted" }, "Couldn't load this day.")));
+      // Their plan for the day: finished tasks struck through.
+      stopPlan = onSnapshot(doc(db, "users", tracked, "plans", key), (s) => planSlot.replaceChildren(...planEl(s.get("items"))), () => planSlot.replaceChildren());
     };
     next.onclick = () => { day = new Date(day.getTime() + 86_400_000); show(); };
     const prev = h("button", { class: "icon-btn", "aria-label": "Previous day", onclick: () => { day = new Date(day.getTime() - 86_400_000); show(); } }, "←");
     show();
-    window.addEventListener("hashchange", () => stop?.(), { once: true });
-    reportCard = h("div", { class: "card" }, h("div", { class: "row" }, prev, label, next), body);
+    window.addEventListener("hashchange", () => { stop?.(); stopPlan?.(); }, { once: true });
+    reportCard = h("div", { class: "card" }, h("div", { class: "row" }, prev, label, next), planSlot, body);
     // Their year; tapping a day opens it above.
     const heatSlot = h("div", {});
     getDoc(doc(db, "users", tracked, "heat", "year")).then((s) => { if (s.exists()) heatSlot.replaceChildren(heatmapEl(s.data(), (d) => { day = d; show(); reportCard.scrollIntoView({ behavior: "smooth" }); })); }).catch(() => {});
@@ -72,4 +75,14 @@ export async function personView(u: User, linkId: string): Promise<HTMLElement> 
     h("div", { class: "card" }, h("h2", {}, "Send encouragement"), h("div", { class: "row" }, REACTIONS.map((r) => h("button", { onclick: send(r.kind) }, r.label))), reply, status),
     h("div", { class: "card" }, h("h2", {}, "Messages"), feed),
   );
+}
+
+/** "Plan · 1 of 3 done" and the tasks, finished ones struck through. */
+function planEl(raw: unknown): HTMLElement[] {
+  const items = (Array.isArray(raw) ? raw : []).filter((x: any) => x && typeof x.text === "string" && x.text.trim()) as { text: string; done?: boolean }[];
+  if (!items.length) return [];
+  return [
+    h("h3", {}, `Plan · ${items.filter((x) => x.done).length} of ${items.length} done`),
+    h("ul", { class: "plan" }, items.map((x) => h("li", x.done ? { style: "text-decoration:line-through;opacity:.6" } : {}, x.text))),
+  ];
 }

@@ -30,7 +30,8 @@ export interface ReportDoc {
   halves?: { morning?: number; afternoon?: number };
 }
 export interface MiddayDoc { done?: string; should?: string; chips?: string }
-export interface CheckinDoc { midday?: MiddayDoc; evening?: boolean; plan?: string; feeling?: string; helped?: string; hurt?: string; change?: string; note?: string }
+export interface PlanTask { text: string; done?: boolean }
+export interface CheckinDoc { midday?: MiddayDoc; evening?: boolean; plan?: string; planItems?: PlanTask[]; feeling?: string; helped?: string; hurt?: string; change?: string; note?: string }
 
 /** "2026-11-01" → "Nov 1, 2026" (the date style used everywhere). */
 export function fmtDate(isoDate: string): string {
@@ -99,7 +100,9 @@ export function reportText(p: ReportParts): string {
     if (sites.length) lines.push("Where the time went: " + sites.map((s) => `${s.name} ${fmtDuration(s.seconds)}`).join(", "));
   }
   const c = p.checkin;
-  if (c?.plan) lines.push(`Plan: ${c.plan.replace(/\n/g, "; ")}`);
+  const tasks = planTasks(c);
+  // Texts can't strike through: finished tasks get a ✓.
+  if (tasks.length) lines.push(`Plan (${tasks.filter((x) => x.done).length} of ${tasks.length} done): ` + tasks.map((x) => (x.done ? "✓ " : "") + x.text).join("; "));
   middayRows(c?.midday).forEach(([l, v]) => lines.push(`${l}: ${v}`));
   if (c?.evening) {
     lines.push(`Felt: ${c.feeling ?? "—"}`);
@@ -112,6 +115,13 @@ export function reportText(p: ReportParts): string {
   if (p.autoSends?.length) lines.push(`Sent to your partner automatically: ${p.autoSends.join(" · ")}`);
   lines.push(`Full day: ${p.link}`);
   return lines.join("\n");
+}
+
+/** The day's tasks: plans/{date} when there is one, else the check-in's text, one task per line. */
+export function planTasks(c?: CheckinDoc): PlanTask[] {
+  const items = (c?.planItems ?? []).filter((x) => x && typeof x.text === "string" && x.text.trim());
+  if (items.length) return items.map((x) => ({ text: x.text.trim(), done: x.done === true }));
+  return (c?.plan ?? "").split("\n").map((t) => t.trim()).filter(Boolean).map((text) => ({ text }));
 }
 
 /** The same report as a simple formatted email. */
@@ -128,7 +138,7 @@ export function reportHtml(p: ReportParts): string {
     active && halvesLine(p.report) ? `<p style="margin:0;color:#556">${esc(halvesLine(p.report)!)}</p>` : "",
     sessions.length ? `<h3 style="margin:16px 0 4px">Longest focused sessions</h3><p style="margin:0">${sessions.slice(0, 3).map((s) => fmtDuration(s.b - s.a)).join(" · ")}</p>` : "",
     sites.length ? `<h3 style="margin:16px 0 4px">Where the time went</h3><table>${sites.map((s) => row(fmtDuration(s.seconds), `${esc(s.name)}${s.category ? ` <span style="color:#889">· ${esc(s.category)}</span>` : ""}`)).join("")}</table>` : "",
-    c?.plan ? `<h3 style="margin:16px 0 4px">Plan</h3><p style="margin:0;white-space:pre-wrap">${esc(c.plan)}</p>` : "",
+    planTasks(c).length ? `<h3 style="margin:16px 0 4px">Plan · ${planTasks(c).filter((x) => x.done).length} of ${planTasks(c).length} done</h3><ul style="margin:0;padding-left:20px">${planTasks(c).map((x) => `<li${x.done ? ' style="color:#889"' : ""}>${x.done ? `<s>${esc(x.text)}</s>` : esc(x.text)}</li>`).join("")}</ul>` : "",
     middayRows(c?.midday).length ? `<h3 style="margin:16px 0 4px">Midday check-in</h3><table>${middayRows(c?.midday).map(([l, v]) => row(l, esc(v))).join("")}</table>` : "",
     `<h3 style="margin:16px 0 4px">Evening check-in</h3>` + (c?.evening
       ? `<table>${row("Felt", esc(c.feeling ?? "—"))}${c.helped ? row("Helped", esc(c.helped)) : ""}${c.hurt ? row("Hurt", esc(c.hurt)) : ""}${c.change ? row("Tomorrow", esc(c.change)) : ""}</table>${c.note ? `<p style="margin:8px 0 0">“${esc(c.note)}”</p>` : ""}`

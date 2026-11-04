@@ -188,13 +188,23 @@ nothing under 25 min focused, then 5 min per 25 (at most 10 under an hour, 15 af
 ## Daily rhythm
 
 - The day is anchored to **first presence at the computer** on a work day, not clock time.
-- **Today's plan** on arrival: one free-form note at the top of Home, starting empty (yesterday's "change for
-  tomorrow" is shown as a hint).
+- **Today's plan** on arrival: tasks you check off, not a text box. Add each with "Add your most important tasks
+  here"; past 5, "More than 5 is hard to finish — maybe save some for tomorrow." (no limit). Click a task to edit,
+  × to remove, drag ⋮⋮ to reorder (on the phone, press and hold ⋮⋮). Finished tasks stay, struck through.
+  - The morning plan shows the previous plan day ("Yesterday", or "Friday" on a Monday) with what got done; each
+    unfinished task has *Add to today*. Yesterday's "change for tomorrow" is shown as a hint. *Start my day* starts
+    the day (and the before-work prompts); tasks added on Home before that don't.
+  - Checkable everywhere it shows: Home (Mac and phone, with yesterday's below), the midday and evening check-ins,
+    every nudge (drift prompts, reminders, Is this a break?, break over, the countdown, step 3) and the unblock delay
+    screen. The phone's step-1 notification shows "Next on your plan: …".
+  - Shared: `users/{uid}/plans/{date}` `{items: [{id, text, done}], updatedAt, by}`; the whole list is rewritten on
+    each change and the newest wins. The Mac sends a change at once and checks for the phone's every 10 s while
+    you're at it; the phone listens live. Older free-form plans were split into tasks by line and by sentence.
 - **Midday check-in** 30 minutes before the midpoint of actual working time (first sit-down → end of work hours); skipped if the day started < ~2h before end of work hours.
   - **Do this later ▾** at the top (10 min / 30 min / 1 h).
   1. **This morning:** one line: focused time, wasted time, longest focused stretch.
   2. **How's the day going?** *What did you get done?* and *What should you have gotten done?* (free text).
-  3. **This afternoon's plan** (today's plan, editable): "Still the same as this morning?"
+  3. **Today's plan** (checkable and editable): "Check off what's done, and change the rest for this afternoon."
   4. **What's in the way?** Chips (Distracted / low energy, Interruptions/meetings, Unclear what to do, Stuck on a
      problem, Overwhelmed, Other), each with one suggestion (Distracted / low energy: *Start break*, 10 min). Shown
      only after a struggling morning: under 60% focused or 30+ min wasted, and the last hour before lunch (breaks and
@@ -214,7 +224,7 @@ nothing under 25 min focused, then 5 min per 25 (at most 10 under an hour, 15 af
 - The daily report gets "Morning 64% focused · Afternoon 48%" (split at lunch, or noon) and the midday answers.
 - **Morning check** (work days, with Today's plan): "Working 9:00–5:00 today?" Yes / start later or finish early / day off.
 - **Evening check-in + reflection** (one prompt) **30 minutes before work hours end** (15–60, in Settings):
-  - Today's plan is shown at the top, for reference (Mac and phone).
+  - Today's plan is shown at the top, checkable (Mac and phone).
   1. Rate today: Rough / Meh / Okay / Good / Great
   2. What helped / what hurt (one line each)
   3. Optional change for tomorrow
@@ -223,7 +233,8 @@ nothing under 25 min focused, then 5 min per 25 (at most 10 under an hour, 15 af
 - **Daily report**, every day: after work ends (6 PM on days off), once you've been inactive for 30 minutes, 8 PM at
   the latest. Decided on the server from the Mac's "last active" time. To each partner over their "Daily report"
   channel (titles per your setting), and to you by email (with titles; on by default). Includes totals, longest
-  focused sessions, where the time went, the plan, the check-in or "No reflection today", alerts held back by the cap,
+  focused sessions, where the time went, the plan ("2 of 4 done"; finished tasks struck through by email and on the
+  partner's web view, ✓ in texts), the check-in or "No reflection today", alerts held back by the cap,
   and a link to the full day. Your own copy also lists messages OnTask sent your partner by itself.
   - If the user has already left the computer, wait for return or prompt on the phone in the evening.
 - Check-ins: escalating phone reminders after work ends until done or the report goes. No "missed check-in" message.

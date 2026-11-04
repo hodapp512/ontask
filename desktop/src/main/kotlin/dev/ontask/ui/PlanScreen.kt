@@ -12,6 +12,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -65,28 +66,17 @@ private fun PlanBody(app: App, prompt: Prompt, date: LocalDate, onDone: () -> Un
 }
 
 @Composable
-internal fun PrioritiesCard(app: App, date: LocalDate, short: Boolean, compact: Boolean = false, onDone: () -> Unit) {
-    var text by remember { mutableStateOf(app.priorities.forDate(date).joinToString("\n")) }
+internal fun PrioritiesCard(app: App, date: LocalDate, short: Boolean, onDone: () -> Unit) {
     val change = remember { app.checkins.get(date.minusDays(1), "evening")?.change.orEmpty() }
-    fun save() { app.priorities.set(date, listOf(text)); app.checkins.save(Checkin(date, "planning", App.nowSec(), null, null, null, null, null, false)); onDone() }
-    // Home: one line to start, growing as you type; the title and button share a row.
-    if (compact) {
-        PlainCard {
-            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Today's plan", style = MaterialTheme.typography.titleMedium)
-                OutlinedTextField(text, { text = it }, Modifier.weight(1f), maxLines = 4, placeholder = { Text("What matters today?") })
-                Button(::save, enabled = text.isNotBlank()) { Text("Save") }
-            }
-            if (change.isNotBlank()) Text("Yesterday you wanted to change: $change", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        return
-    }
-    SectionCard("Today's plan", "What matters today, in your own words.") {
+    val v by app.priorities.version.collectAsState()
+    val any = remember(v) { app.priorities.items(date).isNotEmpty() }
+    SectionCard("Today's plan", null) {
         if (change.isNotBlank()) Notice("Yesterday you wanted to change: $change")
-        OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth(), minLines = 4, placeholder = { Text("e.g. Finish the Acme proposal, then review PRs. No news before lunch.") })
+        YesterdayPlan(app, date, carry = true)
+        PlanList(app, date, editable = true)
         Button({
-            app.priorities.set(date, listOf(text)); app.checkins.save(Checkin(date, "planning", App.nowSec(), null, null, null, null, null, false)); onDone()
-        }, enabled = text.isNotBlank()) { Text(if (short) "Save plan" else "Start my day") }
+            app.checkins.save(Checkin(date, "planning", App.nowSec(), null, null, null, null, null, false)); onDone()
+        }, enabled = any) { Text(if (short) "Save plan" else "Start my day") }
     }
 }
 
@@ -108,16 +98,13 @@ private val OBSTACLES = listOf(
 @Composable
 internal fun MiddayCard(app: App, date: LocalDate, onDone: () -> Unit) {
     val m = remember { app.morningNow() }
-    var plan by remember { mutableStateOf(app.priorities.forDate(date).joinToString("\n")) }
     var gotDone by remember { mutableStateOf("") }
     var should by remember { mutableStateOf("") }
     val chips = remember { mutableStateListOf<String>() }
     var showChips by remember { mutableStateOf(m.struggling) }
-    val planFocus = remember { androidx.compose.ui.focus.FocusRequester() }
 
     fun save(focus: Boolean) {
         val now = App.nowSec()
-        app.priorities.set(date, listOf(plan))
         val done = gotDone.trim().ifBlank { null }
         app.checkins.save(Checkin(date, "midday", now, null, done, should.trim().ifBlank { null }, chips.joinToString(", ").ifBlank { null }, null, false))
         app.events.emit("checkin_midday", now, "done" to done, "should" to should, "chips" to chips.joinToString(","), "focusPct" to m.pct, "struggling" to m.struggling)
@@ -133,8 +120,8 @@ internal fun MiddayCard(app: App, date: LocalDate, onDone: () -> Unit) {
         OutlinedTextField(gotDone, { gotDone = it }, Modifier.fillMaxWidth(), label = { Text("What did you get done?") })
         OutlinedTextField(should, { should = it }, Modifier.fillMaxWidth(), label = { Text("What should you have gotten done?") })
     }
-    SectionCard("This afternoon's plan", "Still the same as this morning?") {
-        OutlinedTextField(plan, { plan = it }, Modifier.fillMaxWidth().focusRequester(planFocus), minLines = 3)
+    SectionCard("Today's plan", "Check off what's done, and change the rest for this afternoon.") {
+        PlanList(app, date, editable = true)
     }
     if (showChips) SectionCard("What's in the way?", if (m.struggling) "The morning was hard to focus in. Pick anything that applies." else null) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -144,7 +131,6 @@ internal fun MiddayCard(app: App, date: LocalDate, onDone: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("$c: $tip", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                 if (c.startsWith("Distracted")) OutlinedButton({ app.startRestBreak(); save(focus = false) }) { Text("Start break") }
-                if (c == "Unclear what to do") TextButton({ runCatching { planFocus.requestFocus() } }) { Text("Go to plan") }
             }
         }
     } else TextButton({ showChips = true }) { Text("Something in the way?") }
@@ -167,7 +153,6 @@ internal fun EveningCard(app: App, date: LocalDate, onDone: () -> Unit) {
     val struggles = remember { app.prefs.str("alerts.queued", "").lines().filter { it.isNotBlank() } }
     if (!edited && existing?.message != null) draft = existing.message
     var step by remember { mutableStateOf(if (existing?.sent == true) 3 else 1) }
-    val plan = remember { app.priorities.forDate(date).joinToString("\n").trim() }
 
     SectionCard("Evening reflection", "How the day felt, what helped and hurt, one change for tomorrow, and a note for your partner.") {
         if (step == 3 && existing?.sent == true) { Text("Today's check-in is done. ✔ It goes out with your daily report."); return@SectionCard }
@@ -175,7 +160,7 @@ internal fun EveningCard(app: App, date: LocalDate, onDone: () -> Unit) {
         androidx.compose.material3.Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Today's plan", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(plan.ifEmpty { "No plan was set today." }, style = MaterialTheme.typography.bodyMedium)
+                PlanList(app, date)
             }
         }
         Text("1. How did today feel?", style = MaterialTheme.typography.titleSmall)

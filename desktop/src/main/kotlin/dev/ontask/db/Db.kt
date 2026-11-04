@@ -164,6 +164,13 @@ object Schema {
         CREATE TABLE ai_checks (id INTEGER PRIMARY KEY, ts INTEGER NOT NULL, provider TEXT NOT NULL, matched INTEGER NOT NULL);
         CREATE INDEX ai_checks_ts ON ai_checks(ts);
         """,
+        // The plan as tasks you check off (see Priorities): an id and done flag per task, and when each day's list last
+        // changed (newest wins between the Mac and the phone). Old free-form plans are split up once, in Priorities.
+        """
+        ALTER TABLE priorities ADD COLUMN id TEXT;
+        ALTER TABLE priorities ADD COLUMN done INTEGER NOT NULL DEFAULT 0;
+        CREATE TABLE plan_meta (date TEXT PRIMARY KEY, updated_ms INTEGER NOT NULL, pushed INTEGER NOT NULL DEFAULT 0);
+        """,
     )
 
     fun migrate(db: Db) = db.use { c ->

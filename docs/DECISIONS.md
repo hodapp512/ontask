@@ -587,3 +587,19 @@ when it comes to the front.*
 - The phone still prompts in work hours only; before-work time still counts in totals and reports.
 - **Step 1 now says "Are you on task?"** (was "It looks like you're drifting."), on the Mac and the phone: a
   question, matching the window's title.
+
+## 2026-11-04 · The plan as tasks you check off
+
+- **Today's plan is a list of tasks, not a text box.** The add field says "Add your most important tasks here";
+  past 5 a note says "More than 5 is hard to finish — maybe save some for tomorrow." No hard limit. *Rejected:*
+  "Pick 3–5 things for today" as the hint (too prescriptive up front).
+- **Checked-off tasks stay, struck through,** everywhere: Home, check-ins, every nudge, the unblock screen, the report
+  email and the partner view. Texts and push can't strike through, so there a finished task gets a ✓.
+- **Reorder by dragging**, edit by clicking, × to remove.
+- **Yesterday's plan** (the last day with one) shows on Home and in the morning plan, where unfinished tasks are one
+  tap to carry over.
+- **Shared between the Mac and the phone** through `plans/{date}`, newest change wins (simple, and two devices
+  editing the same list at the same second is rare). The Mac checks every 10 s while you're at it.
+- **The day starts with "Start my day"**, not with the first task added (adding tasks on Home before then doesn't
+  turn on the before-work prompts).
+- **Old plans were split into tasks by line and by sentence.**

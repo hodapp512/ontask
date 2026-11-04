@@ -314,6 +314,8 @@ class CloudSync(
         val md = checkins.get(today, "midday")
         val payload = buildJsonObject {
             put("evening", ev != null)
+            // The morning plan is done ("Start my day"), not just begun: the phone closes its planning check-in then.
+            put("planned", checkins.done(today, "planning"))
             put("plan", plan(today).joinToString("\n"))
             if (md != null) put("midday", buildJsonObject {
                 md.helped?.let { put("done", it) }; md.hurt?.let { put("should", it) }; md.change?.let { put("chips", it) }

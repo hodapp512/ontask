@@ -97,6 +97,12 @@ describe("bedtime push", () => {
 });
 
 describe("daily report", () => {
+  it("shows the plan's tasks: struck through by email, ✓ in texts", () => {
+    const checkin = { planItems: [{ text: "Call Warren", done: true }, { text: "Follow up with leads" }] };
+    const parts = { ...partnerParts("Sam"), report: undefined, checkin, link: "https://x/#/" };
+    expect(reportText(parts)).toContain("Plan (1 of 2 done): ✓ Call Warren; Follow up with leads");
+    expect(reportHtml(parts)).toContain("<s>Call Warren</s>");
+  });
   // Fridays 9:00-17:00 in Chicago (UTC-5 on these dates).
   const s: ScheduleDoc = { tz: "America/Chicago", workWeek: { "5": [{ startMin: 540, endMin: 1020 }] }, habits: [] };
   const local = (day: number) => (hhmm: string) => new Date(Date.UTC(2026, 9, day, Number(hhmm.slice(0, 2)) + 5, Number(hhmm.slice(3))));
@@ -121,7 +127,7 @@ describe("daily report", () => {
     expect(t).toContain("Here is Sam's day.");
     expect(t).toContain("67% focused");
     expect(t).toContain("Longest focused session 1h 30m (2 in all)");
-    expect(t).toContain("Plan: Ship the report");
+    expect(t).toContain("Plan (0 of 1 done): Ship the report");
     expect(t).toContain('"Long day"');
     expect(t).toContain("Also today: Sam unblocked x.com (3:10 PM)");
     expect(reportText({ ...partnerParts("Sam"), report, link: "l" })).toContain("No reflection today.");

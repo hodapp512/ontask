@@ -6,7 +6,7 @@ import { defineSecret } from "firebase-functions/params";
 import { randomBytes } from "node:crypto";
 import { deliverToPartner, releaseDeferred, routeEvent, takeQueuedAlerts, type Link } from "./deliver";
 import { firstName } from "./logic/messages";
-import { autoSendLine, fmtDate, ownParts, partnerParts, reportDue, reportHtml, reportText, type CheckinDoc, type ReportDoc } from "./logic/report";
+import { autoSendLine, fmtDate, ownParts, partnerParts, reportDue, reportHtml, reportText, type CheckinDoc, type PlanTask, type ReportDoc } from "./logic/report";
 import { bedtimeNight, bedtimePushDue, checkinState, habitsDue, isWorkDay } from "./logic/schedule";
 import { mergeDay, mergeHeat, type DayParts, type DeviceItems, type DeviceReport } from "./logic/merge";
 import { judge, type Cat } from "./logic/judge";
@@ -269,12 +269,15 @@ async function dailyReportSweep(uid: string, s: ScheduleDoc, now: Date, date: st
   if (!reportDue(s, now, lastActive || undefined)) return;
   await db.doc(`users/${uid}/sweepState/${date}`).set({ reportSent: true, reportSentAt: now.getTime() }, { merge: true });
 
-  const [userSnap, rep, items, chk] = await Promise.all([
+  const [userSnap, rep, items, chk, planSnap] = await Promise.all([
     db.doc(`users/${uid}`).get(), db.doc(`users/${uid}/reports/${date}`).get(), db.doc(`users/${uid}/reportItems/${date}`).get(), db.doc(`users/${uid}/checkins/${date}`).get(),
+    db.doc(`users/${uid}/plans/${date}`).get(),
   ]);
   const name = (userSnap.get("displayName") as string | undefined) ?? "Your friend";
   const first = firstName(name);
-  const report = rep.data() as ReportDoc | undefined, checkin = chk.data() as CheckinDoc | undefined;
+  const report = rep.data() as ReportDoc | undefined;
+  // The plan as tasks checked off (plans/{date}); the check-in's plain text is only a fallback.
+  const checkin = { ...(chk.data() as CheckinDoc | undefined), planItems: planSnap.get("items") as PlanTask[] | undefined } as CheckinDoc;
   const link = `${WEB_URL}/#/`;
 
   const links = await db.collection("links").where("trackedUid", "==", uid).where("status", "==", "active").get();

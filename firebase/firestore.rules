@@ -59,6 +59,8 @@ service cloud.firestore {
       // (state/rhythm), and check-ins done on the phone (phoneCheckins/{date}).
       match /state/{doc} { allow read, write: if isOwner(uid); }
       match /phoneCheckins/{date} { allow read, write: if isOwner(uid); }
+      // The day's plan, tasks checked off on either device; partners see it with the day.
+      match /plans/{date} { allow read: if isOwner(uid) || isPartnerOf(uid); allow write: if isOwner(uid); }
       // The year heat map (per-day scores only): shared like the daily report.
       match /heat/{doc} {
         allow write: if false; // merged by the server from deviceHeat

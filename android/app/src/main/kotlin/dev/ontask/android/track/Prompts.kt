@@ -115,7 +115,7 @@ class Prompts(private val svc: AccessibilityService) {
         } else {
             val toEarn = (25 * 60 - focusedSec).coerceAtLeast(0) / 60
             b.setContentTitle("Are you on task?").setStyle(NotificationCompat.BigTextStyle().bigText(
-                "Is this what you meant to be doing right now?" + if (toEarn > 0) "\nYou've focused ${focusedSec / 60} min since your last break. $toEarn more earns a 5-minute break." else ""))
+                "Is this what you meant to be doing right now?" + (dev.ontask.plan.Plan.next(planItems)?.let { "\nNext on your plan: ${it.text}" } ?: "") + if (toEarn > 0) "\nYou've focused ${focusedSec / 60} min since your last break. $toEarn more earns a 5-minute break." else ""))
                 .addAction(action(BACK, "Back to work")).addAction(action(WORKING, "I'm working"))
             if (lunchOffered()) b.addAction(action(LUNCH, "Lunch"))
         }
@@ -162,6 +162,8 @@ class Prompts(private val svc: AccessibilityService) {
     @Volatile private var rhythm: Map<String, Any?> = emptyMap()
     @Volatile private var checkins: Map<String, Any?> = emptyMap()
     @Volatile private var phoneCheckins: Map<String, Any?> = emptyMap()
+    /** Today's tasks (for the step-1 notification's "Next: …"). */
+    @Volatile private var planItems: List<dev.ontask.plan.PlanItem> = emptyList()
     @Volatile private var macActiveMs = 0L
     private var checkinRegs: List<ListenerRegistration> = emptyList()
     private var checkinDay = ""
@@ -175,6 +177,7 @@ class Prompts(private val svc: AccessibilityService) {
             Cloud.db.document("users/$uid/state/rhythm").addSnapshotListener { s, _ -> rhythm = s?.data ?: emptyMap() },
             Cloud.db.document("users/$uid/checkins/$day").addSnapshotListener { s, _ -> checkins = s?.data ?: emptyMap() },
             Cloud.db.document("users/$uid/phoneCheckins/$day").addSnapshotListener { s, _ -> phoneCheckins = s?.data ?: emptyMap() },
+            Cloud.db.document("users/$uid/plans/$day").addSnapshotListener { s, _ -> planItems = dev.ontask.plan.Plan.fromMaps(s?.get("items")) },
             Cloud.db.collection("users/$uid/devices").whereEqualTo("kind", "mac").addSnapshotListener { s, _ -> macActiveMs = s?.documents?.maxOfOrNull { it.get("lastActiveMs").num() } ?: 0 },
         )
     }
@@ -183,7 +186,7 @@ class Prompts(private val svc: AccessibilityService) {
     private fun dueCheckin(): String? {
         val due = (rhythm["due"] as? String)?.takeIf { it.isNotBlank() && rhythm["date"] == LocalDate.now().toString() } ?: return null
         val done = when (due) {
-            "PLANNING", "PLANNING_SHORT" -> !(checkins["plan"] as? String).isNullOrBlank() || phoneCheckins["planning"] != null
+            "PLANNING", "PLANNING_SHORT" -> ((checkins["planned"] as? Boolean) ?: !(checkins["plan"] as? String).isNullOrBlank()) || phoneCheckins["planning"] != null
             "MIDDAY" -> checkins["midday"] != null || phoneCheckins["midday"] != null
             else -> checkins["evening"] == true || phoneCheckins["evening"] != null
         }

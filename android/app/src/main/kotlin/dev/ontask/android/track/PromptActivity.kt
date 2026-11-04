@@ -84,6 +84,7 @@ class PromptActivity : ComponentActivity() {
                 Text(message, Modifier.fillMaxWidth().padding(12.dp))
             }
             Muted("Back at work when the time is up, nothing goes, unless you're back on time-wasting in the next 10 minutes.")
+            if (dev.ontask.android.ui.rememberPlan().isNotEmpty()) { Text("Today's plan", style = MaterialTheme.typography.titleSmall); dev.ontask.android.ui.PlanList() }
             if (!onTask) {
                 Button({ p?.backToWorkFromCountdown(); finish() }, Modifier.fillMaxWidth()) { Text("I'm back to work") }
                 OutlinedButton({ onTask = true }, Modifier.fillMaxWidth()) { Text("I'm actually on task") }
@@ -138,7 +139,7 @@ class PromptActivity : ComponentActivity() {
             Text("Time to come back", style = MaterialTheme.typography.headlineMedium)
             Muted("You've been off track on your phone for a while.")
             p?.state?.let { s -> if (s["breaksTodaySec"].num() >= 60) Muted("You've had ${fmtDuration(s["breaksHourSec"].num())} of breaks in the last hour (${fmtDuration(s["breaksTodaySec"].num())} today).") }
-            checkin?.getString("plan")?.takeIf { it.isNotBlank() }?.let { Text("Today's plan", style = MaterialTheme.typography.titleSmall); Text(it) }
+            if (dev.ontask.android.ui.rememberPlan().isNotEmpty()) { Text("Today's plan", style = MaterialTheme.typography.titleSmall); dev.ontask.android.ui.PlanList() }
             Button({ p?.backToWork(); finish() }, Modifier.fillMaxWidth()) { Text("Back to work") }
             OutlinedButton({ p?.working(); finish() }, Modifier.fillMaxWidth()) { Text("It's actually work") }
             if (!help) TextButton({ help = true }) { Text("Help me get started") }

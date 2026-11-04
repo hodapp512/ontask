@@ -147,7 +147,7 @@ away from the Mac).
 
 ```mermaid
 flowchart TD
-    D[First sit-down on a work day] --> P[Today's plan +<br/>Working 9:00–5:00 today?]
+    D[First sit-down on a work day] --> P[Today's plan, tasks to check off,<br/>with yesterday's to carry over +<br/>Working 9:00–5:00 today?]
     P --> M[Midday check-in<br/>30 min before the midpoint]
     M --> MS{Done or later?}
     MS -- "Do this later<br/>(twice a day at most)" --> M
@@ -165,6 +165,7 @@ flowchart TD
 ```
 
 - Skipped sorting comes back in the next check-in (today's and yesterday's items).
+- The plan's tasks can be checked off all day: Home, both check-ins and every nudge. Start my day starts the day.
 - The midday check-in's "What's in the way?" chips appear only after a struggling morning.
 
 ---

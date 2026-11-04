@@ -64,8 +64,8 @@ fun HomeScreen(uid: String, name: String) {
                 @Suppress("UNCHECKED_CAST") ((items?.data?.get("refs") as? Map<String, Map<String, Any?>>) ?: emptyMap()))
         }
         OCard("Today's plan") {
-            val plan = checkin?.getString("plan")
-            if (!plan.isNullOrBlank()) Text(plan, style = MaterialTheme.typography.bodyLarge)
+            PlanList(editable = true)
+            YesterdayPlan()
             Row(Modifier.fillMaxWidth()) { Text("Work hours", Modifier.weight(1f)); Muted(if (ranges.isEmpty()) "Day off" else ranges.joinToString(", ") { "${clock(it.first)}–${clock(it.second)}" }) }
             if (ranges.isNotEmpty()) {
                 val done = checkin?.getBoolean("evening") == true

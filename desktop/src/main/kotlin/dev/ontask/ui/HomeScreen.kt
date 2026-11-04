@@ -130,21 +130,21 @@ private fun AdsButton(app: App, version: Int, changed: () -> Unit) {
     else Button(toggle, colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)) { Text("Enable ad blocking") }
 }
 
-/** Today's plan (a free-form note, editable inline in the morning, shown as text after) and the evening reflection, which opens in its own window. */
+/** Today's plan (tasks to check off, editable here all day), yesterday's for reference, and the evening reflection. */
 @Composable
 private fun TodayCard(app: App, date: LocalDate, onReflect: () -> Unit) {
-    var editing by remember { mutableStateOf(false) }
-    val planned = remember(editing) { app.checkins.done(date, "planning") }
-    if (!planned || editing) { PrioritiesCard(app, date, short = false, compact = true) { editing = false }; return }
-    val priorities = remember(editing) { app.priorities.forDate(date) }
+    val v by app.priorities.version.collectAsState()
+    val planned = remember(v) { app.checkins.done(date, "planning") }
+    val any = remember(v) { app.priorities.items(date).isNotEmpty() }
     val end = app.settings.schedule.rangesFor(date).maxOfOrNull { it.endMin }
     val evening = app.checkins.get(date, "evening")
     PlainCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Today's plan", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-            TextButton({ editing = true }) { Text("Edit") }
+            if (!planned && any) Button({ app.checkins.save(dev.ontask.plan.Checkin(date, "planning", App.nowSec(), null, null, null, null, null, false)); app.finishPlanning() }) { Text("Start my day") }
         }
-        if (priorities.isEmpty()) Text("Nothing planned yet.", color = MaterialTheme.colorScheme.onSurfaceVariant) else Text(priorities.joinToString("\n"))
+        PlanList(app, date, editable = true)
+        YesterdayPlan(app, date)
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(

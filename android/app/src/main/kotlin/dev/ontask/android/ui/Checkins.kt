@@ -37,13 +37,11 @@ private val OBSTACLES = listOf("Distracted / low energy", "Interruptions/meeting
 @Composable
 fun CheckinScreen(kind: String, onSaved: () -> Unit = {}, onDone: () -> Unit) {
     val uid = Cloud.uid ?: return
-    var plan by remember { mutableStateOf("") }
-    LaunchedEffect(Unit) { runCatching { Cloud.db.document("users/$uid/checkins/${dayKey()}").get().await().getString("plan") }.getOrNull()?.let { if (plan.isBlank()) plan = it } }
     // Already done, on the Mac or on this phone (an old notification, or done meanwhile): close instead of asking again.
     androidx.compose.runtime.DisposableEffect(kind) {
         val key = kind.lowercase().removeSuffix("_short")
         fun macDone(d: Map<String, Any?>) = when (key) {
-            "planning" -> !(d["plan"] as? String).isNullOrBlank()
+            "planning" -> (d["planned"] as? Boolean) ?: !(d["plan"] as? String).isNullOrBlank()
             "midday" -> d["midday"] != null
             else -> d["evening"] == true
         }
@@ -61,9 +59,11 @@ fun CheckinScreen(kind: String, onSaved: () -> Unit = {}, onDone: () -> Unit) {
         when (kind) {
             "PLANNING", "PLANNING_SHORT" -> {
                 Text(if (kind == "PLANNING") "Good morning" else "Quick plan for the rest of the day", style = MaterialTheme.typography.headlineMedium)
+                val items = rememberPlan()
                 OCard("Today's plan") {
-                    OutlinedTextField(plan, { plan = it }, Modifier.fillMaxWidth(), minLines = 3, placeholder = { Text("What matters today?") })
-                    Button({ save(mapOf("plan" to plan.trim())) }, enabled = plan.isNotBlank()) { Text("Start my day") }
+                    YesterdayPlan(carry = true)
+                    PlanList(editable = true)
+                    Button({ save(mapOf("plan" to items.joinToString("\n") { it.text })) }, enabled = items.isNotEmpty()) { Text("Start my day") }
                 }
             }
             "MIDDAY" -> {
@@ -74,16 +74,16 @@ fun CheckinScreen(kind: String, onSaved: () -> Unit = {}, onDone: () -> Unit) {
                     OutlinedTextField(done, { done = it }, Modifier.fillMaxWidth(), label = { Text("What did you get done?") })
                     OutlinedTextField(should, { should = it }, Modifier.fillMaxWidth(), label = { Text("What should you have gotten done?") })
                 }
-                OCard("This afternoon's plan") { Muted("Still the same as this morning?"); OutlinedTextField(plan, { plan = it }, Modifier.fillMaxWidth(), minLines = 2) }
+                OCard("Today's plan") { Muted("Check off what's done, and change the rest for this afternoon."); PlanList(editable = true) }
                 if (showChips) OCard("What's in the way?") {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) { OBSTACLES.forEach { c -> FilterChip(c in chips, { if (c in chips) chips.remove(c) else chips.add(c) }, label = { Text(c) }) } }
                 } else TextButton({ showChips = true }) { Text("Something in the way?") }
-                Button({ save(mapOf("done" to done.trim(), "should" to should.trim(), "chips" to chips.joinToString(", "), "plan" to plan.trim())) }) { Text("Done") }
+                Button({ save(mapOf("done" to done.trim(), "should" to should.trim(), "chips" to chips.joinToString(", "))) }) { Text("Done") }
             }
             else -> {
                 Text("Wrapping up", style = MaterialTheme.typography.headlineMedium)
                 // Today's goals, for reference while you reflect.
-                OCard("Today's plan") { Text(plan.ifBlank { "No plan was set today." }) }
+                OCard("Today's plan") { PlanList() }
                 var rating by remember { mutableStateOf<Int?>(null) }
                 var helped by remember { mutableStateOf("") }; var hurt by remember { mutableStateOf("") }
                 var change by remember { mutableStateOf("") }; var note by remember { mutableStateOf("") }

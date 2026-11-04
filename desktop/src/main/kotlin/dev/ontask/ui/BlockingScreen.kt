@@ -77,7 +77,7 @@ fun UnblockDialog(app: App, domains: List<String>, onClose: () -> Unit) {
                 val priorities = remember { app.priorities.today(now0) }
                 if (priorities.isNotEmpty()) {
                     Text("Today's plan:", style = MaterialTheme.typography.labelMedium)
-                    Text(priorities.joinToString("\n"), style = MaterialTheme.typography.bodyMedium)
+                    PlanList(app)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     app.unblocks.durationsMin.forEach { m -> FilterChip(minutes == m, { minutes = m }, label = { Text("$m min") }) }

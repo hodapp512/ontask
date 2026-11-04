@@ -74,7 +74,10 @@ class App(val dir: Path = dataDir()) {
         }
     }
 
-    val priorities = Priorities(db)
+    val priorities: Priorities = Priorities(db).also { p ->
+        // A change made here goes to the phone at once.
+        p.onLocalChange = { d -> if (cloud.configured) scope.launch(IO) { runCatching { planSync(d) } } }
+    }
     val habits = dev.ontask.plan.Habits(prefs)
 
     fun requestAccessibility() { scope.launch { helper.request("request_accessibility") } }
@@ -89,13 +92,14 @@ class App(val dir: Path = dataDir()) {
 
     val cloud by lazy { dev.ontask.cloud.CloudSync(prefs, events, reports, { settings }, habits, checkins, relabel = { name, cat -> reclassify(name, Category.valueOf(cat)) },
         relabelItem = { key, title, cat -> answerVariable(key, title, Category.valueOf(cat)) },
-        lastActive = { lastActiveTs.takeIf { it > 0 } }, plan = { priorities.forDate(it) }, halves = { dayHalves(it) }, heat = { heatYear() }, settingsSync = settingsSync, hooks = listOf(::syncBreaks, ::syncCheckins)) }
+        lastActive = { lastActiveTs.takeIf { it > 0 } }, plan = { priorities.forDate(it) }, halves = { dayHalves(it) }, heat = { heatYear() }, settingsSync = settingsSync, hooks = listOf(::syncBreaks, ::syncPlans, ::syncCheckins)) }
     /** Last moment you were at the Mac (not Away), for the daily report's "you've wrapped up" rule. */
     @Volatile private var lastActiveTs = 0L
     private var wasAway = false
     val updates = dev.ontask.cloud.UpdateCheck()
     @Volatile var updateAvailable: dev.ontask.cloud.UpdateInfo? = null; private set
     private var lastCloud = 0L; private var lastUpdateCheck = 0L
+    @Volatile private var lastPlanPull = 0L
 
     fun checkForUpdates(): dev.ontask.cloud.UpdateInfo? {
         val repo = prefs.get("update.repo") ?: return null
@@ -361,6 +365,8 @@ class App(val dir: Path = dataDir()) {
         checkRegularEnded(now)
         if (ai.kev.running) ai.kev.stopIfIdle()
         if (cloud.configured && now - lastCloud >= 60) { lastCloud = now; scope.launch(IO) { cloud.syncOnce(now) } }
+        // Today's plan, every 10 s while you're here: a task checked off on the phone shows here within seconds.
+        if (cloud.configured && !live.away && now - lastPlanPull >= 10) { lastPlanPull = now; scope.launch(IO) { runCatching { planSync(LocalDate.now()) } } }
         if (prefs.get("update.repo") != null && now - lastUpdateCheck >= 7 * 86400) { lastUpdateCheck = now; scope.launch(IO) { checkForUpdates() } }
         if (ai.enabled && now - lastBattery >= 60) { lastBattery = now; scope.launch(IO) { batteryCheck() } }
         if (adBlock.refreshDue(now) && !adBlockBusy) { adBlockBusy = true; scope.launch(IO) { try { adBlock.refresh(now) } finally { adBlockBusy = false } } }
@@ -530,7 +536,8 @@ class App(val dir: Path = dataDir()) {
         val zone = ZoneId.systemDefault(); val date = java.time.Instant.ofEpochSecond(now).atZone(zone).toLocalDate()
         val (first, last) = reports.presence(date)
         firstPresence = date to first
-        val planned = priorities.forDate(date).isNotEmpty() || checkins.done(date, "planning")
+        // Started with "Start my day" (tasks added on Home before that don't count yet).
+        val planned = checkins.done(date, "planning")
         dayStarted = if (planned) date else null
         val state = DayState(date, first, !away, planned, checkins.done(date, "midday"), checkins.done(date, "evening"), last)
         val due = Rhythm(zone, prefs.bool("rhythm.midday", true), prefs.bool("rhythm.evening_at_end", true), prefs.int("rhythm.evening_lead_min", 30)).due(settings.schedule, state, now)
@@ -552,16 +559,55 @@ class App(val dir: Path = dataDir()) {
      * one done on the phone (phoneCheckins/{date}, its own document so nothing here overwrites it) is saved here as if
      * done here, and its prompt closes.
      */
+    /** Today's and the previous plan day's tasks, with every regular sync (see [planSync]). */
+    private fun syncPlans(c: dev.ontask.cloud.CloudClient, uid: String) {
+        val today = LocalDate.now()
+        planSync(today, c, uid)
+        priorities.previous(today)?.first?.let { planSync(it, c, uid) }
+    }
+
+    /**
+     * One day's plan with users/{uid}/plans/{date}: the newer list wins. A change made here is sent at once
+     * ([Priorities.onLocalChange]); one made on the phone is taken in.
+     */
+    @Synchronized private fun planSync(date: LocalDate, c0: dev.ontask.cloud.CloudClient? = null, uid0: String? = null) {
+        val c = c0 ?: cloud.client()?.takeIf { it.signedIn } ?: return
+        val uid = uid0 ?: c.ensureUid()
+        val remote = c.get("users/$uid/plans/$date")
+        val remoteMs = (remote?.get("updatedAt") as? kotlinx.serialization.json.JsonPrimitive)?.content?.toLongOrNull() ?: 0L
+        val (localMs, pushed) = priorities.meta(date) ?: (0L to true)
+        if (remote != null && remoteMs > localMs) {
+            val items = (remote["items"] as? kotlinx.serialization.json.JsonArray)?.mapNotNull { e ->
+                val o = e as? kotlinx.serialization.json.JsonObject ?: return@mapNotNull null
+                fun str(k: String) = (o[k] as? kotlinx.serialization.json.JsonPrimitive)?.content
+                str("text")?.takeIf { it.isNotBlank() }?.let { dev.ontask.plan.PlanItem(str("id") ?: dev.ontask.plan.Plan.newId(), it, str("done") == "true") }
+            } ?: emptyList()
+            priorities.setItems(date, items, remoteMs = remoteMs)
+        } else if (!pushed || (remote == null && priorities.items(date).isNotEmpty())) {
+            val ms = if (localMs > 0) localMs else System.currentTimeMillis()
+            c.write("users/$uid/plans", date.toString(), kotlinx.serialization.json.buildJsonObject {
+                put("date", kotlinx.serialization.json.JsonPrimitive(date.toString()))
+                put("items", kotlinx.serialization.json.JsonArray(priorities.items(date).map { i ->
+                    kotlinx.serialization.json.buildJsonObject {
+                        put("id", kotlinx.serialization.json.JsonPrimitive(i.id)); put("text", kotlinx.serialization.json.JsonPrimitive(i.text)); put("done", kotlinx.serialization.json.JsonPrimitive(i.done))
+                    }
+                }))
+                put("updatedAt", kotlinx.serialization.json.JsonPrimitive(ms)); put("by", kotlinx.serialization.json.JsonPrimitive("mac"))
+            })
+            priorities.markPushed(date, localMs)
+        }
+    }
+
     private fun syncCheckins(c: dev.ontask.cloud.CloudClient, uid: String) {
         val today = LocalDate.now(); val now = nowSec()
         val fromPhone = c.get("users/$uid/phoneCheckins/$today")
         fun str(o: kotlinx.serialization.json.JsonObject?, k: String) = (o?.get(k) as? kotlinx.serialization.json.JsonPrimitive)?.content?.takeIf { it.isNotBlank() && it != "null" }
         fromPhone?.let { f ->
             (f["planning"] as? kotlinx.serialization.json.JsonObject)?.let { o ->
-                if (!checkins.done(today, "planning")) { str(o, "plan")?.let { priorities.set(today, listOf(it)) }; checkins.save(Checkin(today, "planning", now, null, null, null, null, null, false)); finishPromptIf(Prompt.PLANNING, Prompt.PLANNING_SHORT) }
+                if (!checkins.done(today, "planning")) { str(o, "plan")?.takeIf { priorities.items(today).isEmpty() }?.let { priorities.set(today, listOf(it)) }; checkins.save(Checkin(today, "planning", now, null, null, null, null, null, false)); finishPromptIf(Prompt.PLANNING, Prompt.PLANNING_SHORT) }
             }
             (f["midday"] as? kotlinx.serialization.json.JsonObject)?.let { o ->
-                if (!checkins.done(today, "midday")) { checkins.save(Checkin(today, "midday", now, null, str(o, "done"), str(o, "should"), str(o, "chips"), null, false)); str(o, "plan")?.let { priorities.set(today, listOf(it)) }; finishPromptIf(Prompt.MIDDAY) }
+                if (!checkins.done(today, "midday")) { checkins.save(Checkin(today, "midday", now, null, str(o, "done"), str(o, "should"), str(o, "chips"), null, false)); str(o, "plan")?.takeIf { priorities.items(today).isEmpty() }?.let { priorities.set(today, listOf(it)) }; finishPromptIf(Prompt.MIDDAY) }
             }
             (f["evening"] as? kotlinx.serialization.json.JsonObject)?.let { o ->
                 if (checkins.get(today, "evening")?.sent != true) { checkins.save(Checkin(today, "evening", now, str(o, "rating")?.toIntOrNull(), str(o, "helped"), str(o, "hurt"), str(o, "change"), str(o, "note"), true)); finishPromptIf(Prompt.EVENING) }
@@ -577,6 +623,8 @@ class App(val dir: Path = dataDir()) {
         }
     }
 
+    /** The day was started from Home: the morning plan's window closes. */
+    fun finishPlanning() = finishPromptIf(Prompt.PLANNING, Prompt.PLANNING_SHORT)
     private fun finishPromptIf(vararg p: Prompt) { if (_duePrompt.value in p) _duePrompt.value = null }
 
     /** Each daily prompt can be put off twice a day ("Later", or closing its window); then it stays up. */
