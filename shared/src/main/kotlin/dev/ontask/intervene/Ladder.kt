@@ -110,10 +110,16 @@ class Ladder(var cfg: LadderConfig = LadderConfig()) {
     val checking get() = checkUntil > 0 || countdownUntil > 0
     val countingDown get() = countdownUntil > 0
 
-    fun tick(now: Long, wasted: Boolean, active: Boolean, unblocksInWindow: Int): Intervention? {
-        val dw = if (wasted && lastTickWasted) now - lastTick else 0L
+    /**
+     * [held]: OnTask's own window is in front (you're reading or answering a prompt). That time neither adds to the
+     * drift nor counts as being back at work: whatever you were doing before carries on, paused.
+     */
+    fun tick(now: Long, wasted0: Boolean, active: Boolean, unblocksInWindow: Int, held: Boolean = false): Intervention? {
+        val wasted = if (held) lastTickWasted else wasted0
+        val dw = if (!held && wasted && lastTickWasted) now - lastTick else 0L
         if (wastedSince != null) wastedSec += dw
         lastTick = now; lastTickWasted = wasted
+        if (held && wastedSince != null) lastWasted = now
         if (!active) { reset(); checkUntil = 0; watchUntil = 0; messaged = false; return null }
         if (countdownUntil > 0) {
             if (now < countdownUntil) return null
@@ -218,6 +224,32 @@ class Ladder(var cfg: LadderConfig = LadderConfig()) {
 
     /** "I'm struggling": jump to the partner step. */
     fun struggling(): Intervention? { if (step == Step.PARTNER) return null; step = Step.PARTNER; step3Open = false; return Intervention(step, 0, 0) }
+
+    /** Everything needed to pick up after OnTask restarts (saved by the caller, see [restore]). */
+    fun snapshot(now: Long): String = listOf(
+        now, step.name, wastedSince ?: -1, lastWasted, wastedSec, lastTick, lastTickWasted, checkUntil, lastRemind, offSince, watchUntil,
+        lastPeak, lastEnd, afterBreak, afterBreakTs, step3Open, step3Wasted, countdownUntil, countdownReason.name, partnerWatchUntil,
+        partnerWatchWasted, fromStep3, afterSend, messaged,
+    ).joinToString("|")
+
+    /**
+     * After a restart: within 10 minutes the drift carries on where it was (step, time drifted, checks, countdown); later
+     * than that, only what an hour-long memory needs (the last peak, and whether your partner already heard).
+     */
+    fun restore(saved: String?, now: Long) = runCatching {
+        val f = saved?.split("|") ?: return@runCatching
+        if (f.size < 24) return@runCatching
+        val at = f[0].toLong()
+        lastPeak = f[11].toInt(); lastEnd = f[12].toLong()
+        if (now - at > 600) return@runCatching
+        step = Step.valueOf(f[1]); wastedSince = f[2].toLong().takeIf { it >= 0 }; lastWasted = f[3].toLong(); wastedSec = f[4].toLong()
+        lastTick = f[5].toLong(); lastTickWasted = f[6].toBoolean(); checkUntil = f[7].toLong(); lastRemind = f[8].toLong(); offSince = f[9].toLong()
+        watchUntil = f[10].toLong(); afterBreak = f[13].toBoolean(); afterBreakTs = f[14].toLong(); step3Open = f[15].toBoolean()
+        step3Wasted = f[16].toLong(); countdownUntil = f[17].toLong(); countdownReason = AutoReason.valueOf(f[18]); partnerWatchUntil = f[19].toLong()
+        partnerWatchWasted = f[20].toLong(); fromStep3 = f[21].toBoolean(); afterSend = f[22].toBoolean(); messaged = f[23].toBoolean()
+        // The time OnTask was closed isn't drifting; carry on from now.
+        if (wastedSince != null) { lastWasted = now; lastTick = now }
+    }
 
     fun reset() {
         step = Step.NONE; wastedSince = null; wastedSec = 0

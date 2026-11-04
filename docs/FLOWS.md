@@ -115,6 +115,8 @@ stateDiagram-v2
 - **Picking up where it left off:** a new drift within the hour starts one step higher (second at step 2, third at
   step 3).
 - Closing a prompt with its X brings it back after 30 s. Nothing on a prompt makes you wait.
+- Time with OnTask's own window in front (reading or answering a prompt) pauses the drift; it doesn't end it.
+  The ladder is saved every 10 s, so a restart (an update, a quit) within 10 minutes carries on where it was.
 - Before work hours, step 3 is the step-2 window again (no partner). On the phone: step 1 is a notification, steps
   2–3 full screen; Back to work goes to the home screen.
 

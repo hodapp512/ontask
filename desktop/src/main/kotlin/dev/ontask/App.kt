@@ -101,6 +101,7 @@ class App(val dir: Path = dataDir()) {
     @Volatile var updateAvailable: dev.ontask.cloud.UpdateInfo? = null; private set
     private var lastCloud = 0L; private var lastUpdateCheck = 0L
     @Volatile private var lastPlanPull = 0L
+    private var lastLadderSave = 0L
 
     fun checkForUpdates(): dev.ontask.cloud.UpdateInfo? {
         val repo = prefs.get("update.repo") ?: return null
@@ -111,7 +112,8 @@ class App(val dir: Path = dataDir()) {
     val ai = AiService(prefs, db, dir.toFile())
         .also { a -> Thread { a.kev.deleteOldWeights() }.apply { isDaemon = true }.start() }
     val checkins = Checkins(db)
-    val ladder = Ladder()
+    // Picks up a drift in progress after a restart (see Ladder.restore).
+    val ladder = Ladder().also { it.restore(prefs.get("ladder.state"), System.currentTimeMillis() / 1000) }
     val alerts = AlertLimiter(2)
 
     private val _intervention = MutableStateFlow<Intervention?>(null)
@@ -348,8 +350,12 @@ class App(val dir: Path = dataDir()) {
         val strict = blocking.strictNow(now)
         if (now - lastPartnerCheck >= 60) { lastPartnerCheck = now; hasPartner = cloud.linkInfo()?.partners?.isNotEmpty() == true }
         ladder.partnerAuto = strict && hasPartner
-        val iv = ladder.tick(now, wasted, (strict || beforeWorkStarted(now)) && !onBreak, unblocks.unblocksInLast(now, ladder.cfg.unblockWindowSec.toLong()))
+        // OnTask's own window in front (a prompt you're reading): the drift pauses, it doesn't end.
+        val held = !live.away && live.sample?.bundleId == "dev.ontask.app"
+        val iv = ladder.tick(now, wasted, (strict || beforeWorkStarted(now)) && !onBreak, unblocks.unblocksInLast(now, ladder.cfg.unblockWindowSec.toLong()), held)
             ?.let { decorate(it, now) }
+        // Saved every 10 s, so a restart (an update, a quit) picks the drift up where it was.
+        if (now - lastLadderSave >= 10) { lastLadderSave = now; prefs.set("ladder.state", ladder.snapshot(now)) }
         if (iv?.send != null) { autoSend(iv, now); _intervention.value = null; closedIv = null }
         else if (iv != null && prefs.bool("ladder.enabled", true)) { _intervention.value = iv; closedIv = null; if (iv.step.n >= 2) _breakCard.value = null }
         // The countdown's window goes once its 10 seconds are up (sent, or watching you stay on task).

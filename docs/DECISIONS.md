@@ -652,3 +652,12 @@ when it comes to the front.*
   the window measures what it draws and takes exactly that height, with the buttons at the bottom and no empty space.
   Guessed heights left the buttons cut off or a gap under them; buttons above the plan was rejected (they belong at
   the bottom). Checked on screen with `./gradlew previewWindows`.
+
+## 2026-11-04 · Drifts survive restarts and prompts
+
+- **Why:** 20+ minutes on YouTube never reached step 3: two app restarts (updates) reset the ladder, and a minute on
+  OnTask's own prompt windows (counted as focused) ended the drift.
+- **The ladder is saved every 10 s and restored on start:** within 10 minutes it carries on (step, time drifted,
+  checks, countdown); later, it keeps only the last peak and whether your partner already heard.
+- **OnTask's own window in front pauses the drift** instead of counting as work. *Rejected:* counting it as drifting
+  (reading a prompt isn't wasting time).
