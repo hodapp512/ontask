@@ -89,7 +89,7 @@ fun InterventionWindow(app: App, iv: Intervention, mode: ThemeMode) {
                 state = rememberWindowState(size = size, position = centeredOnActiveScreen(size)),
             ) {
                 LaunchedEffect(Unit) { bringForwardAlone(window) }
-                OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) { if (iv.reminder) Reminder(app, iv) else if (iv.breakSec > 0) BreakCheck(app, iv) else StepOne(app, iv) } }
+                OnTaskTheme(mode) { Surface(Modifier.fillMaxSize().clearFocusOnTap()) { if (iv.reminder) Reminder(app, iv) else if (iv.breakSec > 0) BreakCheck(app, iv) else StepOne(app, iv) } }
             }
         }
 
@@ -101,7 +101,7 @@ fun InterventionWindow(app: App, iv: Intervention, mode: ThemeMode) {
                 state = rememberWindowState(size = DpSize(560.dp, 640.dp), position = centeredOnActiveScreen(DpSize(560.dp, 640.dp))),
             ) {
                 LaunchedEffect(Unit) { bringForwardAlone(window) }
-                OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) { StepTwo(app, iv) } }
+                OnTaskTheme(mode) { Surface(Modifier.fillMaxSize().clearFocusOnTap()) { StepTwo(app, iv) } }
             }
         }
 
@@ -110,7 +110,7 @@ fun InterventionWindow(app: App, iv: Intervention, mode: ThemeMode) {
             state = rememberWindowState(size = DpSize(540.dp, 620.dp), position = centeredOnActiveScreen(DpSize(540.dp, 620.dp))),
         ) {
             LaunchedEffect(Unit) { bringForwardAlone(window) }
-            OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) { StepThree(app, iv) } }
+            OnTaskTheme(mode) { Surface(Modifier.fillMaxSize().clearFocusOnTap()) { StepThree(app, iv) } }
         }
 
         Step.NONE -> {}
@@ -131,7 +131,7 @@ private fun CountdownWindow(app: App, iv: Intervention, mode: ThemeMode) {
         state = rememberWindowState(size = size, position = centeredOnActiveScreen(size)),
     ) {
         LaunchedEffect(Unit) { bringForwardAlone(window) }
-        OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) { Countdown(app, iv) } }
+        OnTaskTheme(mode) { Surface(Modifier.fillMaxSize().clearFocusOnTap()) { Countdown(app, iv) } }
     }
 }
 
@@ -208,7 +208,7 @@ private fun PlanBox(app: App) {
 }
 
 /** Extra window height for today's plan in a fixed-size nudge. */
-private fun planHeight(app: App) = app.priorities.itemsToday(App.nowSec()).size.let { if (it == 0) 0 else 40 + 40 * it }
+private fun planHeight(app: App) = app.priorities.itemsToday(App.nowSec()).size.let { if (it == 0) 0 else 36 + 30 * it }
 
 /** "Back to work": OnTask then checks you switch (see Ladder.backToWork). */
 @Composable
@@ -337,7 +337,7 @@ fun BreakCardWindow(app: App, c: App.BreakCard, mode: ThemeMode) {
         state = rememberWindowState(size = size, position = centeredOnActiveScreen(size)),
     ) {
         LaunchedEffect(Unit) { bringForwardAlone(window) }
-        OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) {
+        OnTaskTheme(mode) { Surface(Modifier.fillMaxSize().clearFocusOnTap()) {
             Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
                     when (c.due) {
@@ -369,7 +369,7 @@ fun PromptWindow(app: App, prompt: Prompt, mode: ThemeMode) {
         state = rememberWindowState(size = DpSize(640.dp, 760.dp), position = centeredOnActiveScreen(DpSize(640.dp, 760.dp))),
     ) {
         OnTaskTheme(mode) {
-            Surface(Modifier.fillMaxSize()) {
+            Surface(Modifier.fillMaxSize().clearFocusOnTap()) {
                 PlanPromptContent(app, prompt, onDone = { app.finishPrompt(prompt) }, onLater = { m -> app.finishPrompt(prompt, snoozeMin = m) }, laterLeft = app.snoozesLeft(prompt))
             }
         }
@@ -384,7 +384,7 @@ fun UnblockNudgeWindow(app: App, n: App.UnblockNudge, mode: ThemeMode) {
         onCloseRequest = { app.unblockNudgeOk() }, title = "OnTask", alwaysOnTop = true, resizable = false, focusable = false,
         state = rememberWindowState(size = DpSize(440.dp, 190.dp), position = WindowPosition.Aligned(Alignment.BottomEnd)),
     ) {
-        OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) {
+        OnTaskTheme(mode) { Surface(Modifier.fillMaxSize().clearFocusOnTap()) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (n.ending) {
                     Text("Time's up: $sites ${if (n.domains.size == 1) "is" else "are"} blocked again.", style = MaterialTheme.typography.titleSmall)
@@ -421,7 +421,7 @@ fun BedtimeWindow(app: App, n: App.BedtimeNudge, mode: ThemeMode) {
         onCloseRequest = { if (left <= 0) app.bedtimeSnooze(10) }, title = "OnTask", alwaysOnTop = true, resizable = false,
         state = rememberWindowState(size = size, position = centeredOnActiveScreen(size)),
     ) {
-        OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) {
+        OnTaskTheme(mode) { Surface(Modifier.fillMaxSize().clearFocusOnTap()) {
             Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
                     when {

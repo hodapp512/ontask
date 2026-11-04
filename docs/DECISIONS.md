@@ -603,3 +603,6 @@ when it comes to the front.*
 - **The day starts with "Start my day"**, not with the first task added (adding tasks on Home before then doesn't
   turn on the before-work prompts).
 - **Old plans were split into tasks by line and by sentence.**
+- **Compact list, edited in place** (after seeing it on Home): rows close together with no hover shading; no
+  standing text box, just *+ Add task*; an edit saves on Enter, a click elsewhere, or starting another task.
+  **Yesterday's plan only in the morning plan,** not on Home.

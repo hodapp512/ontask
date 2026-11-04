@@ -37,7 +37,7 @@ fun MainScreen(app: App, startAt: Dest = Dest.HOME) {
     OnTaskTheme(mode) {
         var setupDone by remember { mutableStateOf(app.prefs.bool("setup.done", false)) }
         if (!setupDone) { SetupWizard(app) { setupDone = true }; return@OnTaskTheme }
-        androidx.compose.material3.Surface(Modifier.fillMaxSize(), color = androidx.compose.material3.MaterialTheme.colorScheme.background) { Row(Modifier.fillMaxSize()) {
+        androidx.compose.material3.Surface(Modifier.fillMaxSize().clearFocusOnTap(), color = androidx.compose.material3.MaterialTheme.colorScheme.background) { Row(Modifier.fillMaxSize()) {
             NavigationRail {
                 Dest.entries.filter { it.parent == null }.forEach { d ->
                     NavigationRailItem(selected = dest == d || dest.parent == d, onClick = { dest = d }, icon = { Text(d.glyph) }, label = { Text(d.label) })

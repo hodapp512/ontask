@@ -144,7 +144,6 @@ private fun TodayCard(app: App, date: LocalDate, onReflect: () -> Unit) {
             if (!planned && any) Button({ app.checkins.save(dev.ontask.plan.Checkin(date, "planning", App.nowSec(), null, null, null, null, null, false)); app.finishPlanning() }) { Text("Start my day") }
         }
         PlanList(app, date, editable = true)
-        YesterdayPlan(app, date)
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(

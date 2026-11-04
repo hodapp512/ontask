@@ -188,13 +188,15 @@ nothing under 25 min focused, then 5 min per 25 (at most 10 under an hour, 15 af
 ## Daily rhythm
 
 - The day is anchored to **first presence at the computer** on a work day, not clock time.
-- **Today's plan** on arrival: tasks you check off, not a text box. Add each with "Add your most important tasks
-  here"; past 5, "More than 5 is hard to finish — maybe save some for tomorrow." (no limit). Click a task to edit,
-  × to remove, drag ⋮⋮ to reorder (on the phone, press and hold ⋮⋮). Finished tasks stay, struck through.
+- **Today's plan** on arrival: tasks you check off, in compact rows with no hover shading. *+ Add task* opens a new
+  row in place ("Add your most important tasks here" until you type; Enter adds it and opens the next). Past 5,
+  "More than 5 is hard to finish — maybe save some for tomorrow." (no limit). Click a task to edit it in place:
+  Enter, clicking anywhere else or starting another task saves it; Escape cancels. × removes, dragging ⋮⋮ reorders
+  (on the phone, press and hold ⋮⋮). Finished tasks stay, struck through.
   - The morning plan shows the previous plan day ("Yesterday", or "Friday" on a Monday) with what got done; each
     unfinished task has *Add to today*. Yesterday's "change for tomorrow" is shown as a hint. *Start my day* starts
     the day (and the before-work prompts); tasks added on Home before that don't.
-  - Checkable everywhere it shows: Home (Mac and phone, with yesterday's below), the midday and evening check-ins,
+  - Checkable everywhere it shows: Home (Mac and phone; yesterday's plan isn't there), the midday and evening check-ins,
     every nudge (drift prompts, reminders, Is this a break?, break over, the countdown, step 3) and the unblock delay
     screen. The phone's step-1 notification shows "Next on your plan: …".
   - Shared: `users/{uid}/plans/{date}` `{items: [{id, text, done}], updatedAt, by}`; the whole list is rewritten on

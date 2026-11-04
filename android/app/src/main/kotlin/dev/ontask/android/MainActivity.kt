@@ -46,6 +46,7 @@ import dev.ontask.android.ui.OnTaskTheme
 import dev.ontask.android.ui.PeopleScreen
 import dev.ontask.android.ui.PersonScreen
 import dev.ontask.android.ui.SettingsScreen
+import dev.ontask.android.ui.clearFocusOnTap
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -209,7 +210,7 @@ class MainActivity : ComponentActivity() {
                 }
             },
         ) { pad ->
-            Column(Modifier.padding(pad).verticalScroll(rememberScrollState()).padding(16.dp)) {
+            Column(Modifier.padding(pad).verticalScroll(rememberScrollState()).padding(16.dp).clearFocusOnTap()) {
                 when {
                     checkin != null -> {
                         val kind = checkin!!

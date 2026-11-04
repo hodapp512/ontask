@@ -65,7 +65,6 @@ fun HomeScreen(uid: String, name: String) {
         }
         OCard("Today's plan") {
             PlanList(editable = true)
-            YesterdayPlan()
             Row(Modifier.fillMaxWidth()) { Text("Work hours", Modifier.weight(1f)); Muted(if (ranges.isEmpty()) "Day off" else ranges.joinToString(", ") { "${clock(it.first)}–${clock(it.second)}" }) }
             if (ranges.isNotEmpty()) {
                 val done = checkin?.getBoolean("evening") == true
