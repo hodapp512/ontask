@@ -107,7 +107,7 @@ fun PlanList(date: String = dayKey(), editable: Boolean = false, empty: String? 
                             onSave = { t -> if (t.isNotBlank()) PhonePlan.save(date, all + PlanItem(Plan.newId(), t.trim())) },
                             onEnter = { round++ }, onEnd = { if (editing == NEW) editing = null })
                     }
-                } else TextButton({ editing = NEW }) { Text("+ Add task") }
+                } else TextButton({ editing = NEW }, Modifier.padding(top = 20.dp)) { Text("+ Add task") }
                 if (items.size >= Plan.SOFT_MAX) Muted(Plan.TOO_MANY)
             }
         }

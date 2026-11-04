@@ -1,6 +1,10 @@
 package dev.ontask.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -88,7 +92,7 @@ fun PlanList(app: App, date: LocalDate = LocalDate.now(), editable: Boolean = fa
             }
             if (editable) {
                 if (editing == NEW) NewRow(app, date) { if (editing == NEW) editing = null }
-                else TextButton({ editing = NEW }, Modifier.height(32.dp)) { Text("+ Add task", style = MaterialTheme.typography.labelLarge) }
+                else TextButton({ editing = NEW }, Modifier.padding(top = 20.dp).height(32.dp)) { Text("+ Add task", style = MaterialTheme.typography.labelLarge) }
                 if (items.size >= Plan.SOFT_MAX) Text(Plan.TOO_MANY, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -103,7 +107,15 @@ private fun PlanRow(
     var drag by remember { mutableStateOf(0f) }
     val at by rememberUpdatedState(index)
     val n by rememberUpdatedState(count)
-    Row(Modifier.fillMaxWidth().height(ROW_DP.dp), verticalAlignment = Alignment.CenterVertically) {
+    // A light shade over the whole row (handle, checkbox, text and ×) while the pointer is on it.
+    val hover = remember { MutableInteractionSource() }
+    val hovered by hover.collectIsHoveredAsState()
+    Row(
+        Modifier.fillMaxWidth().height(ROW_DP.dp).hoverable(hover)
+            .background(if (hovered) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f) else androidx.compose.ui.graphics.Color.Transparent, RoundedCornerShape(6.dp))
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         if (editable) Text(
             "⋮⋮", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(end = 4.dp).pointerInput(item.id) {
@@ -134,7 +146,7 @@ private fun PlanRow(
 @Composable
 private fun NewRow(app: App, date: LocalDate, onEnd: () -> Unit) {
     var round by remember { mutableStateOf(0) }
-    Row(Modifier.fillMaxWidth().height(ROW_DP.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().height(ROW_DP.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Checkbox(false, null, Modifier.size(28.dp).alpha(0.4f))
         key(round) {
             TaskField("", Modifier.weight(1f).padding(start = 6.dp), placeholder = Plan.ADD_HINT,

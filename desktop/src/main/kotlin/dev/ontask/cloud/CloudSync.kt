@@ -42,7 +42,7 @@ class CloudSync(
     private val settings: () -> Settings,
     private val habits: Habits,
     private val checkins: Checkins,
-    private val clientFactory: (CloudConfig) -> CloudClient = { CloudClient(it, dev.ontask.ai.Keychain()) },
+    private val clientFactory: (CloudConfig) -> CloudClient = { CloudClient(it, if (CloudConfig.noCloud) null else dev.ontask.ai.Keychain()) },
     /** Applies a correction sent from the phone: file this app or site under that category. */
     private val relabel: (name: String, category: String) -> Unit = { _, _ -> },
     /** The same for one page or video on a Varies site: [itemKey] gets that category. */

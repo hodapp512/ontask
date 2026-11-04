@@ -606,3 +606,6 @@ when it comes to the front.*
 - **Compact list, edited in place** (after seeing it on Home): rows close together with no hover shading; no
   standing text box, just *+ Add task*; an edit saves on Enter, a click elsewhere, or starting another task.
   **Yesterday's plan only in the morning plan,** not on Home.
+- **The whole row shades lightly on hover** (handle to ×), not the text alone; *+ Add task* sits 20 px lower.
+- **Tests never reach the real server:** `ontask.noCloud` (set for every test run) turns off the built-in project and
+  the saved sign-in. A test app had synced its sample plan over the real one.

@@ -30,6 +30,8 @@ tasks.test {
     // Tests render screens off-screen; headless keeps the test JVM ("GradleWorkerMain") from taking the front on macOS
     // (OnTask would otherwise track it as an app you used).
     systemProperty("java.awt.headless", "true")
+    // Never the real server or your saved sign-in: a test app once synced its sample plan over the real one.
+    systemProperty("ontask.noCloud", "true")
 }
 tasks.processResources { filesMatching("version.properties") { expand("version" to project.version) } }
 

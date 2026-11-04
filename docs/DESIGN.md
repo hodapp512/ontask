@@ -188,7 +188,8 @@ nothing under 25 min focused, then 5 min per 25 (at most 10 under an hour, 15 af
 ## Daily rhythm
 
 - The day is anchored to **first presence at the computer** on a work day, not clock time.
-- **Today's plan** on arrival: tasks you check off, in compact rows with no hover shading. *+ Add task* opens a new
+- **Today's plan** on arrival: tasks you check off, in compact rows; on the Mac the whole row (handle, checkbox, text, ×) is lightly
+  shaded under the pointer. *+ Add task* opens a new
   row in place ("Add your most important tasks here" until you type; Enter adds it and opens the next). Past 5,
   "More than 5 is hard to finish — maybe save some for tomorrow." (no limit). Click a task to edit it in place:
   Enter, clicking anywhere else or starting another task saves it; Escape cancels. × removes, dragging ⋮⋮ reorders

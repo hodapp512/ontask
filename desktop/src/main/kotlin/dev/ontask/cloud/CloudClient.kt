@@ -38,8 +38,12 @@ open class CloudConfig(val projectId: String, val apiKey: String, val region: St
             java.util.Properties().apply { CloudConfig::class.java.getResourceAsStream("/cloud.properties")?.use { load(it) } }
         }
 
+        /** Set for tests: only a project they set themselves (a fake server or the emulator), never the built-in one. */
+        val noCloud get() = System.getProperty("ontask.noCloud") == "true"
+
         fun fromPrefs(p: Prefs): CloudConfig? {
             val emulator = p.bool("cloud.emulator", false)
+            if (noCloud && p.get("cloud.project").isNullOrBlank()) return null
             val project = p.get("cloud.project")?.takeIf { it.isNotBlank() } ?: (if (emulator) "demo-ontask" else bundled.getProperty("projectId")) ?: return null
             val apiKey = p.get("cloud.api_key")?.takeIf { it.isNotBlank() } ?: bundled.getProperty("apiKey") ?: "unused"
             return CloudConfig(project, apiKey, p.str("cloud.region", bundled.getProperty("region") ?: "us-central1"), emulator, p.get("cloud.web_url")?.takeIf { it.isNotBlank() } ?: bundled.getProperty("webUrl"))
