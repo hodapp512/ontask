@@ -1,7 +1,10 @@
 package dev.ontask.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -79,20 +82,19 @@ private fun Modifier.plainClick(onClick: () -> Unit): Modifier = composed {
 fun PlanList(app: App, date: LocalDate = LocalDate.now(), editable: Boolean = false, empty: String = "No plan was set today.") {
     val v by app.priorities.version.collectAsState()
     val items = remember(v, date) { app.priorities.items(date) }
-    // One task is edited at a time: starting another (or clicking away) ends and saves the current one.
-    var editing by remember { mutableStateOf<String?>(null) }
+    var adding by remember { mutableStateOf(false) }
     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
-        Column(Modifier.fillMaxWidth().clearFocusOnTap()) {
+        Column(Modifier.fillMaxWidth().clearFocusOnTap(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             if (items.isEmpty() && !editable) Text(empty, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            val rowPx = with(LocalDensity.current) { ROW_DP.dp.toPx() }
+            val rowPx = with(LocalDensity.current) { (ROW_DP + 5).dp.toPx() }
             items.forEachIndexed { i, it ->
                 key(it.id) {
-                    PlanRow(app, date, it, i, items.size, editable, rowPx, editing == it.id, onEdit = { editing = it.id }, onEditEnd = { if (editing == it.id) editing = null })
+                    PlanRow(app, date, it, i, items.size, editable, rowPx)
                 }
             }
             if (editable) {
-                if (editing == NEW) NewRow(app, date) { if (editing == NEW) editing = null }
-                else TextButton({ editing = NEW }, Modifier.padding(top = 20.dp).height(32.dp)) { Text("+ Add task", style = MaterialTheme.typography.labelLarge) }
+                if (adding) NewRow(app, date) { adding = false }
+                else TextButton({ adding = true }, Modifier.padding(top = 5.dp).height(32.dp)) { Text("+ Add task", style = MaterialTheme.typography.labelLarge) }
                 if (items.size >= Plan.SOFT_MAX) Text(Plan.TOO_MANY, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -102,7 +104,6 @@ fun PlanList(app: App, date: LocalDate = LocalDate.now(), editable: Boolean = fa
 @Composable
 private fun PlanRow(
     app: App, date: LocalDate, item: PlanItem, index: Int, count: Int, editable: Boolean, rowPx: Float,
-    editing: Boolean, onEdit: () -> Unit, onEditEnd: () -> Unit,
 ) {
     var drag by remember { mutableStateOf(0f) }
     val at by rememberUpdatedState(index)
@@ -132,14 +133,51 @@ private fun PlanRow(
             },
         )
         Checkbox(item.done, { app.priorities.toggle(date, item.id) }, Modifier.size(28.dp))
-        if (editing) TaskField(item.text, Modifier.weight(1f).padding(start = 6.dp), onSave = { t -> if (t.trim() != item.text) app.priorities.edit(date, item.id, t) }, onEnd = onEditEnd)
+        if (editable) InlineText(item, Modifier.weight(1f).padding(start = 6.dp)) { t -> app.priorities.edit(date, item.id, t) }
         else Text(
             item.text,
-            Modifier.weight(1f).padding(start = 6.dp).alpha(if (item.done) 0.6f else 1f).plainClick { if (editable) onEdit() else app.priorities.toggle(date, item.id) },
+            Modifier.weight(1f).padding(start = 6.dp).alpha(if (item.done) 0.6f else 1f).plainClick { app.priorities.toggle(date, item.id) },
             style = MaterialTheme.typography.bodyMedium.copy(textDecoration = if (item.done) TextDecoration.LineThrough else null),
         )
-        if (editable && !editing) Text("×", Modifier.padding(horizontal = 8.dp).plainClick { app.priorities.remove(date, item.id) }, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (editable) DeleteButton { app.priorities.remove(date, item.id) }
     }
+}
+
+/**
+ * A task's text, editable in place: clicking puts the cursor where you clicked. Enter, a click elsewhere or another
+ * task saves it; Escape puts it back.
+ */
+@Composable
+private fun InlineText(item: PlanItem, modifier: Modifier, onSave: (String) -> Unit) {
+    var text by remember(item.id) { mutableStateOf(item.text) }
+    var focused by remember { mutableStateOf(false) }
+    // A change from elsewhere (the phone, or a rename) shows unless you're typing.
+    LaunchedEffect(item.text) { if (!focused) text = item.text }
+    val fm = LocalFocusManager.current
+    BasicTextField(
+        text, { text = it },
+        modifier.alpha(if (item.done && !focused) 0.6f else 1f)
+            .onFocusChanged { if (focused && !it.isFocused && text.trim() != item.text) onSave(text); focused = it.isFocused }
+            .onPreviewKeyEvent { e ->
+                when (e.key) {
+                    Key.Enter, Key.NumPadEnter -> { if (e.type == KeyEventType.KeyDown) fm.clearFocus(); true }
+                    Key.Escape -> { if (e.type == KeyEventType.KeyDown) { text = item.text; fm.clearFocus() }; true }
+                    else -> false
+                }
+            },
+        singleLine = true,
+        textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface, textDecoration = if (item.done && !focused) TextDecoration.LineThrough else null),
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+    )
+}
+
+/** × in a small circle: removes the task. */
+@Composable
+private fun DeleteButton(onClick: () -> Unit) {
+    androidx.compose.foundation.layout.Box(
+        Modifier.padding(horizontal = 6.dp).size(20.dp).border(1.dp, MaterialTheme.colorScheme.outline, CircleShape).clip(CircleShape).plainClick(onClick),
+        contentAlignment = Alignment.Center,
+    ) { Text("×", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
 }
 
 /** The task being added: Enter adds it and opens a fresh one; clicking away adds what's typed and closes. */

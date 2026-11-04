@@ -3,6 +3,7 @@ package dev.ontask.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.foundation.clickable
@@ -143,6 +144,7 @@ private fun TodayCard(app: App, date: LocalDate, onReflect: () -> Unit) {
             Text("Today's plan", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             if (!planned && any) Button({ app.checkins.save(dev.ontask.plan.Checkin(date, "planning", App.nowSec(), null, null, null, null, null, false)); app.finishPlanning() }) { Text("Start my day") }
         }
+        androidx.compose.foundation.layout.Spacer(Modifier.size(10.dp))
         PlanList(app, date, editable = true)
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Row(verticalAlignment = Alignment.CenterVertically) {

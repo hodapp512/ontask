@@ -609,3 +609,5 @@ when it comes to the front.*
 - **The whole row shades lightly on hover** (handle to ×), not the text alone; *+ Add task* sits 20 px lower.
 - **Tests never reach the real server:** `ontask.noCloud` (set for every test run) turns off the built-in project and
   the saved sign-in. A test app had synced its sample plan over the real one.
+- **Editing puts the cursor where you click**, and the × (now in a circle) stays visible and usable while editing.
+  Tasks are 5 px apart, with a little more room under "Today's plan" and less above *+ Add task*.

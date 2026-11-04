@@ -1,6 +1,9 @@
 package dev.ontask.android.ui
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -69,8 +72,6 @@ fun rememberPlan(date: String = dayKey()): List<PlanItem> {
     return Plan.fromMaps(d?.get("items"))
 }
 
-private const val NEW = "+new"
-
 /** A tap on empty space ends text editing (and so saves a task being edited). */
 fun Modifier.clearFocusOnTap(): Modifier = composed {
     val fm = LocalFocusManager.current
@@ -89,25 +90,25 @@ private fun Modifier.plainClick(onClick: () -> Unit): Modifier = composed {
 @Composable
 fun PlanList(date: String = dayKey(), editable: Boolean = false, empty: String? = "No plan was set today.") {
     val items = rememberPlan(date)
-    var editing by remember { mutableStateOf<String?>(null) }
+    var adding by remember { mutableStateOf(false) }
     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
-        Column(Modifier.fillMaxWidth().clearFocusOnTap()) {
+        Column(Modifier.fillMaxWidth().clearFocusOnTap(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             if (items.isEmpty() && !editable && empty != null) Muted(empty)
-            val rowPx = with(LocalDensity.current) { 40.dp.toPx() }
+            val rowPx = with(LocalDensity.current) { 45.dp.toPx() }
             items.forEachIndexed { i, it ->
-                key(it.id) { PlanRow(date, items, it, i, editable, rowPx, editing == it.id, { editing = it.id }, { if (editing == it.id) editing = null }) }
+                key(it.id) { PlanRow(date, items, it, i, editable, rowPx) }
             }
             if (editable) {
-                if (editing == NEW) Row(Modifier.fillMaxWidth().height(40.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (adding) Row(Modifier.fillMaxWidth().height(40.dp), verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(false, null, Modifier.size(36.dp).alpha(0.4f))
                     var round by remember { mutableStateOf(0) }
                     val all by rememberUpdatedState(items)
                     key(round) {
                         TaskField("", Modifier.weight(1f).padding(start = 6.dp), Plan.ADD_HINT,
                             onSave = { t -> if (t.isNotBlank()) PhonePlan.save(date, all + PlanItem(Plan.newId(), t.trim())) },
-                            onEnter = { round++ }, onEnd = { if (editing == NEW) editing = null })
+                            onEnter = { round++ }, onEnd = { adding = false })
                     }
-                } else TextButton({ editing = NEW }, Modifier.padding(top = 20.dp)) { Text("+ Add task") }
+                } else TextButton({ adding = true }, Modifier.padding(top = 5.dp)) { Text("+ Add task") }
                 if (items.size >= Plan.SOFT_MAX) Muted(Plan.TOO_MANY)
             }
         }
@@ -115,7 +116,7 @@ fun PlanList(date: String = dayKey(), editable: Boolean = false, empty: String? 
 }
 
 @Composable
-private fun PlanRow(date: String, items: List<PlanItem>, item: PlanItem, index: Int, editable: Boolean, rowPx: Float, editing: Boolean, onEdit: () -> Unit, onEditEnd: () -> Unit) {
+private fun PlanRow(date: String, items: List<PlanItem>, item: PlanItem, index: Int, editable: Boolean, rowPx: Float) {
     val all by rememberUpdatedState(items)
     val at by rememberUpdatedState(index)
     var drag by remember { mutableStateOf(0f) }
@@ -134,15 +135,36 @@ private fun PlanRow(date: String, items: List<PlanItem>, item: PlanItem, index: 
             }
         })
         Checkbox(item.done, { toggle() }, Modifier.size(36.dp))
-        if (editing) TaskField(item.text, Modifier.weight(1f).padding(start = 6.dp), null,
-            onSave = { t -> if (t.trim() != item.text) put(if (t.isBlank()) all.filter { it.id != item.id } else all.map { if (it.id == item.id) it.copy(text = t.trim()) else it }) },
-            onEnter = null, onEnd = onEditEnd)
-        else Text(
-            item.text, Modifier.weight(1f).padding(start = 6.dp).alpha(if (item.done) 0.6f else 1f).plainClick { if (editable) onEdit() else toggle() },
+        if (editable) InlineText(item, Modifier.weight(1f).padding(start = 6.dp)) { t ->
+            put(if (t.isBlank()) all.filter { it.id != item.id } else all.map { if (it.id == item.id) it.copy(text = t.trim()) else it })
+        } else Text(
+            item.text, Modifier.weight(1f).padding(start = 6.dp).alpha(if (item.done) 0.6f else 1f).plainClick { toggle() },
             style = MaterialTheme.typography.bodyLarge.copy(textDecoration = if (item.done) TextDecoration.LineThrough else null),
         )
-        if (editable && !editing) Text("×", Modifier.padding(horizontal = 12.dp).plainClick { put(all.filter { it.id != item.id }) }, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (editable) Box(
+            Modifier.padding(horizontal = 8.dp).size(24.dp).border(1.dp, MaterialTheme.colorScheme.outline, CircleShape).clip(CircleShape).plainClick { put(all.filter { it.id != item.id }) },
+            contentAlignment = Alignment.Center,
+        ) { Text("×", color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
+}
+
+/** A task's text, editable in place: tapping puts the cursor where you tapped; Done or tapping elsewhere saves. */
+@Composable
+private fun InlineText(item: PlanItem, modifier: Modifier, onSave: (String) -> Unit) {
+    var text by remember(item.id) { mutableStateOf(item.text) }
+    var focused by remember { mutableStateOf(false) }
+    LaunchedEffect(item.text) { if (!focused) text = item.text }
+    val fm = LocalFocusManager.current
+    BasicTextField(
+        text, { text = it },
+        modifier.alpha(if (item.done && !focused) 0.6f else 1f)
+            .onFocusChanged { if (focused && !it.isFocused && text.trim() != item.text) onSave(text); focused = it.isFocused },
+        singleLine = true,
+        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface, textDecoration = if (item.done && !focused) TextDecoration.LineThrough else null),
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { fm.clearFocus() }),
+    )
 }
 
 /** An inline, borderless field the size of a task; saves when left in any way (Done, tapping elsewhere, another task). */

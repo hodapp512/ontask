@@ -191,9 +191,10 @@ nothing under 25 min focused, then 5 min per 25 (at most 10 under an hour, 15 af
 - **Today's plan** on arrival: tasks you check off, in compact rows; on the Mac the whole row (handle, checkbox, text, ×) is lightly
   shaded under the pointer. *+ Add task* opens a new
   row in place ("Add your most important tasks here" until you type; Enter adds it and opens the next). Past 5,
-  "More than 5 is hard to finish — maybe save some for tomorrow." (no limit). Click a task to edit it in place:
-  Enter, clicking anywhere else or starting another task saves it; Escape cancels. × removes, dragging ⋮⋮ reorders
-  (on the phone, press and hold ⋮⋮). Finished tasks stay, struck through.
+  "More than 5 is hard to finish — maybe save some for tomorrow." (no limit). Click a task's text to edit it in place, with
+  the cursor where you clicked: Enter, clicking anywhere else or another task saves it; Escape puts it back. The
+  circled × is always there and removes the task (even mid-edit). Dragging ⋮⋮ reorders (on the phone, press and
+  hold ⋮⋮). Finished tasks stay, struck through.
   - The morning plan shows the previous plan day ("Yesterday", or "Friday" on a Monday) with what got done; each
     unfinished task has *Add to today*. Yesterday's "change for tomorrow" is shown as a hint. *Start my day* starts
     the day (and the before-work prompts); tasks added on Home before that don't.
