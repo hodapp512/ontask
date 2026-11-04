@@ -88,6 +88,8 @@ class PromptActivity : ComponentActivity() {
             if (!onTask) {
                 Button({ p?.backToWorkFromCountdown(); finish() }, Modifier.fillMaxWidth()) { Text("I'm back to work") }
                 OutlinedButton({ onTask = true }, Modifier.fillMaxWidth()) { Text("I'm actually on task") }
+                // Lunchtime (11–2, once a day): starts lunch, and nothing is sent.
+                if (p?.lunchOffered() == true) OutlinedButton({ p.startBreak(lunch = true); finish() }, Modifier.fillMaxWidth()) { Text("I'm at lunch") }
             } else {
                 val items = remember { Tracker.running?.driftItems(minOf(3600L, driftSec + 900)).orEmpty() }
                 var picked by remember { mutableStateOf(items.firstOrNull()) }
@@ -142,6 +144,7 @@ class PromptActivity : ComponentActivity() {
             if (dev.ontask.android.ui.rememberPlan().isNotEmpty()) { Text("Today's plan", style = MaterialTheme.typography.titleSmall); dev.ontask.android.ui.PlanList() }
             Button({ p?.backToWork(); finish() }, Modifier.fillMaxWidth()) { Text("Back to work") }
             OutlinedButton({ p?.working(); finish() }, Modifier.fillMaxWidth()) { Text("It's actually work") }
+            if (p?.lunchOffered() == true) OutlinedButton({ p.startBreak(lunch = true); finish() }, Modifier.fillMaxWidth()) { Text("I'm at lunch") }
             if (!help) TextButton({ help = true }) { Text("Help me get started") }
             else {
                 Muted("Pick the smallest next step from your plan and give it 10 minutes. Put the phone face down.")

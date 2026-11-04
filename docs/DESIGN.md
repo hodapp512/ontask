@@ -146,6 +146,9 @@ nothing under 25 min focused, then 5 min per 25 (at most 10 under an hour, 15 af
 | 2 | +3 min, or 3rd unblock within 60 min | Firmer centered window (answerable at once): drift time, your message, today's plan, break totals; *Back to work / It's actually work / Help me get started* |
 | 3 | +5 min, or 4th unblock within 60 min | Work hours: offer to message the partner ("It's your call. You can edit the message."): *Send, and back to work / Not now, back to work / Help me get started*. Ignored, it's sent automatically (below). Before work hours: the step-2 window again |
 
+At lunchtime (11–2, once a day) every drift prompt, the countdown and the reminders also offer *Lunch* / *I'm at lunch*
+(starts lunch; nothing is sent).
+
 - **During a break** there are no drift prompts. It ends quietly after 2 min of focused work, or with **"That's 5
   minutes. Back to work?"** (break totals: last hour and today) → *Back to work / 5 more minutes* (once). Still drifting a minute after a break or lunch → straight to step 2.
 - **Lunch** (11:00–2:00, once a day, offered on step 1): no drift prompts; **"Is lunch over?" at 30 min** (*Back to work / 15

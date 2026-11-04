@@ -641,3 +641,6 @@ when it comes to the front.*
   pop-up is up or just closed, OnTask coming forward sends the main window back; when the last pop-up closes, the
   front goes back to the app you were in. Left alone: opening OnTask yourself, Cmd-Tab with no pop-up, and pop-ups
   that appear while you're using the main window.
+- **"I'm at lunch" on every drift prompt** at lunchtime (11–2, once a day), not just the first: the firmer window,
+  step 3, the countdown and the reminders too, on Mac and phone. It starts lunch and nothing is sent. A step-3
+  prompt at 12:30 had no way to say so.

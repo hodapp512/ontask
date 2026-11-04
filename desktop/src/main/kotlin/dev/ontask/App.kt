@@ -880,7 +880,7 @@ class App(val dir: Path = dataDir()) {
         iv.copy(
             partnerAllowed = blocking.strictNow(now), site = lastWastedSite,
             breakSec = if (iv.step == Step.PROMPT) breaks.earnedSec() else 0, focusedSec = breaks.focusedSec, toEarnSec = breaks.toEarnSec(),
-            lunch = iv.step == Step.PROMPT && breaks.lunchOffered(t.toLocalDate().toString(), t.hour * 60 + t.minute),
+            lunch = breaks.lunchOffered(t.toLocalDate().toString(), t.hour * 60 + t.minute),
             breaksHourSec = breaks.breakSec(now, now - 3600), breaksTodaySec = breaks.breakSec(now, t.toLocalDate().atStartOfDay(t.zone).toEpochSecond()),
         )
     }

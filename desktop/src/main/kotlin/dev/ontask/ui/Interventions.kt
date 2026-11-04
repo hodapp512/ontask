@@ -154,6 +154,7 @@ private fun Countdown(app: App, iv: Intervention) {
         if (!onTask) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Button({ app.countdownClosed() }) { Text("I'm back to work") }
             OutlinedButton({ onTask = true }) { Text("I'm actually on task") }
+            if (iv.lunch) OutlinedButton({ app.interventionLunch() }) { Text("I'm at lunch") }
         } else OnTaskChooser(app, iv)
     }
 }
@@ -225,6 +226,7 @@ private fun Reminder(app: App, iv: Intervention) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             BackButton(app)
             OutlinedButton({ app.interventionWork() }) { Text("I'm working") }
+            if (iv.lunch) OutlinedButton({ app.interventionLunch() }) { Text("I'm at lunch") }
         }
     }
 }
@@ -322,6 +324,7 @@ private fun StepThree(app: App, iv: Intervention) {
                 app.backToWork()
             }) { Text("Send, and back to work") }
             OutlinedButton({ app.backToWork() }) { Text("Not now, back to work") }
+            if (iv.lunch) OutlinedButton({ app.interventionLunch() }) { Text("I'm at lunch") }
             if (!help) TextButton({ help = true }) { Text("Help me get started") }
         }
         if (help) HelpPanel(app, iv, partner = false)
