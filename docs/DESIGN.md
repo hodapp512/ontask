@@ -132,8 +132,9 @@ This file describes how OnTask works now. **Why** each choice was made, and what
 Active during work hours, and on work days **once you've started your day (the morning plan is done) until work hours
 start** (prompts only then: no partner messages, unblocking stays relaxed). Before you start, the morning is yours. A
 site you unblocked outside work hours isn't counted as drifting while that unblock lasts. Drifting = time in a Wasted category. **Only time
-actually on it counts:** under a minute back at work (or away) pauses the count instead of ending the drift, and that
-minute isn't added to it.
+actually on it counts:** time back at work (or away) pauses the count instead of ending the drift, and isn't added to
+it; only 15 minutes off time-wasting ends a drift. **Closing a prompt with its X counts as ignoring it:** the next step
+comes after one more minute of drifting.
 
 **Breaks are earned.** Focused minutes since your last break add up; time that isn't focused (Neutral or Wasted) is
 taken off minute for minute once a stretch lasts a minute; 5+ min away, a break, or lunch starts it again. Earned:

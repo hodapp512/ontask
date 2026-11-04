@@ -14,7 +14,8 @@ data class LadderConfig(
     val watchDriftSec: Int = 30,          // …and brings the next step after this long
     val resumeWithinSec: Int = 3600,      // drifting again within this long picks up where the last drift left off
     val alertsPerDay: Int = 2,            // partner binge alerts rate limit (1-2/day)
-    val wastedBreakSec: Int = 60,         // this long off "wasted" ends the run
+    val wastedBreakSec: Int = 900,        // this long off "wasted" ends the run (shorter visits elsewhere only pause it)
+    val dismissedSec: Int = 60,           // a prompt closed with its X: the next step after this much more drifting
     val ignoreSec: Int = 60,              // step 3 unanswered while still drifting this long: the countdown to telling your partner
     val countdownSec: Int = 10,           // "Sending a message to your partner in 10…"
 )
@@ -163,7 +164,7 @@ class Ladder(var cfg: LadderConfig = LadderConfig()) {
         }
 
         // Back at work a minute after the break: it's over, and the next drift starts gently again.
-        if (afterBreak && wastedSince == null && now - afterBreakTs >= cfg.wastedBreakSec) afterBreak = false
+        if (afterBreak && wastedSince == null && now - afterBreakTs >= 60) afterBreak = false
         val drift = if (wastedSince != null) wastedSec else 0L
         var target = 0
         if (drift >= cfg.step1WastedSec) target = 1
@@ -174,12 +175,14 @@ class Ladder(var cfg: LadderConfig = LadderConfig()) {
         if (afterBreak && drift >= 60) target = maxOf(target, 2)
         // Back on time-wasting soon after "Back to work": the same drift goes on, the next step after 30 seconds.
         if (wastedSince != null && wastedSince!! < watchUntil && drift >= cfg.watchDriftSec) target = maxOf(target, minOf(3, maxOf(2, lastPeak + 1)))
+        // The last prompt was closed with its X (ignored): the next step after a minute more of drifting.
+        if (dismissedAt >= 0 && wastedSince != null && drift >= dismissedAt + cfg.dismissedSec) target = maxOf(target, minOf(3, step.n + 1))
         if (unblocksInWindow >= cfg.unblocksStep1) target = maxOf(target, 1)
         if (unblocksInWindow >= cfg.unblocksStep2) target = maxOf(target, 2)
         if (unblocksInWindow >= cfg.unblocksStep3) target = maxOf(target, 3)
 
         if (target > step.n) {
-            step = Step.entries[target]
+            step = Step.entries[target]; dismissedAt = -1
             if (step == Step.PARTNER && !messaged) { step3Open = true; step3Wasted = 0 }
             return Intervention(step, drift, unblocksInWindow)
         }
@@ -196,6 +199,18 @@ class Ladder(var cfg: LadderConfig = LadderConfig()) {
         val drift = wastedSec
         backToWork(now); afterSend = true; messaged = true
         return Intervention(Step.PARTNER, drift, 0, send = reason)
+    }
+
+    /** Drift time when the current prompt was closed with its X (-1: it wasn't). */
+    private var dismissedAt = -1L
+
+    /**
+     * A prompt closed with its X counts as ignored: step 1 or 2 moves on after a minute more of drifting, a reminder
+     * ends the "Back to work" check a minute from now, and step 3 already goes to the countdown that way.
+     */
+    fun dismissed(now: Long) {
+        if (checkUntil > 0) { checkUntil = minOf(checkUntil, now + cfg.dismissedSec); return }
+        if (step == Step.PROMPT || step == Step.WINDOW) dismissedAt = wastedSec
     }
 
     /** Step 3 answered by sending it yourself: nothing is sent automatically for this drift. */
@@ -229,7 +244,7 @@ class Ladder(var cfg: LadderConfig = LadderConfig()) {
     fun snapshot(now: Long): String = listOf(
         now, step.name, wastedSince ?: -1, lastWasted, wastedSec, lastTick, lastTickWasted, checkUntil, lastRemind, offSince, watchUntil,
         lastPeak, lastEnd, afterBreak, afterBreakTs, step3Open, step3Wasted, countdownUntil, countdownReason.name, partnerWatchUntil,
-        partnerWatchWasted, fromStep3, afterSend, messaged,
+        partnerWatchWasted, fromStep3, afterSend, messaged, dismissedAt,
     ).joinToString("|")
 
     /**
@@ -247,12 +262,13 @@ class Ladder(var cfg: LadderConfig = LadderConfig()) {
         watchUntil = f[10].toLong(); afterBreak = f[13].toBoolean(); afterBreakTs = f[14].toLong(); step3Open = f[15].toBoolean()
         step3Wasted = f[16].toLong(); countdownUntil = f[17].toLong(); countdownReason = AutoReason.valueOf(f[18]); partnerWatchUntil = f[19].toLong()
         partnerWatchWasted = f[20].toLong(); fromStep3 = f[21].toBoolean(); afterSend = f[22].toBoolean(); messaged = f[23].toBoolean()
+        dismissedAt = f.getOrNull(24)?.toLongOrNull() ?: -1
         // The time OnTask was closed isn't drifting; carry on from now.
         if (wastedSince != null) { lastWasted = now; lastTick = now }
     }
 
     fun reset() {
-        step = Step.NONE; wastedSince = null; wastedSec = 0
+        step = Step.NONE; wastedSince = null; wastedSec = 0; dismissedAt = -1
         step3Open = false; countdownUntil = 0; partnerWatchUntil = 0; fromStep3 = false; afterSend = false
     }
 }

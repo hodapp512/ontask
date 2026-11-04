@@ -74,8 +74,6 @@ class Prompts(private val svc: AccessibilityService) {
         }
         // Nothing escalating (and not in the check after "Back to work", whose reminders keep coming until you switch).
         if (ladder.step == Step.NONE && !ladder.checking && shownStep != Step.NONE) clear()
-        // A full-screen step closed with Back: it comes back after 30 seconds while you're still drifting.
-        if (shownStep.n >= 2 && activityClosedAt > 0 && now - activityClosedAt >= 30 && level == Level.WASTED) { activityClosedAt = 0; launchScreen(shownStep) }
     }
 
     private fun show(step: Step) {
@@ -83,7 +81,8 @@ class Prompts(private val svc: AccessibilityService) {
         if (step == Step.PROMPT) stepOneNotification() else { NotificationManagerCompat.from(svc).cancel(NOTE); launchScreen(step) }
     }
 
-    fun screenClosed() { activityClosedAt = now() }
+    /** A full-screen step closed with Back or swiped away: ignored, so the next step comes after a minute more of drifting. */
+    fun screenClosed() { activityClosedAt = now(); ladder.dismissed(now()) }
 
     private fun launchScreen(step: Step) {
         svc.startActivity(Intent(svc, PromptActivity::class.java).putExtra("step", step.n).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP))

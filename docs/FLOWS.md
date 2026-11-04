@@ -63,8 +63,8 @@ flowchart TD
 ## 2. Drift prompts (the ladder)
 
 In work hours (and on work days, before work hours, once the morning plan is done). A site you unblocked
-outside work hours isn't drifting while the unblock lasts. Drift = time actually on a Wasted category: a minute back
-at work or away pauses it; a minute off ends it.
+outside work hours isn't drifting while the unblock lasts. Drift = time actually on a Wasted category: time back
+at work or away (under 15 minutes) pauses it; 15 minutes off ends it.
 
 ```mermaid
 stateDiagram-v2
@@ -114,7 +114,9 @@ stateDiagram-v2
   *Still at lunch* adds 15 more each time.
 - **Picking up where it left off:** a new drift within the hour starts one step higher (second at step 2, third at
   step 3).
-- Closing a prompt with its X brings it back after 30 s. Nothing on a prompt makes you wait.
+- Closing a prompt with its X (on the phone: Back, or leaving the screen) counts as ignoring it: it doesn't come back,
+  and the next step comes after 1 more minute of drifting (step 3 → the countdown). Closing a reminder ends the
+  "Back to work" check a minute later. Nothing on a prompt makes you wait.
 - Time with OnTask's own window in front (reading or answering a prompt) pauses the drift; it doesn't end it.
   The ladder is saved every 10 s, so a restart (an update, a quit) within 10 minutes carries on where it was.
 - Before work hours, step 3 is the step-2 window again (no partner). On the phone: step 1 is a notification, steps

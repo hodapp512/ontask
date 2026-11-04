@@ -24,4 +24,21 @@ class LadderPersistTest {
         drift(l, 230, 260)
         assertEquals(Step.PROMPT, l.step)   // 100 + 30 s drifted is past 2 min; the drift wasn't ended
     }
+
+    @Test fun closingWithTheXMovesOnAfterAMinute() {
+        val l = Ladder(); l.partnerAuto = true
+        drift(l, 0, 125)                      // step 1 at 2 min
+        assertEquals(Step.PROMPT, l.step)
+        l.dismissed(125); drift(l, 130, 190)  // a minute more: step 2 (not 3 more minutes)
+        assertEquals(Step.WINDOW, l.step)
+        l.dismissed(190); drift(l, 195, 255)  // a minute more: step 3
+        assertEquals(Step.PARTNER, l.step)
+    }
+
+    @Test fun tenMinutesElsewhereOnlyPausesTheDrift() {
+        val l = Ladder(); drift(l, 0, 100)
+        var t = 105L; while (t <= 705) { l.tick(t, false, true, 0); t += 5 } // 10 min in Claude
+        drift(l, 710, 740)
+        assertEquals(Step.PROMPT, l.step)     // 100 + 30 s: the same drift went on
+    }
 }

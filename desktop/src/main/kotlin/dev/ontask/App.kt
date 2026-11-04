@@ -915,8 +915,8 @@ class App(val dir: Path = dataDir()) {
         events.emit("lunch_start", now); ladder.reset(); _intervention.value = null; closedIv = null
     }
 
-    /** The prompt's own close button: it comes back in 30 seconds while you're still drifting. */
-    fun interventionClosed() { _intervention.value?.let { closedIv = it to nowSec() + 30 }; _intervention.value = null }
+    /** The prompt's own close button: ignored. It doesn't come back; the next step comes after a minute more of drifting. */
+    fun interventionClosed() { ladder.dismissed(nowSec()); _intervention.value = null; closedIv = null }
     private var closedIv: Pair<Intervention, Long>? = null
     private var wasLunch = false
 

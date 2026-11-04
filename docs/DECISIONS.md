@@ -662,3 +662,13 @@ when it comes to the front.*
   checks, countdown); later, it keeps only the last peak and whether your partner already heard.
 - **OnTask's own window in front pauses the drift** instead of counting as work. *Rejected:* counting it as drifting
   (reading a prompt isn't wasting time).
+
+## 2026-11-04 · Closing a prompt counts as ignoring it (grilled)
+
+- **Why:** closing nudges with the X only hid them for 30 s, and a minute in Claude ended the drift, so 30 minutes
+  of YouTube never reached your partner.
+- **The X (phone: Back or leaving the screen) = ignored:** the prompt doesn't come back; the next step comes after 1
+  more minute of drifting (step 1 → 2 → 3 → countdown → message). On a reminder it ends the "Back to work" check a
+  minute later.
+- **15 minutes off time-wasting ends a drift** (was 1 minute). Shorter stretches elsewhere only pause it. *Rejected:*
+  5 minutes (too easy to slip between work and time-wasting and reset).

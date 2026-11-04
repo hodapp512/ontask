@@ -64,6 +64,8 @@ class PromptActivity : ComponentActivity() {
 
     @Suppress("DEPRECATION")
     override fun onBackPressed() { if (!countdown) Tracker.running?.prompts?.screenClosed(); finish() }
+    /** Going home (or to another app) with the screen still up counts like closing it. */
+    override fun onUserLeaveHint() { super.onUserLeaveHint(); if (!countdown && !isFinishing) Tracker.running?.prompts?.screenClosed() }
 
     /**
      * "Sending a message to your partner in 10…": why, and the message word for word. Closing it or "I'm back to
