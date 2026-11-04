@@ -53,7 +53,7 @@ class Breaks(
                     if (now >= a.until) { end(now); return Due.BREAK_OVER }
                 }
                 Kind.LUNCH -> {
-                    if (now - a.start >= lunchMaxSec) { end(now); return Due.LUNCH_OVER }
+                    if (now >= a.until) { end(now); return Due.LUNCH_OVER }
                     if (!a.asked && now - a.start >= lunchCheckSec) { active = a.copy(asked = true); return Due.LUNCH_CHECK }
                 }
             }
@@ -78,6 +78,12 @@ class Breaks(
     /** Lunch: offered 11:00–2:00 ([minuteOfDay]), once on [day]. */
     fun lunchOffered(day: String, minuteOfDay: Int) = lunchDay != day && minuteOfDay in 11 * 60 until 14 * 60
     fun startLunch(now: Long, day: String) { lunchDay = day; begin(Active(Kind.LUNCH, now, now + lunchMaxSec)) }
+
+    /** Lunch ended less than 30 minutes ago (it ran out while you were still eating): offer "Still at lunch". */
+    fun lunchJustEnded(now: Long) = active == null && lastKind == Kind.LUNCH && lastLunch?.let { now - it.second < 30 * 60 } == true
+
+    /** "Still at lunch": lunch goes on, 15 more minutes from now (as often as needed). */
+    fun moreLunch(now: Long) { val l = lastLunch ?: return; begin(Active(Kind.LUNCH, l.first, now + 15 * 60, asked = true)) }
 
     /** "5 more minutes" after a break (once), or "15 more minutes" of lunch. */
     fun extend(now: Long): Boolean {
@@ -104,10 +110,13 @@ class Breaks(
     fun end(now: Long) {
         val a = active ?: return
         if (a.kind == Kind.BREAK) taken += a.start to minOf(now, a.until)
+        if (a.kind == Kind.LUNCH) lastLunch = a.start to now
         lastKind = a.kind; lastExtended = a.extended
         active = null; focusedSec = 0; nonFocusRun = 0; focusedInBreak = 0
     }
     private var lastKind: Kind? = null
+    /** The last lunch (start, end), for "Still at lunch". */
+    private var lastLunch: Pair<Long, Long>? = null
     private var lastExtended = false
 
     private fun begin(a: Active) { active = a; focusedInBreak = 0 }

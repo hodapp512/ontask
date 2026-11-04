@@ -880,7 +880,8 @@ class App(val dir: Path = dataDir()) {
         iv.copy(
             partnerAllowed = blocking.strictNow(now), site = lastWastedSite,
             breakSec = if (iv.step == Step.PROMPT) breaks.earnedSec() else 0, focusedSec = breaks.focusedSec, toEarnSec = breaks.toEarnSec(),
-            lunch = breaks.lunchOffered(t.toLocalDate().toString(), t.hour * 60 + t.minute),
+            stillLunch = breaks.lunchJustEnded(now),
+            lunch = breaks.lunchJustEnded(now) || breaks.lunchOffered(t.toLocalDate().toString(), t.hour * 60 + t.minute),
             breaksHourSec = breaks.breakSec(now, now - 3600), breaksTodaySec = breaks.breakSec(now, t.toLocalDate().atStartOfDay(t.zone).toEpochSecond()),
         )
     }
@@ -901,7 +902,9 @@ class App(val dir: Path = dataDir()) {
     /** Lunch: up to 45 minutes, once a day between 11:00 and 2:00. */
     fun interventionLunch() {
         val now = nowSec()
-        synchronized(breaks) { breaks.startLunch(now, LocalDate.now().toString()) }
+        // Lunch that just ran out goes on for 15 more minutes; otherwise lunch starts.
+        val more = synchronized(breaks) { breaks.lunchJustEnded(now).also { if (it) breaks.moreLunch(now) else breaks.startLunch(now, LocalDate.now().toString()) } }
+        if (more) { events.emit("lunch_more", now); ladder.reset(); _intervention.value = null; closedIv = null; _breakCard.value = null; return }
         prefs.set("lunch.span", "${LocalDate.now()}|$now|${now + 45 * 60}")
         events.emit("lunch_start", now); ladder.reset(); _intervention.value = null; closedIv = null
     }
@@ -922,12 +925,12 @@ class App(val dir: Path = dataDir()) {
         BreakCard(
             due, if (due == dev.ontask.intervene.Breaks.Due.BREAK_OVER) ((last?.let { it.second - it.first } ?: 0) + 30) / 60 else (now - (breaks.active?.start ?: now)) / 60,
             breaks.breakSec(now, now - 3600), breaks.breakSec(now, LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toEpochSecond()),
-            canExtend = due == dev.ontask.intervene.Breaks.Due.LUNCH_CHECK || due == dev.ontask.intervene.Breaks.Due.BREAK_OVER && breaks.canExtend(now),
+            canExtend = due == dev.ontask.intervene.Breaks.Due.LUNCH_CHECK || due == dev.ontask.intervene.Breaks.Due.LUNCH_OVER || due == dev.ontask.intervene.Breaks.Due.BREAK_OVER && breaks.canExtend(now),
         )
     }
 
     /** "5 more minutes" (once per break) or "15 more minutes" of lunch. */
-    fun breakMore() { synchronized(breaks) { breaks.extend(nowSec()) }; ladder.reset(); _breakCard.value = null; closedCard = null }
+    fun breakMore() { synchronized(breaks) { val now = nowSec(); if (breaks.lunchJustEnded(now)) breaks.moreLunch(now) else breaks.extend(now) }; ladder.reset(); _breakCard.value = null; closedCard = null }
     fun breakCardDone() { if (_breakCard.value?.due == dev.ontask.intervene.Breaks.Due.LUNCH_CHECK) synchronized(breaks) { breaks.end(nowSec()) }; ladder.breakOver(nowSec()); _breakCard.value = null; closedCard = null }
     fun breakCardClosed() { _breakCard.value?.let { closedCard = it to nowSec() + 30 }; _breakCard.value = null }
 

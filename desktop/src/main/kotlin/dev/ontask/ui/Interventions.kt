@@ -154,7 +154,7 @@ private fun Countdown(app: App, iv: Intervention) {
         if (!onTask) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Button({ app.countdownClosed() }) { Text("I'm back to work") }
             OutlinedButton({ onTask = true }) { Text("I'm actually on task") }
-            if (iv.lunch) OutlinedButton({ app.interventionLunch() }) { Text("I'm at lunch") }
+            if (iv.lunch) OutlinedButton({ app.interventionLunch() }) { Text(if (iv.stillLunch) "Still at lunch" else "I'm at lunch") }
         } else OnTaskChooser(app, iv)
     }
 }
@@ -226,7 +226,7 @@ private fun Reminder(app: App, iv: Intervention) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             BackButton(app)
             OutlinedButton({ app.interventionWork() }) { Text("I'm working") }
-            if (iv.lunch) OutlinedButton({ app.interventionLunch() }) { Text("I'm at lunch") }
+            if (iv.lunch) OutlinedButton({ app.interventionLunch() }) { Text(if (iv.stillLunch) "Still at lunch" else "I'm at lunch") }
         }
     }
 }
@@ -244,7 +244,7 @@ private fun BreakCheck(app: App, iv: Intervention) {
             Button({ app.interventionBreak() }) { Text("Yes, $min-min break") }
             OutlinedButton({ app.interventionWork() }) { Text("I'm working") }
             OutlinedButton({ app.backToWork() }) { Text("Back to work") }
-            if (iv.lunch) OutlinedButton({ app.interventionLunch() }) { Text("Lunch") }
+            if (iv.lunch) OutlinedButton({ app.interventionLunch() }) { Text(if (iv.stillLunch) "Still at lunch" else "Lunch") }
         }
     }
 }
@@ -263,7 +263,7 @@ private fun StepOne(app: App, iv: Intervention) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             BackButton(app)
             OutlinedButton({ app.interventionWork() }) { Text("I'm working") }
-            if (iv.lunch) OutlinedButton({ app.interventionLunch() }) { Text("Lunch") }
+            if (iv.lunch) OutlinedButton({ app.interventionLunch() }) { Text(if (iv.stillLunch) "Still at lunch" else "Lunch") }
         }
     }
 }
@@ -298,6 +298,7 @@ private fun StepTwo(app: App, iv: Intervention) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             BackButton(app)
             OutlinedButton({ app.interventionWork() }) { Text("It's actually work") }
+            if (iv.lunch) OutlinedButton({ app.interventionLunch() }) { Text(if (iv.stillLunch) "Still at lunch" else "I'm at lunch") }
             if (!help) TextButton({ help = true }) { Text("Help me get started") }
         }
         if (help) HelpPanel(app, iv, partner = iv.partnerAllowed)
@@ -324,7 +325,7 @@ private fun StepThree(app: App, iv: Intervention) {
                 app.backToWork()
             }) { Text("Send, and back to work") }
             OutlinedButton({ app.backToWork() }) { Text("Not now, back to work") }
-            if (iv.lunch) OutlinedButton({ app.interventionLunch() }) { Text("I'm at lunch") }
+            if (iv.lunch) OutlinedButton({ app.interventionLunch() }) { Text(if (iv.stillLunch) "Still at lunch" else "I'm at lunch") }
             if (!help) TextButton({ help = true }) { Text("Help me get started") }
         }
         if (help) HelpPanel(app, iv, partner = false)
@@ -355,7 +356,7 @@ fun BreakCardWindow(app: App, c: App.BreakCard, mode: ThemeMode) {
                 PlanBox(app)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     BackButton(app)
-                    if (c.canExtend) OutlinedButton({ app.breakMore() }) { Text(if (c.due == Breaks.Due.LUNCH_CHECK) "15 more minutes" else "5 more minutes") }
+                    if (c.canExtend) OutlinedButton({ app.breakMore() }) { Text(if (c.due == Breaks.Due.BREAK_OVER) "5 more minutes" else "15 more minutes") }
                 }
             }
         } }

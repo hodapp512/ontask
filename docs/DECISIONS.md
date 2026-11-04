@@ -644,3 +644,7 @@ when it comes to the front.*
 - **"I'm at lunch" on every drift prompt** at lunchtime (11–2, once a day), not just the first: the firmer window,
   step 3, the countdown and the reminders too, on Mac and phone. It starts lunch and nothing is sent. A step-3
   prompt at 12:30 had no way to say so.
+- **The firmer "Time to come back" window has *I'm at lunch* too** (it was missed when lunch was added to every
+  prompt; a 12:40 prompt had no way to say so).
+- **"Still at lunch":** for 30 minutes after lunch runs out (45 min), every drift prompt and the "Lunch is over" card
+  offer it: 15 more minutes, as often as needed (Mac).

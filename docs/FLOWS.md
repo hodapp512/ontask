@@ -110,7 +110,8 @@ stateDiagram-v2
 
 - **Earned breaks:** 5 min per 25 focused (at most 10 under an hour, 15 after); unfocused time is taken off minute
   for minute. **Lunch:** 11–2, once a day, offered on every drift prompt ("I'm at lunch", which also stops a
-  partner message); "Is lunch over?" at 30 min, 15 more allowed, 45 max.
+  partner message); "Is lunch over?" at 30 min, 45 min by default; for 30 min after it runs out,
+  *Still at lunch* adds 15 more each time.
 - **Picking up where it left off:** a new drift within the hour starts one step higher (second at step 2, third at
   step 3).
 - Closing a prompt with its X brings it back after 30 s. Nothing on a prompt makes you wait.

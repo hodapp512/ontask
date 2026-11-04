@@ -50,7 +50,7 @@ data class Intervention(
     val step: Step, val driftSec: Long, val unblocks: Int, val partnerAllowed: Boolean = true, val site: String? = null,
     /** "Still on youtube.com. Back to work?": a reminder after "Back to work" while you haven't switched yet. */
     val reminder: Boolean = false,
-    val breakSec: Long = 0, val focusedSec: Long = 0, val toEarnSec: Long = 0, val lunch: Boolean = false,
+    val breakSec: Long = 0, val focusedSec: Long = 0, val toEarnSec: Long = 0, val lunch: Boolean = false, val stillLunch: Boolean = false,
     val breaksHourSec: Long = 0, val breaksTodaySec: Long = 0,
     /** Set: the "Sending a message to your partner in 10…" countdown, and why. */
     val countdown: AutoReason? = null,
