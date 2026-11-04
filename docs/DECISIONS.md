@@ -632,6 +632,7 @@ when it comes to the front.*
 - **Both devices, from the merged day**, so overlaps count once. Just for you; partners don't see it.
 - **Nudge windows fit their content** (height sized to what's in them) instead of a fixed height plus a guess for
   the plan: the guess was short and hid the reminder's *Back to work / I'm working* buttons.
-- **FLOWS.md diagrams are styled:** a shared light theme, rounded boxes, questions as white pills (not big
-  diamonds), and colors by meaning (green on track, amber nudge, red drifting, blue partner/server, gray quiet), with
-  a legend. Every diagram carries the same `%%{init}%%` line and classDefs; keep them when adding one.
+- **FLOWS.md diagrams stay in Mermaid's default look.** A custom theme (fonts, pale fills, pill-shaped questions)
+  looked good in a browser but broke in IntelliJ's dark Markdown preview (clipped text, light text on pale boxes), so
+  it was taken back out. Kept: readable state names in the drift diagram. *Rejected:* `%%{init}%%` themes and
+  classDef colors, which depend on the viewer's theme and fonts.

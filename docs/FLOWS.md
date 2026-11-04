@@ -4,9 +4,6 @@ Diagrams of how OnTask decides and acts. [DESIGN.md](DESIGN.md) has the full rul
 [DECISIONS.md](DECISIONS.md) the reasons. **Keep these current:** a change to one of these flows updates its diagram in
 the same commit. GitHub draws the Mermaid blocks; any Mermaid viewer works offline.
 
-**Colors:** green = on track, amber = a nudge, red = drifting or a hard step, blue = your partner or the
-server, gray = quiet or nothing happens; white pills are questions; the dark green box is where a flow starts.
-
 1. [How a category is decided](#1-how-a-category-is-decided)
 2. [Drift prompts (the ladder)](#2-drift-prompts-the-ladder)
 3. [Telling your partner when step 3 is ignored](#3-telling-your-partner-when-step-3-is-ignored)
@@ -22,53 +19,37 @@ server, gray = quiet or nothing happens; white pills are questions; the dark gre
 Every tick (a few seconds on the Mac, 5 s on the phone) the app, window title and address in front are classified.
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"fontFamily": "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif", "fontSize": "14px", "primaryColor": "#F7F9F8", "primaryBorderColor": "#B8C2BC", "primaryTextColor": "#1F2933", "lineColor": "#8A949C", "edgeLabelBackground": "#FFFFFF", "tertiaryColor": "#F7F9F8", "clusterBkg": "#F4F7F5", "clusterBorder": "#C8D0CB"}, "flowchart": {"curve": "basis", "nodeSpacing": 40, "rankSpacing": 50, "padding": 12}}}%%
 flowchart TD
-    T("Tick: app, title, address") --> AW(["Away?<br/>idle 2 min, locked, asleep,<br/>not if media or mic/camera"])
-    AW -- yes --> AWAY("Away: left out of ratios")
-    AW -- no --> S(["Search results page?<br/>Google, Bing, DuckDuckGo,<br/>Brave, Yahoo"])
+    T[Tick: app, title, address] --> AW{Away?<br/>idle 2 min, locked, asleep,<br/>not if media or mic/camera}
+    AW -- yes --> AWAY[Away: left out of ratios]
+    AW -- no --> S{Search results page?<br/>Google, Bing, DuckDuckGo,<br/>Brave, Yahoo}
     S -- yes --> V
-    S -- no --> R(["A rule matches?<br/>yours first, then built-in,<br/>title, then site, then app"])
-    R -- "no" --> U("Unclassified")
-    R -- "yes, Varies site" --> V("Varies: judge this page")
-    R -- "yes, a category" --> C("That category's level:<br/>Focused, Neutral or Wasted")
-    R -- "yes, Other<br/>new tab, notification, Spotlight…" --> O(["On it under 2 min?"])
-    O -- yes --> PREV("Counts as what came just before")
-    O -- no --> NEU("Neutral")
+    S -- no --> R{A rule matches?<br/>yours first, then built-in,<br/>title, then site, then app}
+    R -- "no" --> U[Unclassified]
+    R -- "yes, Varies site" --> V[Varies: judge this page]
+    R -- "yes, a category" --> C[That category's level:<br/>Focused, Neutral or Wasted]
+    R -- "yes, Other<br/>new tab, notification, Spotlight…" --> O{On it under 2 min?}
+    O -- yes --> PREV[Counts as what came just before]
+    O -- no --> NEU[Neutral]
 
-    V --> F(["A feed?<br/>YouTube home, Shorts,<br/>Reddit front, LinkedIn feed…"])
-    F -- yes --> W("Entertainment: Wasted")
-    F -- no --> VD(["Verdict remembered<br/>for this page?"])
+    V --> F{A feed?<br/>YouTube home, Shorts,<br/>Reddit front, LinkedIn feed…}
+    F -- yes --> W[Entertainment: Wasted]
+    F -- no --> VD{Verdict remembered<br/>for this page?}
     VD -- yes --> C
-    VD -- no --> SR(["Source rule?<br/>2 matching answers for its<br/>subreddit, channel, group…"])
+    VD -- no --> SR{Source rule?<br/>2 matching answers for its<br/>subreddit, channel, group…}
     SR -- yes --> C
-    SR -- no --> AI1(["AI sure, 60%+?<br/>Kev on the Mac, Jev for the phone,<br/>once per page"])
+    SR -- no --> AI1{AI sure, 60%+?<br/>Kev on the Mac, Jev for the phone,<br/>once per page}
     AI1 -- yes --> C
-    AI1 -- no --> UN("Unsure, counted as Neutral")
+    AI1 -- no --> UN[Unsure, counted as Neutral]
 
-    U --> AI2(["AI sure about<br/>the site or app?"])
+    U --> AI2{AI sure about<br/>the site or app?}
     AI2 -- yes --> C
     AI2 -- no --> ASK
 
-    UN --> ASK("After 15 s: screenshot of the front window,<br/>then ask: Which category is this? / Is this work?")
-    ASK -- answered --> RULE("Rule or verdict, shared by both devices,<br/>past activity relabeled, screenshot deleted")
-    ASK -- "Not now / closed" --> LATER("Asked again later, and listed in<br/>Help sort these after the next check-in")
+    UN --> ASK[After 15 s: screenshot of the front window,<br/>then ask: Which category is this? / Is this work?]
+    ASK -- answered --> RULE[Rule or verdict, shared by both devices,<br/>past activity relabeled, screenshot deleted]
+    ASK -- "Not now / closed" --> LATER[Asked again later, and listed in<br/>Help sort these after the next check-in]
     RULE --> C
-
-    classDef start fill:#1F7A44,stroke:#1F7A44,color:#FFFFFF,font-weight:bold
-    classDef good fill:#E3F4EA,stroke:#2E9E5B,color:#14532D
-    classDef bad fill:#FBE7E7,stroke:#D64545,color:#7F1D1D
-    classDef warn fill:#FFF4DA,stroke:#E0A526,color:#6B4E00
-    classDef partner fill:#E5EEFB,stroke:#4A7BD0,color:#1E3A6E
-    classDef quiet fill:#F1F3F2,stroke:#9AA5B1,color:#374151
-    class T start
-    class C,RULE good
-    class W bad
-    class V,UN warn
-    class ASK partner
-    class AWAY,PREV,NEU,U,LATER quiet
-    classDef ask fill:#FFFFFF,stroke:#6B7780,stroke-width:1.5px,color:#1F2933
-    class AI1,AI2,AW,F,O,R,S,SR,VD ask
 ```
 
 - Timings: unclassified question after 15 s; at most once per page and every 2 minutes; Not now = 15 min; closing
@@ -86,17 +67,7 @@ outside work hours isn't drifting while the unblock lasts. Drift = time actually
 at work or away pauses it; a minute off ends it.
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"fontFamily": "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif", "fontSize": "14px", "primaryColor": "#F7F9F8", "primaryBorderColor": "#B8C2BC", "primaryTextColor": "#1F2933", "lineColor": "#8A949C", "edgeLabelBackground": "#FFFFFF", "tertiaryColor": "#F7F9F8", "clusterBkg": "#F4F7F5", "clusterBorder": "#C8D0CB"}, "flowchart": {"curve": "basis", "nodeSpacing": 40, "rankSpacing": 50, "padding": 12}}}%%
 stateDiagram-v2
-    state "Working" as Working
-    state "Step 1 · Are you on task?" as Step1
-    state "Step 2 · Time to come back" as Step2
-    state "Step 3 · Tell your partner?" as Step3
-    state "Automatic message (flow 3)" as AutoSend
-    state "Break or lunch" as Break
-    state "Break over · Back to work?" as BreakOver
-    state "One step up" as NextStep
-    state "Back-to-work check" as Check
     [*] --> Working
     Working --> Step1: drift 2 min (1 min with a break earned)<br/>or 2nd unblock within the hour
     Step1 --> Step2: +3 min, or 3rd unblock
@@ -127,17 +98,14 @@ stateDiagram-v2
     BreakOver --> Check: Back to work
     BreakOver --> Step2: still drifting a minute later
 
-    classDef start fill:#1F7A44,stroke:#1F7A44,color:#FFFFFF,font-weight:bold
-    classDef good fill:#E3F4EA,stroke:#2E9E5B,color:#14532D
-    classDef bad fill:#FBE7E7,stroke:#D64545,color:#7F1D1D
-    classDef warn fill:#FFF4DA,stroke:#E0A526,color:#6B4E00
-    classDef partner fill:#E5EEFB,stroke:#4A7BD0,color:#1E3A6E
-    classDef quiet fill:#F1F3F2,stroke:#9AA5B1,color:#374151
-    class Working good
-    class Step1,Step2,BreakOver,NextStep warn
-    class Step3 bad
-    class AutoSend partner
-    class Break quiet
+    state "Step 1 · Are you on task?" as Step1
+    state "Step 2 · Time to come back" as Step2
+    state "Step 3 · Tell your partner?" as Step3
+    state "Automatic message (flow 3)" as AutoSend
+    state "Break or lunch" as Break
+    state "Break over · Back to work?" as BreakOver
+    state "One step up" as NextStep
+    state "Back-to-work check" as Check
 ```
 
 - **Earned breaks:** 5 min per 25 focused (at most 10 under an hour, 15 after); unfocused time is taken off minute
@@ -155,42 +123,27 @@ stateDiagram-v2
 Work hours, with a partner. At most one message per drift, and the server's cap applies (flow 6).
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"fontFamily": "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif", "fontSize": "14px", "primaryColor": "#F7F9F8", "primaryBorderColor": "#B8C2BC", "primaryTextColor": "#1F2933", "lineColor": "#8A949C", "edgeLabelBackground": "#FFFFFF", "tertiaryColor": "#F7F9F8", "clusterBkg": "#F4F7F5", "clusterBorder": "#C8D0CB"}, "flowchart": {"curve": "basis", "nodeSpacing": 40, "rankSpacing": 50, "padding": 12}}}%%
 flowchart TD
-    S3("Step 3: Want to let your partner know?") --> A(["What do you do?"])
-    A -- "Send, and back to work" --> SENT_SELF("Your message goes.<br/>Nothing more for this drift") --> CHK
-    A -- "Not now, back to work" --> CHK("Back-to-work check:<br/>5 min to switch, reminder every 30 s")
-    A -- "nothing, or the X,<br/>1 min more of drifting" --> CD1("Countdown, 10 s<br/>'You've been on reddit.com for 12 min<br/>and didn't answer the check-in.'")
+    S3[Step 3: Want to let your partner know?] --> A{What do you do?}
+    A -- "Send, and back to work" --> SENT_SELF[Your message goes.<br/>Nothing more for this drift] --> CHK
+    A -- "Not now, back to work" --> CHK[Back-to-work check:<br/>5 min to switch, reminder every 30 s]
+    A -- "nothing, or the X,<br/>1 min more of drifting" --> CD1[Countdown, 10 s<br/>'You've been on reddit.com for 12 min<br/>and didn't answer the check-in.']
 
-    CHK -- "still on it after 5 min" --> CD2("Countdown, 10 s<br/>'…still on reddit.com after 5 minutes.'")
+    CHK -- "still on it after 5 min" --> CD2[Countdown, 10 s<br/>'…still on reddit.com after 5 minutes.']
     CHK -- "switched (and Not now was pressed)" --> WATCH
-    CHK -- "switched (after your own send)" --> DONE("Done")
+    CHK -- "switched (after your own send)" --> DONE[Done]
 
-    CD1 --> END(["When the 10 s are up"])
+    CD1 --> END{When the 10 s are up}
     CD2 --> END
-    CD1 -. "I'm actually on task" .-> PICK("Pick what was work:<br/>a page or the whole site") --> WORK("Filed as Work, nothing sent")
+    CD1 -. "I'm actually on task" .-> PICK[Pick what was work:<br/>a page or the whole site] --> WORK[Filed as Work, nothing sent]
     CD2 -. "I'm actually on task" .-> PICK
 
     END -- "still on time-wasting" --> SEND
-    END -- "back at work" --> WATCH("10-minute watch")
+    END -- "back at work" --> WATCH[10-minute watch]
     WATCH -- "30 s back on time-wasting" --> SEND
     WATCH -- "10 min on task" --> DONE
 
-    SEND("OnTask's message goes to your partner,<br/>listed in your own daily report") --> REM("Reminders every 30 s until you switch,<br/>nothing more is sent")
-
-    classDef start fill:#1F7A44,stroke:#1F7A44,color:#FFFFFF,font-weight:bold
-    classDef good fill:#E3F4EA,stroke:#2E9E5B,color:#14532D
-    classDef bad fill:#FBE7E7,stroke:#D64545,color:#7F1D1D
-    classDef warn fill:#FFF4DA,stroke:#E0A526,color:#6B4E00
-    classDef partner fill:#E5EEFB,stroke:#4A7BD0,color:#1E3A6E
-    classDef quiet fill:#F1F3F2,stroke:#9AA5B1,color:#374151
-    class S3,CD1,CD2 bad
-    class CHK,WATCH warn
-    class SENT_SELF,SEND partner
-    class PICK,WORK,DONE good
-    class REM quiet
-    classDef ask fill:#FFFFFF,stroke:#6B7780,stroke-width:1.5px,color:#1F2933
-    class A,END ask
+    SEND[OnTask's message goes to your partner,<br/>listed in your own daily report] --> REM[Reminders every 30 s until you switch,<br/>nothing more is sent]
 ```
 
 - *I'm back to work* and the X only close the countdown window; what you do next decides.
@@ -204,37 +157,22 @@ Anchored to your first sit-down on a work day. Check-ins appear on the device in
 away from the Mac).
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"fontFamily": "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif", "fontSize": "14px", "primaryColor": "#F7F9F8", "primaryBorderColor": "#B8C2BC", "primaryTextColor": "#1F2933", "lineColor": "#8A949C", "edgeLabelBackground": "#FFFFFF", "tertiaryColor": "#F7F9F8", "clusterBkg": "#F4F7F5", "clusterBorder": "#C8D0CB"}, "flowchart": {"curve": "basis", "nodeSpacing": 40, "rankSpacing": 50, "padding": 12}}}%%
 flowchart TD
-    D("First sit-down on a work day") --> P("Today's plan, tasks to check off,<br/>with yesterday's to carry over +<br/>Working 9:00–5:00 today?")
-    P --> M("Midday check-in<br/>30 min before the midpoint")
-    M --> MS(["Done or later?"])
+    D[First sit-down on a work day] --> P[Today's plan, tasks to check off,<br/>with yesterday's to carry over +<br/>Working 9:00–5:00 today?]
+    P --> M[Midday check-in<br/>30 min before the midpoint]
+    M --> MS{Done or later?}
     MS -- "Do this later<br/>(twice a day at most)" --> M
-    MS -- Done --> H1(["Anything unsorted?"])
-    H1 -- yes --> SORT1("Help sort these:<br/>screenshot, name, time, category") --> E
+    MS -- Done --> H1{Anything unsorted?}
+    H1 -- yes --> SORT1[Help sort these:<br/>screenshot, name, time, category] --> E
     H1 -- no --> E
-    E("Evening check-in<br/>30 min before work ends") --> ES(["Done or later?"])
+    E[Evening check-in<br/>30 min before work ends] --> ES{Done or later?}
     ES -- later --> E
-    ES -- Done --> H2(["Anything unsorted?"])
-    H2 -- yes --> SORT2("Help sort these") --> R
+    ES -- Done --> H2{Anything unsorted?}
+    H2 -- yes --> SORT2[Help sort these] --> R
     H2 -- no --> R
-    R("Daily report<br/>30 min inactive after work, or 8 PM") --> PART("To each partner")
-    R --> ME("To you by email:<br/>titles + automatic messages")
-    R --> B("Bedtime 9:30 PM:<br/>reminder every 15 min while still on")
-
-    classDef start fill:#1F7A44,stroke:#1F7A44,color:#FFFFFF,font-weight:bold
-    classDef good fill:#E3F4EA,stroke:#2E9E5B,color:#14532D
-    classDef bad fill:#FBE7E7,stroke:#D64545,color:#7F1D1D
-    classDef warn fill:#FFF4DA,stroke:#E0A526,color:#6B4E00
-    classDef partner fill:#E5EEFB,stroke:#4A7BD0,color:#1E3A6E
-    classDef quiet fill:#F1F3F2,stroke:#9AA5B1,color:#374151
-    class D start
-    class P good
-    class M,E warn
-    class SORT1,SORT2,B quiet
-    class R,PART,ME partner
-    classDef ask fill:#FFFFFF,stroke:#6B7780,stroke-width:1.5px,color:#1F2933
-    class ES,H1,H2,MS ask
+    R[Daily report<br/>30 min inactive after work, or 8 PM] --> PART[To each partner]
+    R --> ME[To you by email:<br/>titles + automatic messages]
+    R --> B[Bedtime 9:30 PM:<br/>reminder every 15 min while still on]
 ```
 
 - Skipped sorting comes back in the next check-in (today's and yesterday's items).
@@ -248,34 +186,18 @@ flowchart TD
 The block list is blocked around the clock; work hours only change how hard it is to unblock.
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"fontFamily": "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif", "fontSize": "14px", "primaryColor": "#F7F9F8", "primaryBorderColor": "#B8C2BC", "primaryTextColor": "#1F2933", "lineColor": "#8A949C", "edgeLabelBackground": "#FFFFFF", "tertiaryColor": "#F7F9F8", "clusterBkg": "#F4F7F5", "clusterBorder": "#C8D0CB"}, "flowchart": {"curve": "basis", "nodeSpacing": 40, "rankSpacing": 50, "padding": 12}}}%%
 flowchart TD
-    U("Unblock a site") --> WH(["In work hours?"])
-    WH -- no --> FREE("Instant: 5, 10, 15, 30 min or 1 h,<br/>ends when work starts, nobody told")
-    WH -- yes --> FW(["For work?"])
-    FW -- yes --> PUR("Purpose + 15 min to 3 h, no delay") --> TOLD1("Partner told:<br/>work unblock with the purpose")
-    FW -- no --> DELAY("Delay that grows each time today:<br/>10 s, 30 s, 2 min, then 5 min")
-    DELAY --> LEN("5, 10 or 15 min") --> TOLD2("Partner told:<br/>unblock alert, capped")
-    LEN --> NUDGE("Corner nudge at start and end:<br/>OK / I'm struggling")
-    LEN --> LADDER("2nd–4th unblock within the hour<br/>escalates the ladder")
-    FREE --> END("Time's up: blocked again,<br/>an open tab goes to the blocked page")
+    U[Unblock a site] --> WH{In work hours?}
+    WH -- no --> FREE[Instant: 5, 10, 15, 30 min or 1 h,<br/>ends when work starts, nobody told]
+    WH -- yes --> FW{For work?}
+    FW -- yes --> PUR[Purpose + 15 min to 3 h, no delay] --> TOLD1[Partner told:<br/>work unblock with the purpose]
+    FW -- no --> DELAY[Delay that grows each time today:<br/>10 s, 30 s, 2 min, then 5 min]
+    DELAY --> LEN[5, 10 or 15 min] --> TOLD2[Partner told:<br/>unblock alert, capped]
+    LEN --> NUDGE[Corner nudge at start and end:<br/>OK / I'm struggling]
+    LEN --> LADDER[2nd–4th unblock within the hour<br/>escalates the ladder]
+    FREE --> END[Time's up: blocked again,<br/>an open tab goes to the blocked page]
     PUR --> END
     LEN --> END
-
-    classDef start fill:#1F7A44,stroke:#1F7A44,color:#FFFFFF,font-weight:bold
-    classDef good fill:#E3F4EA,stroke:#2E9E5B,color:#14532D
-    classDef bad fill:#FBE7E7,stroke:#D64545,color:#7F1D1D
-    classDef warn fill:#FFF4DA,stroke:#E0A526,color:#6B4E00
-    classDef partner fill:#E5EEFB,stroke:#4A7BD0,color:#1E3A6E
-    classDef quiet fill:#F1F3F2,stroke:#9AA5B1,color:#374151
-    class U start
-    class FREE,PUR good
-    class DELAY,LADDER bad
-    class LEN,NUDGE warn
-    class TOLD1,TOLD2 partner
-    class END quiet
-    classDef ask fill:#FFFFFF,stroke:#6B7780,stroke-width:1.5px,color:#1F2933
-    class FW,WH ask
 ```
 
 ---
@@ -285,32 +207,19 @@ flowchart TD
 Devices only write events; Cloud Functions send everything.
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"fontFamily": "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif", "fontSize": "14px", "primaryColor": "#F7F9F8", "primaryBorderColor": "#B8C2BC", "primaryTextColor": "#1F2933", "lineColor": "#8A949C", "edgeLabelBackground": "#FFFFFF", "tertiaryColor": "#F7F9F8", "clusterBkg": "#F4F7F5", "clusterBorder": "#C8D0CB"}, "flowchart": {"curve": "basis", "nodeSpacing": 40, "rankSpacing": 50, "padding": 12}}}%%
 flowchart TD
-    EV("Event from the Mac or phone") --> T(["Type"])
-    T -- "binge alert (yours or automatic),<br/>work-hours unblock" --> CAP(["Drift alerts this half-day<br/>under 2? midnight–noon, noon–midnight"])
-    CAP -- no --> HOLD("Held: listed in the daily report<br/>'Also today'")
+    EV[Event from the Mac or phone] --> T{Type}
+    T -- "binge alert (yours or automatic),<br/>work-hours unblock" --> CAP{Drift alerts this half-day<br/>under 2? midnight–noon, noon–midnight}
+    CAP -- no --> HOLD[Held: listed in the daily report<br/>'Also today']
     CAP -- yes --> Q
     T -- "work unblock, work-hours change" --> Q
     T -- "daily report" --> Q
-    Q(["Partner's quiet hours?"]) -- yes --> DEF("Deferred, sent when they end")
-    Q -- no --> CH(["Partner's channel<br/>for this type"])
-    CH -- push --> PUSH("Push, text instead if their app<br/>hasn't been opened in 3 days")
-    CH -- text --> TXT("Text")
-    CH -- email --> EM("Email")
-    CH -- off --> NONE("Not sent")
-
-    classDef start fill:#1F7A44,stroke:#1F7A44,color:#FFFFFF,font-weight:bold
-    classDef good fill:#E3F4EA,stroke:#2E9E5B,color:#14532D
-    classDef bad fill:#FBE7E7,stroke:#D64545,color:#7F1D1D
-    classDef warn fill:#FFF4DA,stroke:#E0A526,color:#6B4E00
-    classDef partner fill:#E5EEFB,stroke:#4A7BD0,color:#1E3A6E
-    classDef quiet fill:#F1F3F2,stroke:#9AA5B1,color:#374151
-    class EV start
-    class PUSH,TXT,EM partner
-    class HOLD,DEF,NONE quiet
-    classDef ask fill:#FFFFFF,stroke:#6B7780,stroke-width:1.5px,color:#1F2933
-    class CAP,CH,Q,T ask
+    Q{Partner's quiet hours?} -- yes --> DEF[Deferred, sent when they end]
+    Q -- no --> CH{Partner's channel<br/>for this type}
+    CH -- push --> PUSH[Push, text instead if their app<br/>hasn't been opened in 3 days]
+    CH -- text --> TXT[Text]
+    CH -- email --> EM[Email]
+    CH -- off --> NONE[Not sent]
 ```
 
 - Drift messages end with "No need to reply — but a 👍 helps." Partners can react with one tap; reactions reach the
@@ -322,42 +231,28 @@ flowchart TD
 ## 7. Mac and phone sync
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"fontFamily": "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif", "fontSize": "14px", "primaryColor": "#F7F9F8", "primaryBorderColor": "#B8C2BC", "primaryTextColor": "#1F2933", "lineColor": "#8A949C", "edgeLabelBackground": "#FFFFFF", "tertiaryColor": "#F7F9F8", "clusterBkg": "#F4F7F5", "clusterBorder": "#C8D0CB"}, "flowchart": {"curve": "basis", "nodeSpacing": 40, "rankSpacing": 50, "padding": 12}}}%%
 flowchart LR
     subgraph Mac
-        MT("Tracking + Kev") --> MR("deviceReports, deviceReportItems,<br/>deviceHeat: every 2 min, and on stepping away")
-        MS("Settings, rules, verdicts")
-        MST("state/breaks, state/rhythm,<br/>schedule/current")
+        MT[Tracking + Kev] --> MR[deviceReports, deviceReportItems,<br/>deviceHeat: every 2 min, and on stepping away]
+        MS[Settings, rules, verdicts]
+        MST[state/breaks, state/rhythm,<br/>schedule/current]
     end
     subgraph Phone
-        PT("Accessibility tracking") --> PR("Its own day report and heat:<br/>every 2 min and on screen-off")
-        PS("Settings, rules, verdicts")
-        PJ("Unknown items") --> JS("judgeSeen: Jev on the server")
+        PT[Accessibility tracking] --> PR[Its own day report and heat:<br/>every 2 min and on screen-off]
+        PS[Settings, rules, verdicts]
+        PJ[Unknown items] --> JS[judgeSeen: Jev on the server]
     end
     subgraph Firebase
-        MERGE("Merge functions:<br/>phone wins over overlapping Mac time") --> RD("reports, reportItems, heat/year")
-        SYNC("sync and verdicts:<br/>three-way merge on each device")
-        EVT("events → partner messages")
+        MERGE[Merge functions:<br/>phone wins over overlapping Mac time] --> RD[reports, reportItems, heat/year]
+        SYNC[sync and verdicts:<br/>three-way merge on each device]
+        EVT[events → partner messages]
     end
     MR --> MERGE
     PR --> MERGE
     MS <--> SYNC
     PS <--> SYNC
-    MST --> PH("Phone reads breaks, due check-in, work hours")
-    RD --> VIEW("Home on Mac and phone,<br/>Your patterns, partner view")
-
-    classDef start fill:#1F7A44,stroke:#1F7A44,color:#FFFFFF,font-weight:bold
-    classDef good fill:#E3F4EA,stroke:#2E9E5B,color:#14532D
-    classDef bad fill:#FBE7E7,stroke:#D64545,color:#7F1D1D
-    classDef warn fill:#FFF4DA,stroke:#E0A526,color:#6B4E00
-    classDef partner fill:#E5EEFB,stroke:#4A7BD0,color:#1E3A6E
-    classDef quiet fill:#F1F3F2,stroke:#9AA5B1,color:#374151
-    class MT,PT good
-    class MERGE,RD,SYNC,EVT,JS partner
-    class VIEW,PH quiet
-    style Mac fill:#F4F7F5,stroke:#2E9E5B
-    style Phone fill:#F4F7F5,stroke:#2E9E5B
-    style Firebase fill:#EEF3FC,stroke:#4A7BD0
+    MST --> PH[Phone reads breaks, due check-in, work hours]
+    RD --> VIEW[Home on Mac and phone,<br/>Your patterns, partner view]
 ```
 
 - Raw activity and screenshots never leave the device; only day reports, settings, verdicts and events do.
