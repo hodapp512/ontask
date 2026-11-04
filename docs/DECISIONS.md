@@ -573,3 +573,15 @@ when it comes to the front.*
   interruption for something that can wait until you open the app).
 - **A phone check-in already done closes itself.** Opening the phone's check-in (from an old notification, or one
   done on the Mac meanwhile) now checks both devices' records and closes if that check-in is done.
+
+## 2026-11-04 · Before work, prompts start when you start your day (grilled)
+
+- **Why:** an "Are you on task?" prompt at 7:45 while reading the news, more than an hour before work. Since Nov 2
+  prompts ran from the first sit-down.
+- **Before work hours, prompts start only once the morning plan is done** ("Start my day", on either device). Until
+  then the morning is yours; the plan prompt coming back is the nudge. Work hours prompt as before. *Rejected:* no
+  prompts before work at all (loses the Nov 2 fix for mornings already started), a fixed window before work hours,
+  exempting news.
+- **A site unblocked outside work hours isn't drifting while that unblock lasts**, even after the day has started:
+  you chose it.
+- The phone still prompts in work hours only; before-work time still counts in totals and reports.

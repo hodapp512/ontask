@@ -62,7 +62,8 @@ flowchart TD
 
 ## 2. Drift prompts (the ladder)
 
-In work hours (and on work days from the first sit-down). Drift = time actually on a Wasted category: a minute back
+In work hours (and on work days, before work hours, once the morning plan is done). A site you unblocked
+outside work hours isn't drifting while the unblock lasts. Drift = time actually on a Wasted category: a minute back
 at work or away pauses it; a minute off ends it.
 
 ```mermaid

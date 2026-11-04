@@ -129,8 +129,9 @@ This file describes how OnTask works now. **Why** each choice was made, and what
 
 ## Interventions (binge ladder)
 
-Active during work hours, and on work days **from your first sit-down until work hours start**
-(prompts only then: no partner messages, unblocking stays relaxed). Drifting = time in a Wasted category. **Only time
+Active during work hours, and on work days **once you've started your day (the morning plan is done) until work hours
+start** (prompts only then: no partner messages, unblocking stays relaxed). Before you start, the morning is yours. A
+site you unblocked outside work hours isn't counted as drifting while that unblock lasts. Drifting = time in a Wasted category. **Only time
 actually on it counts:** under a minute back at work (or away) pauses the count instead of ending the drift, and that
 minute isn't added to it.
 

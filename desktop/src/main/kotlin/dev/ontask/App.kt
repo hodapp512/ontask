@@ -322,7 +322,8 @@ class App(val dir: Path = dataDir()) {
         // Stepping away: sync now, so the server sees the final numbers and when you stopped.
         if (live.away && !wasAway && cloud.configured) { lastCloud = now; scope.launch(IO) { cloud.syncOnce(now, force = true) } }
         wasAway = live.away
-        val wasted = !live.away && live.classification?.level == Level.WASTED
+        // A site you unblocked outside work hours (the instant kind) isn't drifting while that unblock lasts.
+        val wasted = !live.away && live.classification?.level == Level.WASTED && !leisureUnblocked(now)
         if (wasted) driftSite()?.let { lastWastedSite = it }
         val (due, earned, onBreak) = synchronized(breaks) {
             breaks.forgetBefore(LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toEpochSecond())
@@ -340,7 +341,7 @@ class App(val dir: Path = dataDir()) {
         val strict = blocking.strictNow(now)
         if (now - lastPartnerCheck >= 60) { lastPartnerCheck = now; hasPartner = cloud.linkInfo()?.partners?.isNotEmpty() == true }
         ladder.partnerAuto = strict && hasPartner
-        val iv = ladder.tick(now, wasted, (strict || beforeWorkAfterSitDown(now)) && !onBreak, unblocks.unblocksInLast(now, ladder.cfg.unblockWindowSec.toLong()))
+        val iv = ladder.tick(now, wasted, (strict || beforeWorkStarted(now)) && !onBreak, unblocks.unblocksInLast(now, ladder.cfg.unblockWindowSec.toLong()))
             ?.let { decorate(it, now) }
         if (iv?.send != null) { autoSend(iv, now); _intervention.value = null; closedIv = null }
         else if (iv != null && prefs.bool("ladder.enabled", true)) { _intervention.value = iv; closedIv = null; if (iv.step.n >= 2) _breakCard.value = null }
@@ -529,7 +530,9 @@ class App(val dir: Path = dataDir()) {
         val zone = ZoneId.systemDefault(); val date = java.time.Instant.ofEpochSecond(now).atZone(zone).toLocalDate()
         val (first, last) = reports.presence(date)
         firstPresence = date to first
-        val state = DayState(date, first, !away, priorities.forDate(date).isNotEmpty() || checkins.done(date, "planning"), checkins.done(date, "midday"), checkins.done(date, "evening"), last)
+        val planned = priorities.forDate(date).isNotEmpty() || checkins.done(date, "planning")
+        dayStarted = if (planned) date else null
+        val state = DayState(date, first, !away, planned, checkins.done(date, "midday"), checkins.done(date, "evening"), last)
         val due = Rhythm(zone, prefs.bool("rhythm.midday", true), prefs.bool("rhythm.evening_at_end", true), prefs.int("rhythm.evening_lead_min", 30)).due(settings.schedule, state, now)
         // What's due whether or not you're at the Mac, so the phone can offer it when you're on the phone instead.
         rhythmDue = Rhythm(zone, prefs.bool("rhythm.midday", true), prefs.bool("rhythm.evening_at_end", true), prefs.int("rhythm.evening_lead_min", 30))
@@ -856,6 +859,12 @@ class App(val dir: Path = dataDir()) {
     @Volatile private var lastWastedSite: String? = null
 
     /** The site you're drifting on, for the prompts' "Block YouTube for 15 minutes" (whole site, e.g. youtube.com). */
+    /** Whether the site in front is one you unblocked outside work hours and that unblock is still on. */
+    private fun leisureUnblocked(now: Long): Boolean {
+        val site = driftSite() ?: return false
+        return runCatching { unblocks.active(now).any { it.kind == dev.ontask.block.UnblockKind.LEISURE && dev.ontask.classify.siteDomain(it.domain) == site } }.getOrDefault(false)
+    }
+
     fun driftSite(): String? = dev.ontask.classify.domainOf(tracker.live.value.sample?.url)?.let { dev.ontask.classify.siteDomain(it) }
 
     /** "Block <site> for 15 minutes": blocks it now and counts as "Back to work". Your partner isn't told. */
@@ -871,15 +880,19 @@ class App(val dir: Path = dataDir()) {
     /** Today's first moment at the computer (refreshed every 30 s by the rhythm check). */
     @Volatile private var firstPresence: Pair<LocalDate, Long?>? = null
 
+    /** The day whose morning plan is done (refreshed every 30 s by the rhythm check). */
+    @Volatile private var dayStarted: LocalDate? = null
+
     /**
-     * On a work day, from when you first sit down until work hours start, drifting gets the same prompts as during work
-     * hours (but no partner messages, and unblocking stays relaxed).
+     * On a work day, once you've started your day (the morning plan is done) and until work hours start, drifting gets
+     * the same prompts as during work hours (but no partner messages, and unblocking stays relaxed). Before you start,
+     * the morning is yours.
      */
-    private fun beforeWorkAfterSitDown(now: Long): Boolean {
+    private fun beforeWorkStarted(now: Long): Boolean {
         val zone = ZoneId.systemDefault()
         val t = java.time.Instant.ofEpochSecond(now).atZone(zone)
         val (date, first) = firstPresence ?: return false
-        if (date != t.toLocalDate() || first == null || first > now) return false
+        if (date != t.toLocalDate() || first == null || first > now || dayStarted != date) return false
         val start = settings.schedule.rangesFor(date).minOfOrNull { it.startMin } ?: return false
         return t.hour * 60 + t.minute < start
     }
