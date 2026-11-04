@@ -98,22 +98,26 @@ fun InterventionWindow(app: App, iv: Intervention, mode: ThemeMode) {
 
         // Before work hours, step 3 is the firmer window again (no partner message then).
         Step.WINDOW, Step.PARTNER.takeIf { !iv.partnerAllowed } -> {
+            val state = rememberWindowState(size = DpSize(560.dp, 480.dp), position = centeredOnActiveScreen(DpSize(560.dp, 480.dp)))
             Window(
                 // Normal-sized window (not full screen), answerable at once; closing it only hides it for a moment.
-                onCloseRequest = { app.interventionClosed() }, title = "OnTask — are you on task?", alwaysOnTop = true, resizable = true,
-                state = rememberWindowState(size = DpSize(560.dp, 640.dp), position = centeredOnActiveScreen(DpSize(560.dp, 640.dp))),
+                onCloseRequest = { app.interventionClosed() }, title = "OnTask — are you on task?", alwaysOnTop = true, resizable = false,
+                state = state,
             ) {
                 LaunchedEffect(Unit) { bringForwardAlone(window) }
-                OnTaskTheme(mode) { Surface(Modifier.fillMaxSize().clearFocusOnTap()) { StepTwo(app, iv) } }
+                OnTaskTheme(mode) { Surface(Modifier.fillMaxSize().clearFocusOnTap()) { FitHeight(state, 560.dp) { StepTwo(app, iv) } } }
             }
         }
 
-        Step.PARTNER -> Window(
-            onCloseRequest = { app.interventionClosed() }, title = "OnTask — reach out?", alwaysOnTop = true,
-            state = rememberWindowState(size = DpSize(540.dp, 620.dp), position = centeredOnActiveScreen(DpSize(540.dp, 620.dp))),
-        ) {
-            LaunchedEffect(Unit) { bringForwardAlone(window) }
-            OnTaskTheme(mode) { Surface(Modifier.fillMaxSize().clearFocusOnTap()) { StepThree(app, iv) } }
+        Step.PARTNER -> {
+            val state = rememberWindowState(size = DpSize(540.dp, 560.dp), position = centeredOnActiveScreen(DpSize(540.dp, 560.dp)))
+            Window(
+                onCloseRequest = { app.interventionClosed() }, title = "OnTask — reach out?", alwaysOnTop = true, resizable = false,
+                state = state,
+            ) {
+                LaunchedEffect(Unit) { bringForwardAlone(window) }
+                OnTaskTheme(mode) { Surface(Modifier.fillMaxSize().clearFocusOnTap()) { FitHeight(state, 540.dp) { StepThree(app, iv) } } }
+            }
         }
 
         Step.NONE -> {}
@@ -129,12 +133,13 @@ fun InterventionWindow(app: App, iv: Intervention, mode: ThemeMode) {
 @Composable
 private fun CountdownWindow(app: App, iv: Intervention, mode: ThemeMode) {
     val size = DpSize(560.dp, 520.dp)
+    val state = rememberWindowState(size = size, position = centeredOnActiveScreen(size))
     Window(
-        onCloseRequest = { app.countdownClosed() }, title = "OnTask — telling your partner", alwaysOnTop = true, resizable = true,
-        state = rememberWindowState(size = size, position = centeredOnActiveScreen(size)),
+        onCloseRequest = { app.countdownClosed() }, title = "OnTask — telling your partner", alwaysOnTop = true, resizable = false,
+        state = state,
     ) {
         LaunchedEffect(Unit) { bringForwardAlone(window) }
-        OnTaskTheme(mode) { Surface(Modifier.fillMaxSize().clearFocusOnTap()) { Countdown(app, iv) } }
+        OnTaskTheme(mode) { Surface(Modifier.fillMaxSize().clearFocusOnTap()) { FitHeight(state, 560.dp) { Countdown(app, iv) } } }
     }
 }
 
@@ -145,7 +150,7 @@ private fun Countdown(app: App, iv: Intervention) {
     var onTask by remember(iv) { mutableStateOf(false) }
     val reason = iv.countdown ?: return
     val site = iv.site ?: "time-wasting sites"
-    Column(Modifier.padding(24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(if (left > 0) "Sending a message to your partner in $left…" else "Sending…", style = MaterialTheme.typography.headlineSmall)
         Text(dev.ontask.intervene.autoTrigger(reason, site, maxOf(1, iv.driftSec / 60)), style = MaterialTheme.typography.bodyLarge)
         Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)) {
@@ -310,7 +315,7 @@ private fun HelpPanel(app: App, iv: Intervention, partner: Boolean) {
 @Composable
 private fun StepTwo(app: App, iv: Intervention) {
     var help by remember(iv) { mutableStateOf(false) }
-    Column(Modifier.padding(24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Time to come back", style = MaterialTheme.typography.headlineMedium)
         Text(app.unblockMessage(), style = MaterialTheme.typography.titleMedium)
         Text("You've been off track for ${iv.driftSec / 60} min. Unblocks in the last hour: ${iv.unblocks}.", style = MaterialTheme.typography.bodyLarge)
@@ -333,7 +338,7 @@ private fun StepThree(app: App, iv: Intervention) {
     var text by remember { mutableStateOf("I've been drifting on $what. I'm getting back to work.\nNo need to reply — but a 👍 helps.") }
     var status by remember { mutableStateOf("") }
     var help by remember(iv) { mutableStateOf(false) }
-    Column(Modifier.padding(24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Want to let your partner know?", style = MaterialTheme.typography.headlineMedium)
         Text("It's your call. You can edit the message.", style = MaterialTheme.typography.bodyMedium)
         BreakTotals(iv.breaksHourSec, iv.breaksTodaySec)

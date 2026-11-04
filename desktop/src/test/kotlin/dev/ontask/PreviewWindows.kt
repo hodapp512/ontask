@@ -14,6 +14,9 @@ fun main(args: Array<String>) {
     val iv = when (args.firstOrNull()) {
         "reminder" -> Intervention(Step.PROMPT, 300, 0, reminder = true, site = "youtube.com", lunch = true)
         "break" -> Intervention(Step.PROMPT, 60, 0, breakSec = 300, focusedSec = 2400, lunch = true)
+        "step2" -> Intervention(Step.WINDOW, 300, 0, site = "youtube.com")
+        "step3" -> Intervention(Step.PARTNER, 600, 0, site = "youtube.com")
+        "countdown" -> Intervention(Step.PARTNER, 720, 0, site = "youtube.com", countdown = dev.ontask.intervene.AutoReason.IGNORED)
         else -> Intervention(Step.PROMPT, 120, 0, focusedSec = 720, toEarnSec = 780, lunch = true, site = "youtube.com")
     }
     Thread {

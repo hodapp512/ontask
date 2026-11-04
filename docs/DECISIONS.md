@@ -648,7 +648,8 @@ when it comes to the front.*
   prompt; a 12:40 prompt had no way to say so).
 - **"Still at lunch":** for 30 minutes after lunch runs out (45 min), every drift prompt and the "Lunch is over" card
   offer it: 15 more minutes, as often as needed (Mac).
-- **Small pop-ups size themselves to their content** (Are you on task?, the reminder, Is this a break?, break over):
+- **Every drift pop-up sizes itself to its content** (Are you on task?, the reminder, Is this a break?, break over,
+  Time to come back, step 3 and the countdown; it grows when Help me get started opens):
   the window measures what it draws and takes exactly that height, with the buttons at the bottom and no empty space.
   Guessed heights left the buttons cut off or a gap under them; buttons above the plan was rejected (they belong at
   the bottom). Checked on screen with `./gradlew previewWindows`.
