@@ -25,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -80,31 +81,34 @@ fun SortScreen(initial: List<SortRow>, onClose: () -> Unit) {
     val uid = Cloud.uid ?: return
     val schedule by remember { Cloud.doc("users/$uid/schedule/current") }.collectAsState(null)
     val categories = categoriesOf(schedule?.data)
-    var rows by remember { mutableStateOf(initial) }
+    // Sorted rows stay (dimmed, "Sorted as Work") and can still be changed until Done or Skip for now.
+    val sorted = remember { androidx.compose.runtime.mutableStateMapOf<String, String>() }
     var big by remember { mutableStateOf<ImageBitmap?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Help sort these", Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium)
-            TextButton(onClose) { Text("Skip for now") }
-        }
-        Muted("OnTask couldn't tell what these were. Picking a category fixes today's numbers and remembers it.")
-        rows.forEach { r ->
+        Text("Help sort these", style = MaterialTheme.typography.headlineMedium)
+        Muted("OnTask couldn't tell what these were.")
+        initial.forEach { r ->
             val img = remember(r.shotKey) { Shots.file(ctx, r.shotKey).takeIf { it.exists() }?.let { f -> runCatching { BitmapFactory.decodeFile(f.path)?.asImageBitmap() }.getOrNull() } }
+            val done = sorted[r.shotKey]
             OCard {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(Modifier.alpha(if (done != null) 0.5f else 1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Box(Modifier.size(72.dp, 100.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
                         if (img != null) Image(img, "Screenshot of ${r.name}", Modifier.size(72.dp, 100.dp).clickable { big = img }, contentScale = ContentScale.Crop)
                         else Text(if (r.phone) "No picture" else "💻 picture\non your Mac", style = MaterialTheme.typography.labelSmall)
                     }
                     Column(Modifier.weight(1f)) {
                         Text((if (!r.phone) "💻 " else "") + r.name, maxLines = 3)
-                        Muted(fmtDuration(r.seconds) + " · " + if (r.ref["itemKey"] != null) "Unsure" else "Unclassified")
+                        Muted(fmtDuration(r.seconds) + " · " + (done?.let { "Sorted as $it" } ?: if (r.ref["itemKey"] != null) "Unsure" else "Unclassified"))
                     }
                 }
-                if (categories.isNotEmpty()) RefMenu(r.ref, categories) { c -> if (!c.variable) Shots.delete(ctx, r.shotKey) }
+                if (categories.isNotEmpty()) RefMenu(r.ref, categories) { c -> sorted[r.shotKey] = c.label; if (!c.variable) Shots.delete(ctx, r.shotKey) }
             }
         }
-        Button(onClose, Modifier.fillMaxWidth()) { Text("Done") }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClose) { Text("Skip for now") }
+            Box(Modifier.weight(1f))
+            Button(onClose) { Text("Done") }
+        }
     }
     big?.let { img -> Dialog({ big = null }) { Image(img, null, Modifier.fillMaxWidth().clickable { big = null }, contentScale = ContentScale.Fit) } }
 }

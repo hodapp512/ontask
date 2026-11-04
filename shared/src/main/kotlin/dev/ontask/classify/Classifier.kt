@@ -8,6 +8,10 @@ import java.net.URI
 
 enum class RuleKind { TITLE, DOMAIN, APP }
 
+/**
+ * A TITLE rule's [Rule.pattern] is a keyword anywhere in the window title, or "App|Title" for one app's windows with
+ * that title: the whole title, its start ("New Tab - Google Chrome"), or the site its title names ([windowSite]).
+ */
 data class Rule(
     val id: Long,
     val kind: RuleKind,
@@ -29,6 +33,27 @@ fun siteDomain(host: String): String {
     while (labels.size > 2 && prefix.matches(labels.first())) labels.removeAt(0)
     return labels.joinToString(".")
 }
+
+/** Browsers on the Mac, by app name. */
+val BROWSERS = listOf("Google Chrome", "Safari", "Arc", "Brave Browser", "Microsoft Edge", "Firefox", "Chromium", "Opera", "Vivaldi")
+
+/**
+ * The site a browser window's title names, for windows whose address can't be read (pop-ups, installed web apps,
+ * mini players): "Inbox (557) - me@gmail.com - Gmail - Google Chrome - Dennis" → "Gmail".
+ */
+fun windowSite(app: String?, title: String?): String? {
+    var t = title?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    app?.let { a -> t.indexOf(" - $a").takeIf { it > 0 }?.let { t = t.substring(0, it) } }
+    return t.split(" - ", " | ", " — ", " – ").last().trim().ifEmpty { null }
+}
+
+/** "Google Chrome – Gmail": what a browser window with no address is called, in rows and rules. */
+fun browserWindowSubject(app: String?, title: String?, url: String?): String? =
+    if (app in BROWSERS && domainOf(url) == null) windowSite(app, title)?.let { "$app – $it" } else null
+
+/** The TITLE rule pattern for a [browserWindowSubject] ("Google Chrome|Gmail"), or null for anything else. */
+fun browserWindowPattern(subject: String): String? =
+    BROWSERS.firstOrNull { subject.startsWith("$it – ") }?.let { "$it|" + subject.removePrefix("$it – ") }
 
 fun domainOf(url: String?): String? {
     if (url.isNullOrBlank()) return null
@@ -58,7 +83,7 @@ class Classifier(userRules: List<Rule>, builtIn: List<Rule> = DefaultRules.all) 
         if (Pages.isSearch(s.url)) Category.registry[Category.VARIABLE.name]?.let { return Classification(it, Source.RULE) }
         for (r in ordered) {
             val hit = when (r.kind) {
-                RuleKind.TITLE -> title != null && title.contains(r.pattern.lowercase())
+                RuleKind.TITLE -> title != null && titleMatches(r.pattern, s.app, s.title!!)
                 RuleKind.DOMAIN -> domain != null && (domain == r.pattern || domain.endsWith("." + r.pattern))
                 RuleKind.APP -> r.pattern.equals(s.app, ignoreCase = true) || r.pattern.equals(s.bundleId, ignoreCase = true)
             }
@@ -70,5 +95,14 @@ class Classifier(userRules: List<Rule>, builtIn: List<Rule> = DefaultRules.all) 
 
     companion object {
         val AWAY = Classification(Category.AWAY, Source.AWAY)
+
+        /** Whether a TITLE rule's [pattern] (a keyword, or "App|Title") matches this window. */
+        fun titleMatches(pattern: String, app: String?, title: String): Boolean {
+            val bar = pattern.indexOf('|')
+            if (bar < 0) return title.contains(pattern, ignoreCase = true)
+            if (!pattern.substring(0, bar).equals(app, ignoreCase = true)) return false
+            val t = pattern.substring(bar + 1)
+            return title.equals(t, true) || title.startsWith("$t - ", true) || windowSite(app, title).equals(t, true)
+        }
     }
 }

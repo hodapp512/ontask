@@ -45,13 +45,37 @@ class CategoriesTest {
         assertEquals(Category.UNKNOWN, Classifier(emptyList()).classify(Sample(app = "Spotify")).category)
     }
 
+    @Test fun betweenThingsIsOtherAndBrowserWindowsAreNamedByTitle() {
+        val c = Classifier(emptyList())
+        assertEquals(Category.OTHER, c.classify(Sample(app = "Google Chrome", title = "New Tab - Google Chrome - Dennis", url = "chrome://newtab/")).category)
+        assertEquals(Category.OTHER, c.classify(Sample(app = "UserNotificationCenter")).category)
+        assertEquals(Category.OTHER, c.classify(Sample(app = "Google Chrome", title = "Who's using Chrome?")).category)
+        assertEquals("Google Chrome – Gmail", dev.ontask.classify.browserWindowSubject("Google Chrome", "Inbox (557) - me@gmail.com - Gmail - Google Chrome - Dennis", null))
+        assertEquals("Google Chrome|Gmail", dev.ontask.classify.browserWindowPattern("Google Chrome – Gmail"))
+        val rule = dev.ontask.classify.Rule(1, dev.ontask.classify.RuleKind.TITLE, "Google Chrome|Gmail", Category.PERSONAL_ADMIN, user = true)
+        assertEquals(Category.PERSONAL_ADMIN, Classifier(listOf(rule)).classify(Sample(app = "Google Chrome", title = "Inbox (3) - me@gmail.com - Gmail")).category)
+        assertEquals(Category.UNKNOWN, Classifier(listOf(rule)).classify(Sample(app = "Safari", title = "Inbox (3) - me@gmail.com - Gmail")).category)
+    }
+
+    @Test fun otherBorrowsWhatCameBeforeForTwoMinutes() {
+        val b = Borrow()
+        b.solid(100, Level.WASTED)
+        assertEquals(Level.WASTED, b.level(110, Category.OTHER, away = false))
+        assertEquals(Level.WASTED, b.level(225, Category.OTHER, away = false))
+        assertNull(b.level(235, Category.OTHER, away = false)) // 2 minutes on it: Neutral
+        val fresh = Borrow()
+        assertNull(fresh.level(10, Category.OTHER, away = false)) // nothing before it
+    }
+
     @Test fun searchesAreJudgedOneByOne() {
         val brave = dev.ontask.classify.Rule(1, dev.ontask.classify.RuleKind.DOMAIN, "search.brave.com", Category.ENTERTAINMENT, user = true)
         val c = Classifier(listOf(brave))
         assertEquals(Category.VARIABLE, c.classify(Sample(app = "Chrome", url = "https://search.brave.com/search?q=excalidraw+or+mermaid")).category)
         assertEquals(Category.VARIABLE, c.classify(Sample(app = "Chrome", url = "https://www.google.com/search?q=news&sca=1")).category)
         assertEquals(Category.ENTERTAINMENT, c.classify(Sample(app = "Chrome", url = "https://search.brave.com/settings")).category)
-        assertEquals(Category.WORK_SUPPORT, Classifier(emptyList()).classify(Sample(app = "Chrome", url = "https://docs.google.com/document/d/1")).category)
+        // Email, calendars and documents can be work or personal: judged one by one.
+        assertEquals(Category.VARIABLE, Classifier(emptyList()).classify(Sample(app = "Chrome", url = "https://docs.google.com/document/d/1")).category)
+        assertEquals(Category.WORK_SUPPORT, Classifier(emptyList()).classify(Sample(app = "Chrome", url = "https://slack.com/x")).category)
         assertEquals("google.com/search?q=excalidraw or mermaid", itemKey("Chrome", "x", "https://www.google.com/search?q=Excalidraw+or++mermaid&oq=x"))
         assertEquals("duckduckgo.com/search?q=news", itemKey("Chrome", "x", "https://duckduckgo.com/?q=news"))
         assertEquals("Google search: news", dev.ontask.classify.Pages.label("google.com", "news - Google Search", "https://www.google.com/search?q=news"))

@@ -1,7 +1,7 @@
 export type LevelKey = "DEEP" | "MIXED" | "WASTED" | "AWAY";
 export const LEVELS: { key: LevelKey; label: string; color: string; short: string }[] = [
   { key: "DEEP", label: "Focused", color: "#2e9e5b", short: "D" },
-  { key: "MIXED", label: "Mixed", color: "#e0a526", short: "M" },
+  { key: "MIXED", label: "Neutral", color: "#e0a526", short: "M" },
   { key: "WASTED", label: "Wasted", color: "#d64545", short: "W" },
   { key: "AWAY", label: "Away", color: "#9aa5b1", short: "A" },
 ];
@@ -28,14 +28,14 @@ export function deepShare(totals: Partial<Record<LevelKey, number>>): number | n
 export type Seg = { a: number; b: number; k: string; c?: string; t?: { n: string; s: number }[]; d?: string; also?: Seg[] };
 
 /**
- * Glances under [minSec] (switching between windows) are drawn as part of the stretch before them, or after them
+ * Glances under [minSec] (switching between windows), and Other under 2 minutes, are drawn as part of the stretch before them, or after them
  * when nothing comes just before; the two sides of a glance join up. As on the Mac and the phone.
  */
 export function absorbShort(segs: Seg[], minSec = 15): Seg[] {
   const out: Seg[] = [], pending: Seg[] = [];
   for (const r of [...segs].sort((x, y) => x.a - y.a)) {
     const last = pending.length === 0 && out.length && r.a - out[out.length - 1].b <= minSec ? out[out.length - 1] : undefined;
-    if (r.b - r.a < minSec) {
+    if (r.b - r.a < minSec || (r.c === "Other" && r.b - r.a < 120)) {
       if (last) out[out.length - 1] = { ...last, b: Math.max(last.b, r.b), also: [...(last.also ?? []), { ...r, also: undefined }, ...(r.also ?? [])] };
       else pending.push(r);
       continue;

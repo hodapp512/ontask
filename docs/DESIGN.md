@@ -58,10 +58,23 @@ This file describes how OnTask works now. **Why** each choice was made, and what
 - At 20% battery, ask whether to switch to metadata-only.
 
 ### Levels & categories
-- **Levels:** Focused / Mixed / Wasted, plus **Away** (excluded from ratios).
+- **Levels:** Focused / **Neutral** (stored as MIXED; called Mixed before Nov 3, 2026) / Wasted, plus **Away**
+  (excluded from ratios).
 - **Categories are editable data** (rename, change level, add, delete → history re-sorted). Defaults:
-  Work (Focused), Work adjacent (Mixed), Entertainment / News / Social (Wasted), Personal admin (Mixed), and
-  **Varies** (judged per page).
+  Work (Focused), Work adjacent (Focused), Entertainment / News / Social (Wasted), Personal admin (Neutral),
+  **Varies** (judged per page) and **Other** (Neutral).
+- **Email, calendars, documents and file storage are Varies** (Gmail, Google Calendar/Docs/Drive, Outlook, the Mail
+  and Calendar apps…): they can be work or personal, so each account or document is judged on its own (Gmail's
+  address names the account). Your own rules win.
+- **Other** is for moments between things: New Tab, the profile picker, blank pages, OnTask's Blocked page,
+  notification alerts (UserNotificationCenter), the login window, Spotlight, the Dock, Control Center, the
+  screenshot tool, Finder, launchers; on the phone, the system UI and permission dialogs. **It counts as what you
+  were on just before for up to 2 minutes, then as Neutral** (Neutral too with nothing just before). It's never asked
+  about, and on the timeline a stretch of it under 2 minutes joins the stretch around it. Anything can be filed
+  there with the picker.
+- **Browser windows whose address can't be read** (pop-ups, installed web apps, mini players) are named from their
+  title: "Google Chrome – Gmail" (the last part of the title). Sorting one makes a rule for that browser's windows
+  with that title (`Google Chrome|Gmail`), not for all of Chrome.
 - "Focused session" ≈ 25+ minutes without distraction events.
 
 ### Pages on Varies sites
@@ -76,7 +89,7 @@ This file describes how OnTask works now. **Why** each choice was made, and what
   Facebook group, YouTube channel, Medium author or Substack publication) → AI on title, address and looked-up facts
   (oEmbed channel; page description) → AI with on-screen text → **"I can't tell whether this is work. What is it?"**
   (category buttons, Not now, Pause asking 15 min–1 day; at most once per page and every 2 minutes).
-- Undecided pages are **Unsure** (counted as Mixed). Each page has its own category ("YouTube: Learning Java" →
+- Undecided pages are **Unsure** (counted as Neutral). Each page has its own category ("YouTube: Learning Java" →
   Work) and its own row on Home; its dropdown changes only that page. Catch-up judging of the last week (pages never judged when
   seen, e.g. AI off or not running) runs every 3 hours and never asks. **Each page, video or unknown app is judged by
   the AI once** (`ai_tried`): an answer, sure or not, is never asked for again; only a failed call is retried. Kev
@@ -121,7 +134,7 @@ Active during work hours, and on work days **from your first sit-down until work
 actually on it counts:** under a minute back at work (or away) pauses the count instead of ending the drift, and that
 minute isn't added to it.
 
-**Breaks are earned.** Focused minutes since your last break add up; time that isn't focused (Mixed or Wasted) is
+**Breaks are earned.** Focused minutes since your last break add up; time that isn't focused (Neutral or Wasted) is
 taken off minute for minute once a stretch lasts a minute; 5+ min away, a break, or lunch starts it again. Earned:
 nothing under 25 min focused, then 5 min per 25 (at most 10 under an hour, 15 after).
 
@@ -189,10 +202,13 @@ nothing under 25 min focused, then 5 min per 25 (at most 10 under an hour, 15 af
 - **Help sort these** (after the midday and evening check-ins, in their own window, only when something is
   waiting): sites and apps with no category and pages or videos still Unsure, from both devices, today and
   yesterday, 30 s or more, the 10 with the most time. Each row: screenshot (click for full size; "📱 picture on your
-  phone" / "💻 on your Mac" when the other device took it), name, title, time, category picker. *Skip for now* (or
-  closing it) leaves them for the next check-in. Same on the phone after a check-in done there.
-- **Every pop-up stays on top of other windows**, and only the pop-up comes forward (OnTask's main window stays
-  where it was). Check-ins can be put off twice a day each (Do this later, or closing
+  phone" / "💻 on your Mac" when the other device took it), name, title, time, category picker. Under the title:
+  "OnTask couldn't tell what these were." A sorted row stays, dimmed, "Sorted as Work", and can still be changed.
+  *Skip for now* (bottom left) or closing it leaves the rest for the next check-in; *Done* bottom right. Same on the
+  phone after a check-in done there.
+- **Every pop-up stays on top of other windows**, and only the pop-up comes forward: when OnTask comes to the front
+  through any pop-up (shown, clicked or answered), its main window is sent back behind the app you were using.
+  Opening the main window yourself (menu bar, Dock, Spotlight) brings it forward as usual. Check-ins can be put off twice a day each (Do this later, or closing
   the window = 10 min); after that the window stays until answered.
 - The daily report gets "Morning 64% focused · Afternoon 48%" (split at lunch, or noon) and the midday answers.
 - **Morning check** (work days, with Today's plan): "Working 9:00–5:00 today?" Yes / start later or finish early / day off.

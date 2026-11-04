@@ -57,6 +57,8 @@ class Tracker(
     /** What was in front before a background Java tool briefly took over (see [JAVA_TOOLS]). */
     private var lastReal: Sample? = null
 
+    private val borrow = dev.ontask.Borrow()
+
     @Synchronized
     fun onSample(sample: Sample, nowSec: Long, procMs: Long): Segment {
         // A build's test runner or a Java script can grab the front for a moment; that time counts toward what you had
@@ -71,7 +73,10 @@ class Tracker(
         val workTime = st.schedule.isWork(nowSec, zone) && !notWork(nowSec)
 
         val cur = open
-        val extend = cur != null && key == openKey && cls === openClassifier && cur.workTime == workTime &&
+        // Other borrows what came before for 2 minutes; crossing that starts a new segment at Neutral.
+        val otherCat = if (away) Category.AWAY else if (cur != null && key == openKey) cur.category else cls.classify(s).category
+        val borrowedNow = borrow.level(nowSec, otherCat, away)
+        val extend = cur != null && key == openKey && cls === openClassifier && cur.workTime == workTime && cur.borrowed == borrowedNow &&
             nowSec - lastTs <= 3L * st.tickSec && cur.startTs / 3600 == nowSec / 3600
         val seg: Segment
         if (extend) {
@@ -93,10 +98,12 @@ class Tracker(
                 item = if (varies) dev.ontask.classify.Pages.label(domainOf(s.url), s.title, s.url) else null,
                 // A feed is time-wasting whatever it shows; no AI, no question.
                 itemCategory = if (varies && dev.ontask.classify.Pages.isFeed(s.url)) Category.feed else null,
+                borrowed = borrowedNow,
             )
             open = seg; openKey = key; openClassifier = cls
         }
         lastTs = nowSec
+        if (!away && seg.category != Category.OTHER) borrow.solid(nowSec, seg.level)
 
         val day = Instant.ofEpochSecond(nowSec).atZone(zone).toLocalDate()
         if (day != totalsDay) { totalsDay = day; totals.clear() }

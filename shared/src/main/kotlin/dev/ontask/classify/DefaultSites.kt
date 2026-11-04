@@ -9,7 +9,7 @@ import dev.ontask.Category
  * Space-separated to stay compact. Your own rules always win (see DefaultRules).
  */
 internal object DefaultSites {
-    private val byCategory: Map<Category, String> = mapOf(
+    private val byCategory: List<Pair<Category, String>> = listOf(
         Category.CORE_WORK to (
             "github.com gitlab.com bitbucket.org codeberg.org gitee.com stackoverflow.com stackexchange.com superuser.com " +
             "serverfault.com askubuntu.com localhost console.firebase.google.com firebase.google.com " +
@@ -45,15 +45,15 @@ internal object DefaultSites {
             "excalidraw.com draw.io diagrams.net lucidchart.com miro.com whimsical.com"
         ),
         Category.WORK_SUPPORT to (
-            "wix.com squarespace.com mail.google.com gmail.com calendar.google.com docs.google.com drive.google.com " +
-            "sheets.google.com slides.google.com forms.google.com keep.google.com meet.google.com chat.google.com " +
+            "wix.com squarespace.com " +
+            "meet.google.com chat.google.com " +
             "sites.google.com translate.google.com scholar.google.com notion.so notion.com atlassian.net atlassian.com " +
             "trello.com asana.com monday.com clickup.com airtable.com smartsheet.com basecamp.com linear.app jira.com " +
             "confluence.com coda.io evernote.com onenote.com obsidian.md todoist.com slack.com teams.microsoft.com " +
             "teams.live.com zoom.us zoom.com webex.com gotomeeting.com gotowebinar.com whereby.com loom.com calendly.com " +
-            "outlook.com outlook.live.com outlook.office.com office.com office365.com microsoft365.com sharepoint.com " +
-            "onedrive.com 1drv.com live.com hotmail.com mail.yahoo.com proton.me protonmail.com fastmail.com mail.com " +
-            "gmx.net zoho.com dropbox.com box.com wetransfer.com docusign.com adobe.com acrobat.com canva.com grammarly.com " +
+            "sharepoint.com " +
+            "" +
+            "wetransfer.com docusign.com adobe.com acrobat.com canva.com grammarly.com " +
             "deepl.com quillbot.com ilovepdf.com smallpdf.com typeform.com jotform.com surveymonkey.com qualtrics.com " +
             "hubspot.com salesforce.com force.com service-now.com zendesk.com freshdesk.com intercom.com mailchimp.com " +
             "constantcontact.com brevo.com hootsuite.com sproutsocial.com zapier.com make.com ifttt.com 1password.com " +
@@ -83,6 +83,8 @@ internal object DefaultSites {
             "chat.openai.com gamma.app tldraw.com mural.co sec.gov uspto.gov federalregister.gov"
         ),
         Category.VARIABLE to (
+            // Email, calendars, documents and storage: work or personal, judged per account or document.
+            "mail.google.com gmail.com calendar.google.com docs.google.com drive.google.com sheets.google.com slides.google.com forms.google.com keep.google.com outlook.com outlook.live.com outlook.office.com office.com office365.com microsoft365.com onedrive.com 1drv.com live.com hotmail.com mail.yahoo.com proton.me protonmail.com fastmail.com mail.com gmx.net zoho.com dropbox.com box.com " +
             "behance.net dribbble.com youtube.com youtu.be vimeo.com reddit.com facebook.com linkedin.com medium.com " +
             "substack.com quora.com dailymotion.com rumble.com lobste.rs dev.to hashnode.com podcasts.apple.com podbean.com " +
             "anchor.fm buzzsprout.com libsyn.com ted.com"
@@ -175,5 +177,5 @@ internal object DefaultSites {
         ),
     )
 
-    fun domains(): Map<Category, List<String>> = byCategory.mapValues { (_, s) -> s.split(' ').filter { it.isNotEmpty() } }
+    fun domains(): Map<Category, List<String>> = byCategory.groupBy({ it.first }, { it.second }).mapValues { (_, v) -> v.joinToString(" ").split(' ').filter { it.isNotEmpty() } }
 }

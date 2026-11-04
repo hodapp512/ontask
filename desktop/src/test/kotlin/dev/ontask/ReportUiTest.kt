@@ -65,6 +65,6 @@ class RelabelTest {
         assertEquals(1, rules.relabelHistory(dev.ontask.classify.RuleKind.DOMAIN, "youtube.com", dev.ontask.Category.WORK_SUPPORT))
         assertEquals(1, rules.relabelHistory(dev.ontask.classify.RuleKind.APP, "Xcode", dev.ontask.Category.CORE_WORK))
         val levels = db.use { c -> c.createStatement().executeQuery("SELECT level FROM ticks ORDER BY start_ts").use { rs -> buildList { while (rs.next()) add(rs.getString(1)) } } }
-        assertEquals(listOf("MIXED", "DEEP"), levels) // Work adjacent counts as Mixed by default
+        assertEquals(listOf("DEEP", "DEEP"), levels) // Work adjacent counts as Focused by default
     }
 }

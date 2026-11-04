@@ -435,7 +435,9 @@ class App(val dir: Path = dataDir()) {
      */
     private fun unknownCheck(now: Long, live: dev.ontask.track.Live) {
         val seg = tracker.currentSegment()
-        val name = seg?.takeIf { !live.away && tracker.needsAi() }?.let { s -> s.domain?.let { d -> dev.ontask.classify.siteDomain(d) } ?: s.app }
+        val name = seg?.takeIf { !live.away && tracker.needsAi() }?.let { s ->
+            s.domain?.let { d -> dev.ontask.classify.siteDomain(d) } ?: dev.ontask.classify.browserWindowSubject(s.app, s.title, s.url) ?: s.app
+        }
         if (name == null) { unknownSince = null; return }
         if (unknownSince?.first != name) unknownSince = name to now
         val aiPending = ai.enabled && !ai.metadataOnly && lastAi < unknownSince!!.second
@@ -1006,14 +1008,25 @@ class App(val dir: Path = dataDir()) {
      */
     fun reclassify(name: String, to: Category, from: Category = Category.UNKNOWN) {
         if (!to.variable) deleteShot(siteShotKey(name))
-        val kind = if ('.' in name && ' ' !in name) dev.ontask.classify.RuleKind.DOMAIN else dev.ontask.classify.RuleKind.APP
+        // "Google Chrome – Gmail" (a browser window with no address) is a rule for that app's windows with that title;
+        // a site is one with a dot or one seen as an address ("newtab"); anything else is an app.
+        val window = dev.ontask.classify.browserWindowPattern(name)
+        val kind = when {
+            window != null -> dev.ontask.classify.RuleKind.TITLE
+            '.' in name && ' ' !in name || seenAsSite(name) -> dev.ontask.classify.RuleKind.DOMAIN
+            else -> dev.ontask.classify.RuleKind.APP
+        }
         // A site rule covers the whole site: moving "en.m.wikipedia.org" means all of wikipedia.org.
-        val pattern = if (kind == dev.ontask.classify.RuleKind.DOMAIN) dev.ontask.classify.siteDomain(name) else name
+        val pattern = window ?: if (kind == dev.ontask.classify.RuleKind.DOMAIN) dev.ontask.classify.siteDomain(name) else name
         ruleStore.label(kind, pattern, to, from, nowSec())
         ai.accuracy.answered(pattern, to, nowSec())
         ruleStore.relabelHistory(kind, pattern, to)
         reloadRules(); tracker.invalidate()
     }
+
+    private fun seenAsSite(name: String): Boolean = ' ' !in name && runCatching {
+        db.use { c -> c.prepareStatement("SELECT 1 FROM ticks WHERE domain=? LIMIT 1").use { ps -> ps.setString(1, name); ps.executeQuery().use { it.next() } } }
+    }.getOrDefault(false)
 
     /** Deletes a category and re-sorts what was in it with the remaining rules (anything unmatched → Unclassified). */
     /**

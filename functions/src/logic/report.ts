@@ -43,7 +43,7 @@ export function fmtDuration(sec: number): string {
   return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ""}`;
 }
 
-const LEVELS: [string, string, string][] = [["DEEP", "Focused", "#2e9e5b"], ["MIXED", "Mixed", "#e0a526"], ["WASTED", "Wasted", "#d64545"]];
+const LEVELS: [string, string, string][] = [["DEEP", "Focused", "#2e9e5b"], ["MIXED", "Neutral", "#e0a526"], ["WASTED", "Wasted", "#d64545"]];
 /** "Morning 64% focused · Afternoon 48%", or null when neither half had enough screen time. */
 export function halvesLine(r?: ReportDoc): string | null {
   const h = r?.halves;

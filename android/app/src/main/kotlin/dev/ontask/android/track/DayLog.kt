@@ -43,17 +43,17 @@ class DayLog(ctx: Context, private val zone: ZoneId = ZoneId.systemDefault()) {
 
     /** Records [sec] seconds ending at [now] of [seg]'s kind: extends the last stretch when it's the same thing. */
     @Synchronized
-    fun add(now: Long, sec: Long, pkg: String, app: String, subject: String, title: String?, item: String?, cat: Category, work: Boolean) {
+    fun add(now: Long, sec: Long, pkg: String, app: String, subject: String, title: String?, item: String?, cat: Category, work: Boolean, level: Level = cat.level) {
         val today = Instant.ofEpochSecond(now).atZone(zone).toLocalDate()
         if (today != date) { save(); date = today; segs.clear(); segs.addAll(load(today)); dir.listFiles()?.filter { it.name < "${today.minusDays(14)}.json" }?.forEach { it.delete() } }
         val last = segs.lastOrNull()
-        if (last != null && last.pkg == pkg && last.subject == subject && last.item == item && last.cat == cat.name && last.work == work && now - sec - last.end <= 10) last.end = now
-        else segs.add(Seg(now - sec, now, pkg, app, subject, title, item, cat.name, cat.level.name, work))
+        if (last != null && last.pkg == pkg && last.subject == subject && last.item == item && last.cat == cat.name && last.level == level.name && last.work == work && now - sec - last.end <= 10) last.end = now
+        else segs.add(Seg(now - sec, now, pkg, app, subject, title, item, cat.name, level.name, work))
         val p = heat.getOrPut(today.toString()) { Parts() }
         p.active += sec
-        if (cat.level == Level.DEEP) p.deep += sec
-        if (work) { p.workActive += sec; if (cat.level == Level.DEEP) p.workDeep += sec }
-        else { p.offActive += sec; if (cat.level == Level.WASTED) p.offWasted += sec }
+        if (level == Level.DEEP) p.deep += sec
+        if (work) { p.workActive += sec; if (level == Level.DEEP) p.workDeep += sec }
+        else { p.offActive += sec; if (level == Level.WASTED) p.offWasted += sec }
     }
 
     /** A page's category decided after the fact: its stretches today change (and the heat numbers are recounted). */

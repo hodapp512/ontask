@@ -113,7 +113,7 @@ private fun PauseAskingButton(app: App) {
 /** What a category counts as: one of the three levels, or "Varies" (decided per page or video). */
 private enum class Kind(val label: String, val level: Level, val variable: Boolean, val hint: String) {
     FOCUSED("Focused", Level.DEEP, false, "Real work"),
-    MIXED("Mixed", Level.MIXED, false, "Work-ish: email, chat, admin"),
+    MIXED("Neutral", Level.MIXED, false, "Neither: personal admin, in-between moments"),
     WASTED("Wasted", Level.WASTED, false, "Distractions"),
     VARIES("Varies", Level.MIXED, true, "Decided per video or page (AI or asks you)"),
     ;
@@ -133,7 +133,7 @@ fun CategoriesSettings(app: App) {
 
     SectionCard(
         "Categories",
-        "Each counts as Focused, Mixed or Wasted, or Varies (judged per video or page).",
+        "Each counts as Focused, Neutral or Wasted, or Varies (judged per video or page).",
     ) {
         cats.forEach { c ->
             var label by remember(c, version) { mutableStateOf(c.label) }

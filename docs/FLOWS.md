@@ -27,7 +27,10 @@ flowchart TD
     S -- no --> R{A rule matches?<br/>yours first, then built-in,<br/>title, then site, then app}
     R -- "no" --> U[Unclassified]
     R -- "yes, Varies site" --> V[Varies: judge this page]
-    R -- "yes, a category" --> C[That category's level:<br/>Focused, Mixed or Wasted]
+    R -- "yes, a category" --> C[That category's level:<br/>Focused, Neutral or Wasted]
+    R -- "yes, Other<br/>new tab, notification, Spotlight…" --> O{On it under 2 min?}
+    O -- yes --> PREV[Counts as what came just before]
+    O -- no --> NEU[Neutral]
 
     V --> F{A feed?<br/>YouTube home, Shorts,<br/>Reddit front, LinkedIn feed…}
     F -- yes --> W[Entertainment: Wasted]
@@ -37,7 +40,7 @@ flowchart TD
     SR -- yes --> C
     SR -- no --> AI1{AI sure, 60%+?<br/>Kev on the Mac, Jev for the phone,<br/>once per page}
     AI1 -- yes --> C
-    AI1 -- no --> UN[Unsure, counted as Mixed]
+    AI1 -- no --> UN[Unsure, counted as Neutral]
 
     U --> AI2{AI sure about<br/>the site or app?}
     AI2 -- yes --> C
@@ -52,6 +55,8 @@ flowchart TD
 - Timings: unclassified question after 15 s; at most once per page and every 2 minutes; Not now = 15 min; closing
   with the X = 1 min. Screenshots are kept on the device that took them, at most 7 days.
 - Changing a category anywhere (timeline pop-up, Where the time went, Help sort these) makes the same rule or verdict.
+- A browser window with no readable address is named from its title ("Google Chrome – Gmail"); its rule covers only
+  that browser's windows with that title.
 
 ---
 

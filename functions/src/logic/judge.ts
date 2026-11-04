@@ -7,9 +7,10 @@ export const THRESHOLD = 0.6;
 
 const DESCRIPTIONS: Record<string, string> = {
   CORE_WORK: "doing their job or project, such as building software, its tools, docs and tutorials",
-  WORK_SUPPORT: "related to work without doing it, such as career, job hunting, professional networking, industry and tech commentary",
+  WORK_SUPPORT: "related to work without doing it, such as career, job hunting, professional networking, industry and tech commentary, work chat and meetings",
   ENTERTAINMENT: "fun videos, hobbies, sports, news, politics, social media",
-  PERSONAL_ADMIN: "home, family, church, errands, buying things they need",
+  PERSONAL_ADMIN: "home, family, church, errands, personal email and calendar, banking, buying things they need",
+  OTHER: "in between things, such as a new tab, a notification or system dialog, a launcher or search box",
 };
 
 export interface Seen { app?: string; title?: string; url?: string; screenText?: string; plan?: string }

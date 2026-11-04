@@ -2,7 +2,8 @@ package dev.ontask
 
 import kotlinx.serialization.Serializable
 
-enum class Level(val label: String) { DEEP("Focused"), MIXED("Mixed"), WASTED("Wasted"), AWAY("Away") }
+/** [MIXED] is shown as "Neutral" (renamed Nov 3, 2026; the stored name stays). */
+enum class Level(val label: String) { DEEP("Focused"), MIXED("Neutral"), WASTED("Wasted"), AWAY("Away") }
 
 /**
  * A category: built-in (named after the old fixed list, e.g. CORE_WORK) or made by the user (`c_<n>`). Its [level]
@@ -16,14 +17,19 @@ class Category(val name: String, val label: String, val level: Level, val variab
 
     companion object {
         val CORE_WORK = Category("CORE_WORK", "Work", Level.DEEP)
-        val WORK_SUPPORT = Category("WORK_SUPPORT", "Work adjacent", Level.MIXED)
+        val WORK_SUPPORT = Category("WORK_SUPPORT", "Work adjacent", Level.DEEP)
         val ENTERTAINMENT = Category("ENTERTAINMENT", "Entertainment / News / Social", Level.WASTED)
         val PERSONAL_ADMIN = Category("PERSONAL_ADMIN", "Personal admin", Level.MIXED)
         val VARIABLE = Category("VARIABLE", "Varies", Level.MIXED, variable = true)
+        /**
+         * Moments between things (a new tab, a notification alert, Spotlight…): counts as what's around it for up to 2
+         * minutes, then as Neutral (see [Borrow]). Never asked about.
+         */
+        val OTHER = Category("OTHER", "Other", Level.MIXED)
         val UNKNOWN = Category("UNKNOWN", "Unclassified", Level.MIXED)
         val AWAY = Category("AWAY", "Away", Level.AWAY)
 
-        val builtIns = listOf(CORE_WORK, WORK_SUPPORT, VARIABLE, ENTERTAINMENT, PERSONAL_ADMIN)
+        val builtIns = listOf(CORE_WORK, WORK_SUPPORT, VARIABLE, ENTERTAINMENT, PERSONAL_ADMIN, OTHER)
 
         /** Built-ins of earlier versions; their history is sorted again into the current ones once (CategoryStore.migrate). */
         val retired = listOf("LEARNING", "COMMUNICATION", "SOCIAL", "NEWS", "SHOPPING")

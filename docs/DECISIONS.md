@@ -529,3 +529,25 @@ when it comes to the front.*
   Kev was used as a second opinion, but on a bare site name it says "Work adjacent" about 80% of the time, so only
   the 55 cases where it picked something else were reviewed again (4 changed). *Rejected:* a resource file (shared
   code is a source folder on both builds, and the list is only ~19 KB).
+
+## 2026-11-03 · Other, Neutral, email as Varies, browser windows by title (grilled)
+
+- **New built-in category Other** (Neutral) for moments between things: New Tab, notification alerts
+  (UserNotificationCenter), the login window, Spotlight, the Dock, OnTask's Blocked page… It counts as what you were
+  on just before for up to 2 minutes, then as Neutral, and it's never asked about. Seconds on a new tab aren't work
+  or time-wasting; they belong to what's around them. *Rejected:* asking about them (nobody can answer "what is a new
+  tab"); "In between" as a name; a separate level.
+- **Mixed is renamed Neutral.** "Mixed" read as "partly work"; these are things that are neither.
+- **Work adjacent stays, and counts as Focused** by default. Merging it into Work was decided and then undone: the
+  user finds the distinction useful.
+- **Email, calendars, documents and file storage are Varies**, judged per account or document: a personal inbox and
+  a work inbox are both "Gmail". *Rejected:* filing them all as work.
+- **Browser windows with no readable address are named from their title** ("Google Chrome – Gmail") and sorted with
+  a rule for that browser's windows with that title. Lumping them all as "Google Chrome" made one answer file all of
+  Chrome.
+- **Help sort these:** sorted rows stay (dimmed, "Sorted as …") instead of disappearing; Skip for now bottom left,
+  Done bottom right; one line, "OnTask couldn't tell what these were." Picking a category for a site without a dot
+  ("newtab") now saves a site rule (it used to save an app rule that matched nothing).
+- **No pop-up brings the main window forward,** not only drift prompts: whenever OnTask comes to the front through a
+  pop-up, the main window goes back behind the app you were using.
+

@@ -29,6 +29,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
@@ -61,26 +62,23 @@ fun SortWindow(app: App, initial: List<App.SortItem>, mode: ThemeMode) {
 
 @Composable
 private fun SortContent(app: App, initial: List<App.SortItem>) {
-    var items by remember { mutableStateOf(initial) }
+    // Sorted rows stay (dimmed, "Sorted as Work") and can still be changed until Done or Skip for now.
+    val sorted = remember { androidx.compose.runtime.mutableStateMapOf<Int, dev.ontask.Category>() }
     var big by remember { mutableStateOf<ImageBitmap?>(null) }
-    val scope = rememberCoroutineScope()
-    fun refresh() = scope.launch { items = withContext(Dispatchers.IO) { app.sortItems() }; if (items.isEmpty()) app.sortClosed() }
     Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Help sort these", style = MaterialTheme.typography.headlineSmall)
-                Text("OnTask couldn't tell what these were. Picking a category fixes today's numbers and remembers it.",
-                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            TextButton({ app.sortClosed() }) { Text("Skip for now") }
-        }
+        Text("Help sort these", style = MaterialTheme.typography.headlineSmall)
+        Text("OnTask couldn't tell what these were.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            items.forEachIndexed { i, it ->
+            initial.forEachIndexed { i, it ->
                 if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                SortRow(app, it, onOpen = { img -> big = img }, onSorted = { refresh() })
+                SortRow(app, it, sorted[i], onOpen = { img -> big = img }, onPicked = { c -> sorted[i] = c })
             }
         }
-        Row { Box(Modifier.weight(1f)); Button({ app.sortClosed() }) { Text("Done") } }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton({ app.sortClosed() }) { Text("Skip for now") }
+            Box(Modifier.weight(1f))
+            Button({ app.sortClosed() }) { Text("Done") }
+        }
     }
     big?.let { img ->
         Window(onCloseRequest = { big = null }, title = "Screenshot", state = rememberWindowState(size = DpSize(1040.dp, 760.dp)), alwaysOnTop = true) {
@@ -90,12 +88,13 @@ private fun SortContent(app: App, initial: List<App.SortItem>) {
 }
 
 @Composable
-private fun SortRow(app: App, it: App.SortItem, onOpen: (ImageBitmap) -> Unit, onSorted: () -> Unit) {
+private fun SortRow(app: App, it: App.SortItem, sortedAs: dev.ontask.Category?, onOpen: (ImageBitmap) -> Unit, onPicked: (dev.ontask.Category) -> Unit) {
     val img = remember(it.shot) {
         it.shot?.let { p -> runCatching { org.jetbrains.skia.Image.makeFromEncoded(java.nio.file.Files.readAllBytes(p)).toComposeImageBitmap() }.getOrNull() }
     }
+    val dim = if (sortedAs != null) 0.5f else 1f
     Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(Modifier.size(120.dp, 76.dp).clip(RoundedCornerShape(6.dp)), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(120.dp, 76.dp).clip(RoundedCornerShape(6.dp)).alpha(dim), contentAlignment = Alignment.Center) {
             if (img != null) Image(img, "Screenshot of ${it.name}", Modifier.fillMaxSize().clickable { onOpen(img) }, contentScale = ContentScale.Crop)
             else Surface(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxSize()) {
                 Box(contentAlignment = Alignment.Center) {
@@ -103,11 +102,12 @@ private fun SortRow(app: App, it: App.SortItem, onOpen: (ImageBitmap) -> Unit, o
                 }
             }
         }
-        Column(Modifier.weight(1f)) {
+        Column(Modifier.weight(1f).alpha(dim)) {
             Text((if (it.phone) "📱 " else "") + it.name, style = MaterialTheme.typography.bodyLarge, maxLines = 2)
             it.ref.title?.takeIf { t -> t != it.name && !it.name.contains(t) }?.let { t -> Text(t, style = MaterialTheme.typography.bodySmall, maxLines = 2, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            Text(fmtDuration(it.seconds) + if (it.category.variable) " · Unsure" else " · Unclassified", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(fmtDuration(it.seconds) + " · " + (sortedAs?.let { c -> "Sorted as ${c.label}" } ?: if (it.category.variable) "Unsure" else "Unclassified"),
+                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        CategoryPicker(app, it.ref.subject, it.category, onSorted, item = it.ref.itemKey?.let { k -> k to it.ref.title })
+        CategoryPicker(app, it.ref.subject, sortedAs ?: it.category, {}, item = it.ref.itemKey?.let { k -> k to it.ref.title }, onPicked = onPicked)
     }
 }

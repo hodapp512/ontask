@@ -149,9 +149,10 @@ class AiService(
         /** What the built-in categories mean, for the model. Your own categories are described by their names. */
         val DESCRIPTIONS = mapOf(
             "CORE_WORK" to "doing their job or project, such as building software, its tools, docs and tutorials",
-            "WORK_SUPPORT" to "related to work without doing it, such as career, job hunting, professional networking, industry and tech commentary",
+            "WORK_SUPPORT" to "related to work without doing it, such as career, job hunting, professional networking, industry and tech commentary, work chat and meetings",
             "ENTERTAINMENT" to "fun videos, hobbies, sports, news, politics, social media",
-            "PERSONAL_ADMIN" to "home, family, church, errands, buying things they need",
+            "PERSONAL_ADMIN" to "home, family, church, errands, personal email and calendar, banking, buying things they need",
+            "OTHER" to "in between things, such as a new tab, a notification or system dialog, a launcher or search box",
         )
 
         /** The text the model judges: what's open, anything looked up, today's plan, and (if allowed) on-screen text. */

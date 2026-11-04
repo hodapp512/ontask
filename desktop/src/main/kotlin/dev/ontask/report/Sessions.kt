@@ -46,8 +46,9 @@ object Sessions {
     }
 
     /**
-     * For drawing the timeline: a stretch under [minSec] (switching between windows, not where the time went) becomes
-     * part of the stretch before it, or after it when nothing comes just before; the two sides of a glance join up.
+     * For drawing the timeline: a stretch under [minSec] (switching between windows, not where the time went), or in
+     * Other under 2 minutes, becomes part of the stretch before it, or after it when nothing comes just before; the two
+     * sides of a glance join up.
      */
     fun absorbShort(runs: List<Run>, minSec: Long = 15): List<Run> {
         val out = ArrayList<Run>(); val pending = ArrayList<Run>()
@@ -55,7 +56,7 @@ object Sessions {
         for (r in runs.sortedBy { it.start }) {
             if (r.level == Level.AWAY) { out.addAll(pending); pending.clear(); out.add(r); continue }
             val last = out.lastOrNull()?.takeIf { pending.isEmpty() && near(it, r) }
-            if (r.seconds < minSec) {
+            if (r.seconds < minSec || r.category == dev.ontask.Category.OTHER && r.seconds < dev.ontask.Borrow.LIMIT_SEC) {
                 if (last != null) out[out.lastIndex] = last.copy(end = maxOf(last.end, r.end), absorbed = last.absorbed + r.copy(absorbed = emptyList()) + r.absorbed)
                 else pending.add(r)
                 continue

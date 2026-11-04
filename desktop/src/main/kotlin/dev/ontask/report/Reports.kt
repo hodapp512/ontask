@@ -59,7 +59,9 @@ class Reports(private val db: Db, private val zone: ZoneId = ZoneId.systemDefaul
                 ps.setLong(1, start); ps.setLong(2, end)
                 ps.executeQuery().use { rs ->
                     while (rs.next()) {
-                        val a = rs.getLong(1); val b = rs.getLong(2); val subject = rs.getString(4)
+                        val a = rs.getLong(1); val b = rs.getLong(2)
+                        // A browser window whose address can't be read is named from its title: "Google Chrome – Gmail".
+                        val subject = dev.ontask.classify.browserWindowSubject(rs.getString(7), rs.getString(8), rs.getString(9)) ?: rs.getString(4)
                         // A video or page on a Varies site is named: "youtube.com – Learning Java".
                         val name = rs.getString(6)?.substringAfter(": ", "")?.takeIf { it.isNotBlank() && subject.isNotBlank() }?.let { "$subject – $it" }
                             ?: dev.ontask.track.displayAppName(subject)

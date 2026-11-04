@@ -46,7 +46,7 @@ object Uploader {
     /** What each timeline name refers to (the app or site, or the page or video), so any device can reclassify it. */
     private fun refs(segs: List<Seg>): Map<String, Map<String, Any?>> = segs.associate { s ->
         val name = s.title?.takeIf { s.item != null }?.let { "${s.subject} – $it" } ?: s.subject
-        name to buildMap { put("subject", s.subject); s.item?.let { put("itemKey", it) }; s.title?.let { put("title", it) }; put("categoryId", s.cat) }
+        name to buildMap { put("subject", s.subject); s.item?.let { put("itemKey", it) }; s.title?.let { put("title", it) }; put("categoryId", Category.valueOf(s.cat).name) }
     }
 
     private class Run(val start: Long, var end: Long, val level: String, val cat: String, val top: HashMap<String, Long>)
@@ -84,12 +84,12 @@ object Uploader {
         }
         return sums.entries.filter { it.value >= 10 }.sortedByDescending { it.value }.take(20).map { (k, sec) ->
             buildMap {
-                put("name", k.name); put("seconds", sec); put("categoryId", k.cat)
-                put("category", Category.registry[k.cat]?.let { if (it.variable && k.item != null) "Unsure" else it.label } ?: "Unclassified")
+                put("name", k.name); put("seconds", sec); put("categoryId", Category.valueOf(k.cat).name)
+                put("category", Category.valueOf(k.cat).let { if (it.variable && k.item != null) "Unsure" else it.label })
                 k.item?.let { put("itemKey", it) }; k.title?.let { put("title", it) }
             }
         }
     }
 
-    private fun label(cat: String): String = Category.registry[cat]?.let { if (it == Category.UNKNOWN) "Unclassified" else if (it.variable) "Unsure" else it.label } ?: cat
+    private fun label(cat: String): String = Category.valueOf(cat).let { if (it == Category.UNKNOWN) "Unclassified" else if (it.variable) "Unsure" else it.label }
 }

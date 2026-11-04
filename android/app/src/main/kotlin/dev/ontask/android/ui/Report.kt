@@ -183,7 +183,7 @@ fun Timeline(raw: List<Map<String, Any?>>, dayStart: Long?, tz: String?, refs: M
 }
 
 /**
- * Glances under [minSec] (switching between apps) are drawn as part of the stretch before them, or after them when
+ * Glances under [minSec] (switching between apps), and Other under 2 minutes, are drawn as part of the stretch before them, or after them when
  * nothing comes just before; the two sides of a glance join up. They're kept under "also" for the details.
  */
 @Suppress("UNCHECKED_CAST")
@@ -194,7 +194,7 @@ fun absorbShort(segs: List<Map<String, Any?>>, minSec: Long = 15): List<Map<Stri
     val out = ArrayList<Map<String, Any?>>(); val pending = ArrayList<Map<String, Any?>>()
     for (r in segs.sortedBy { a(it) }) {
         val last = out.lastOrNull()?.takeIf { pending.isEmpty() && a(r) - b(it) <= minSec }
-        if (b(r) - a(r) < minSec) {
+        if (b(r) - a(r) < minSec || r["c"] == "Other" && b(r) - a(r) < dev.ontask.Borrow.LIMIT_SEC) {
             if (last != null) out[out.lastIndex] = last + mapOf("b" to maxOf(b(last), b(r)), "also" to also(last) + (r - "also") + also(r))
             else pending.add(r)
             continue
@@ -233,9 +233,15 @@ internal fun RefMenu(ref: Map<String, Any?>, categories: List<Cat>, onPicked: (C
                     open = false; picked = c.label; onPicked(c)
                     val subject = ref["subject"] as? String ?: return@DropdownMenuItem
                     if (itemKey != null) dev.ontask.android.track.PhoneRules.saveVerdict(dev.ontask.android.Cloud.deviceId(ctx), itemKey, ref["title"] as? String, c.id, dev.ontask.Source.USER_LABEL, null)
-                    else dev.ontask.android.track.PhoneRules.saveRule(
-                        if ('.' in subject && ' ' !in subject) dev.ontask.classify.RuleKind.DOMAIN else dev.ontask.classify.RuleKind.APP,
-                        if ('.' in subject && ' ' !in subject) dev.ontask.classify.siteDomain(subject) else subject, c.id)
+                    else {
+                        // "Google Chrome – Gmail" is a rule for that browser's windows with that title; a site has a dot
+                        // or is all lowercase with no spaces ("newtab"); anything else is an app.
+                        val window = dev.ontask.classify.browserWindowPattern(subject)
+                        val site = window == null && ' ' !in subject && ('.' in subject || subject == subject.lowercase())
+                        dev.ontask.android.track.PhoneRules.saveRule(
+                            when { window != null -> dev.ontask.classify.RuleKind.TITLE; site -> dev.ontask.classify.RuleKind.DOMAIN; else -> dev.ontask.classify.RuleKind.APP },
+                            window ?: if (site) dev.ontask.classify.siteDomain(subject) else subject, c.id)
+                    }
                 })
             }
         }

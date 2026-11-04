@@ -35,8 +35,10 @@ data class Segment(
     /** For Varies categories: the page or video ("YouTube: Learning Java") and, once judged, its category. */
     val item: String? = null,
     var itemCategory: Category? = null,
+    /** In the Other category: the level it borrows from what came just before (see [dev.ontask.Borrow]). */
+    val borrowed: dev.ontask.Level? = null,
 ) {
-    val level get() = itemCategory?.level ?: category.level
+    val level get() = borrowed ?: itemCategory?.level ?: category.level
 }
 
 class TickStore(private val db: Db) {
@@ -120,12 +122,18 @@ class RuleStore(private val db: Db) {
      */
     fun relabelHistory(kind: RuleKind, pattern: String, category: Category): Int = db.use { c ->
         val names = if (kind == RuleKind.APP && pattern == "OnTask") listOf("OnTask", "MainKt", "java") else listOf(pattern.trim())
-        val where = when (kind) {
-            RuleKind.DOMAIN -> "(domain = ? OR domain LIKE ?)"
-            RuleKind.APP -> "domain IS NULL AND app IN (${names.joinToString(",") { "?" }})"
-            RuleKind.TITLE -> "title LIKE ?"
+        // "App|Title" (one app's windows with that title) is matched the way the classifier does, then by id.
+        val ids = if (kind == RuleKind.TITLE && '|' in pattern) c.prepareStatement("SELECT id, title FROM ticks WHERE app=? AND domain IS NULL AND title IS NOT NULL").use { ps ->
+            ps.setString(1, pattern.substringBefore('|'))
+            ps.executeQuery().use { rs -> buildList<Long> { while (rs.next()) if (dev.ontask.classify.Classifier.titleMatches(pattern, pattern.substringBefore('|'), rs.getString(2))) add(rs.getLong(1)) } }
+        } else null
+        val where = when {
+            ids != null -> if (ids.isEmpty()) "0" else "id IN (${ids.joinToString(",")})"
+            kind == RuleKind.DOMAIN -> "(domain = ? OR domain LIKE ?)"
+            kind == RuleKind.APP -> "domain IS NULL AND app IN (${names.joinToString(",") { "?" }})"
+            else -> "title LIKE ?"
         }
-        fun bind(ps: java.sql.PreparedStatement, at: Int) = when (kind) {
+        fun bind(ps: java.sql.PreparedStatement, at: Int) = if (ids != null) Unit else when (kind) {
             RuleKind.TITLE -> ps.setString(at, "%${pattern.trim()}%")
             RuleKind.DOMAIN -> { ps.setString(at, pattern.trim()); ps.setString(at + 1, "%." + pattern.trim()) }
             RuleKind.APP -> names.forEachIndexed { i, n -> ps.setString(at + i, n) }

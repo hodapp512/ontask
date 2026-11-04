@@ -45,6 +45,7 @@ class Tracker : AccessibilityService() {
     lateinit var prompts: Prompts; private set
     /** What's in front now, for "I'm working": a rule key (APP|…, DOMAIN|…) or a page's item key. */
     @Volatile private var currentKey: String? = null
+    private val borrow = dev.ontask.Borrow()
     /** What's been unsorted in front, and since when (for its screenshot). */
     private var shotSince: Pair<String, Long>? = null
     @Volatile private var pkg: String? = null
@@ -141,11 +142,14 @@ class Tracker : AccessibilityService() {
             val shotKey = if (item != null) Shots.itemKey(item) else Shots.siteKey(subject)
             if (!unsorted) shotSince = null else if (shotSince?.first != shotKey) shotSince = shotKey to now
             else if (now - shotSince!!.second >= 15) Shots.take(this, shotKey)
-            log.add(now, TICK_MS / 1000, p, app, subject, t, item, cat, work)
+            // Other (system pop-ups, search) counts as what came just before, for up to 2 minutes.
+            val level = borrow.level(now, cat, away = false) ?: cat.level
+            if (cat != Category.OTHER) borrow.solid(now, level)
+            log.add(now, TICK_MS / 1000, p, app, subject, t, item, cat, work, level)
             currentKey = item ?: if (domain != null) "DOMAIN|$domain" else "APP|$p"
-            prompts.lastSite = if (cat.level == dev.ontask.Level.WASTED) subject else prompts.lastSite
-            prompts.tick(now, cat.level, work)
-        } else prompts.tick(now, null, PhoneRules.isWork(now))
+            prompts.lastSite = if (level == dev.ontask.Level.WASTED && cat != Category.OTHER) subject else prompts.lastSite
+            prompts.tick(now, level, work)
+        } else { borrow.level(now, Category.AWAY, away = true); prompts.tick(now, null, PhoneRules.isWork(now)) }
         prompts.bedtimeTick(now, power.isInteractive && !keyguard.isKeyguardLocked)
         prompts.checkinTick(power.isInteractive && !keyguard.isKeyguardLocked)
         // A new version (published with the web app) is offered by notification, checked every 6 hours.

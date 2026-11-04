@@ -10,7 +10,7 @@ import java.util.Locale
 
 /** The levels as the Mac shows them: Focused, Mixed, Wasted, Away. */
 enum class Lvl(val key: String, val label: String, val color: Color) {
-    DEEP("DEEP", "Focused", Color(0xFF2E9E5B)), MIXED("MIXED", "Mixed", Color(0xFFE0A526)),
+    DEEP("DEEP", "Focused", Color(0xFF2E9E5B)), MIXED("MIXED", "Neutral", Color(0xFFE0A526)),
     WASTED("WASTED", "Wasted", Color(0xFFD64545)), AWAY("AWAY", "Away", Color(0xFF9AA5B1));
     companion object { fun of(short: String?) = entries.firstOrNull { it.key.first().toString() == short } ?: AWAY }
 }

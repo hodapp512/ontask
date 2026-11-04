@@ -1,5 +1,6 @@
 package dev.ontask
 
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -59,10 +60,11 @@ fun main() {
                 position = androidx.compose.ui.window.WindowPosition.Aligned(androidx.compose.ui.Alignment.Center),
             )
         }
-        OnTaskTray(app) { dest -> Nav.open(dest); visible = true }
+        OnTaskTray(app) { dest -> dev.ontask.ui.KeepMainBack.allowMain(); Nav.open(dest); visible = true }
         // Opening OnTask again (Finder, Dock, Spotlight) while it runs in the menu bar shows the window.
         LaunchedEffect(Unit) {
-            runCatching { java.awt.Desktop.getDesktop().addAppEventListener(java.awt.desktop.AppReopenedListener { Nav.open(null); visible = true }) }
+            runCatching { java.awt.Desktop.getDesktop().addAppEventListener(java.awt.desktop.AppReopenedListener { dev.ontask.ui.KeepMainBack.allowMain(); Nav.open(null); visible = true }) }
+            dev.ontask.ui.KeepMainBack.install()
         }
         AppOverlays(app)
         // The window is only composed while visible, so a hidden app holds no UI resources.
@@ -71,6 +73,7 @@ fun main() {
                 val raises by Nav.raises.collectAsState()
                 // Without a Dock icon macOS doesn't activate OnTask by itself, so bring it forward explicitly.
                 LaunchedEffect(Unit) { dev.ontask.ui.Pinch.install(window.rootPane) }
+                DisposableEffect(Unit) { dev.ontask.ui.KeepMainBack.main = window; onDispose { if (dev.ontask.ui.KeepMainBack.main === window) dev.ontask.ui.KeepMainBack.main = null } }
                 LaunchedEffect(raises) {
                     runCatching { java.awt.Desktop.getDesktop().requestForeground(true) }
                     window.toFront(); window.requestFocus()

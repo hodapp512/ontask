@@ -223,6 +223,8 @@ fun CategoryPicker(
     app: dev.ontask.App, name: String, current: dev.ontask.Category, onChanged: () -> Unit,
     /** For a page or video on a Varies site: its item key and title. Picking a category then changes just this one. */
     item: Pair<String, String?>? = null,
+    /** Told which category was picked (after it's saved). */
+    onPicked: (dev.ontask.Category) -> Unit = {},
 ) {
     var open by remember { mutableStateOf(false) }
     val unsure = item != null && current.variable
@@ -239,7 +241,7 @@ fun CategoryPicker(
                     leadingIcon = { Box(Modifier.size(8.dp).background(levelColor(cat.level), androidx.compose.foundation.shape.CircleShape)) },
                     onClick = {
                         open = false
-                        if (cat != current) { if (item != null) app.answerVariable(item.first, item.second, cat) else reclassify(app, name, current, cat); onChanged() }
+                        if (cat != current) { if (item != null) app.answerVariable(item.first, item.second, cat) else reclassify(app, name, current, cat); onPicked(cat); onChanged() }
                     },
                 )
             }
@@ -282,3 +284,34 @@ suspend fun bringForwardAlone(popup: java.awt.Window) {
         java.awt.Window.getWindows().filter { it !== popup && it.isShowing && !it.isAlwaysOnTop }.forEach { it.toBack() }
     }
 }
+
+/**
+ * Keeps OnTask's main window where it was when OnTask comes to the front through a pop-up (clicking a category
+ * question, a check-in, a card…): macOS raises all of an app's windows when it's activated, so the main window is sent
+ * back behind the app you were using. Opening the main window yourself ([allowMain]) is left alone.
+ */
+object KeepMainBack {
+    @Volatile var main: java.awt.Window? = null
+    @Volatile private var allowUntil = 0L
+
+    /** The main window is being opened on purpose (menu bar, Dock, Spotlight): let it come forward. */
+    fun allowMain() { allowUntil = System.currentTimeMillis() + 3000 }
+
+    fun install() = runCatching {
+        java.awt.Desktop.getDesktop().addAppEventListener(object : java.awt.desktop.AppForegroundListener {
+            override fun appRaisedToForeground(e: java.awt.desktop.AppForegroundEvent) {
+                // Activation settles over a few hundred milliseconds; check a few times.
+                listOf(40, 200, 600).forEach { ms -> javax.swing.Timer(ms) { pushBack() }.apply { isRepeats = false; start() } }
+            }
+            override fun appMovedToBackground(e: java.awt.desktop.AppForegroundEvent) {}
+        })
+    }
+
+    private fun pushBack() {
+        val m = main ?: return
+        if (System.currentTimeMillis() < allowUntil || !m.isShowing) return
+        val active = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().activeWindow
+        if (active != null && active !== m) m.toBack()
+    }
+}
+
