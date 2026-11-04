@@ -118,7 +118,7 @@ internal fun MiddayCard(app: App, date: LocalDate, onDone: () -> Unit) {
     )
     SectionCard("How's the day going?", null) {
         OutlinedTextField(gotDone, { gotDone = it }, Modifier.fillMaxWidth(), label = { Text("What did you get done?") })
-        OutlinedTextField(should, { should = it }, Modifier.fillMaxWidth(), label = { Text("What should you have gotten done?") })
+        OutlinedTextField(should, { should = it }, Modifier.fillMaxWidth(), label = { Text("What should have been done or improved?") })
     }
     SectionCard("Today's plan", "Check off what's done, and change the rest for this afternoon.") {
         PlanList(app, date, editable = true)

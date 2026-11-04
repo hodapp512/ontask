@@ -360,7 +360,7 @@ when it comes to the front.*
   windows as soon as you clicked away; a menu-bar app can then be ignored all day.
 - **Every pop-up is always on top.** Check-ins get Later (10 min / 30 min / 1 h); closing counts as 10 min; after two
   snoozes the window stays until answered.
-- **Midday asks "What did you get done?" and "What should you have gotten done?"** (the user's wording, instead of
+- **Midday asks "What did you get done?" and "What should have been done or improved?"** (the user's wording, instead of
   "what's going well / not well"), then lets you revise the plan. Done items are ticked in the plan itself.
 - **The morning's numbers come first** (focused %, wasted, longest stretch, top apps, timeline) so the answers rest on
   facts; the report gets one line, "Morning X% · Afternoon Y%", not the whole card.

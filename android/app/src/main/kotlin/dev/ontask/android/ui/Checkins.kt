@@ -72,7 +72,7 @@ fun CheckinScreen(kind: String, onSaved: () -> Unit = {}, onDone: () -> Unit) {
                 val chips = remember { mutableStateListOf<String>() }; var showChips by remember { mutableStateOf(false) }
                 OCard("How's the day going?") {
                     OutlinedTextField(done, { done = it }, Modifier.fillMaxWidth(), label = { Text("What did you get done?") })
-                    OutlinedTextField(should, { should = it }, Modifier.fillMaxWidth(), label = { Text("What should you have gotten done?") })
+                    OutlinedTextField(should, { should = it }, Modifier.fillMaxWidth(), label = { Text("What should have been done or improved?") })
                 }
                 OCard("Today's plan") { Muted("Check off what's done, and change the rest for this afternoon."); PlanList(editable = true) }
                 if (showChips) OCard("What's in the way?") {
