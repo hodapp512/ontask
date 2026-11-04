@@ -231,7 +231,7 @@ private fun BreakCheck(app: App, iv: Intervention) {
 @Composable
 private fun StepOne(app: App, iv: Intervention) {
     Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("It looks like you're drifting.", style = MaterialTheme.typography.headlineSmall)
+        Text("Are you on task?", style = MaterialTheme.typography.headlineSmall)
         Text("Is this what you meant to be doing right now?", style = MaterialTheme.typography.bodyLarge)
         if (iv.toEarnSec > 0) Text(
             "You've focused ${fmtDuration(iv.focusedSec)} since your last break. ${fmtDuration(iv.toEarnSec)} more earns a 5-minute break.",

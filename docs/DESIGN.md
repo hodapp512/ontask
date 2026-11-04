@@ -142,7 +142,7 @@ nothing under 25 min focused, then 5 min per 25 (at most 10 under an hour, 15 af
 | Step | Trigger | Response |
 |---|---|---|
 | 1 (break earned) | 1 min of drifting | Centered, takes focus: **"Is this a break? You've focused 40 min, so you've got 5 minutes."** *Yes, 5-min break / I'm working / Back to work* (+ *Lunch*) |
-| 1 (not earned) | 2 min of drifting, or 2nd unblock within 60 min | Centered, takes focus: **"It looks like you're drifting."** + "You've focused 12 min since your last break. 13 min more earns a 5-minute break." *Back to work / I'm working* (+ *Lunch*) |
+| 1 (not earned) | 2 min of drifting, or 2nd unblock within 60 min | Centered, takes focus: **"Are you on task?"** + "You've focused 12 min since your last break. 13 min more earns a 5-minute break." *Back to work / I'm working* (+ *Lunch*) |
 | 2 | +3 min, or 3rd unblock within 60 min | Firmer centered window (answerable at once): drift time, your message, today's plan, break totals; *Back to work / It's actually work / Help me get started* |
 | 3 | +5 min, or 4th unblock within 60 min | Work hours: offer to message the partner ("It's your call. You can edit the message."): *Send, and back to work / Not now, back to work / Help me get started*. Ignored, it's sent automatically (below). Before work hours: the step-2 window again |
 

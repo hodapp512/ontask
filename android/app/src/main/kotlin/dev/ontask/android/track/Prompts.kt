@@ -22,7 +22,7 @@ import java.time.LocalTime
 /**
  * Drift prompts on the phone, in work hours, the same way as on the Mac: after 25+ minutes of focus (counted by the
  * Mac, shared in users/{uid}/state/breaks) a minute on something time-wasting asks "Is this a break?"; otherwise
- * two minutes bring "It looks like you're drifting". Step 1 is a heads-up notification you can't swipe away; steps
+ * two minutes bring "Are you on task?". Step 1 is a heads-up notification you can't swipe away; steps
  * 2 and 3 are a full-screen OnTask screen. A break or lunch started here is shared, so the Mac stays quiet too.
  */
 class Prompts(private val svc: AccessibilityService) {
@@ -114,7 +114,7 @@ class Prompts(private val svc: AccessibilityService) {
                 .addAction(action(BREAK, "Yes, $earned-min break")).addAction(action(WORKING, "I'm working")).addAction(action(BACK, "Back to work"))
         } else {
             val toEarn = (25 * 60 - focusedSec).coerceAtLeast(0) / 60
-            b.setContentTitle("It looks like you're drifting.").setStyle(NotificationCompat.BigTextStyle().bigText(
+            b.setContentTitle("Are you on task?").setStyle(NotificationCompat.BigTextStyle().bigText(
                 "Is this what you meant to be doing right now?" + if (toEarn > 0) "\nYou've focused ${focusedSec / 60} min since your last break. $toEarn more earns a 5-minute break." else ""))
                 .addAction(action(BACK, "Back to work")).addAction(action(WORKING, "I'm working"))
             if (lunchOffered()) b.addAction(action(LUNCH, "Lunch"))

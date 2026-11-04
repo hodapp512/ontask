@@ -585,3 +585,5 @@ when it comes to the front.*
 - **A site unblocked outside work hours isn't drifting while that unblock lasts**, even after the day has started:
   you chose it.
 - The phone still prompts in work hours only; before-work time still counts in totals and reports.
+- **Step 1 now says "Are you on task?"** (was "It looks like you're drifting."), on the Mac and the phone: a
+  question, matching the window's title.
