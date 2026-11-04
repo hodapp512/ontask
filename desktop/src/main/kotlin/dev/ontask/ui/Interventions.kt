@@ -295,8 +295,9 @@ private fun StepOne(app: App, iv: Intervention) {
 }
 
 /**
- * "Help me get started": your plan with "pick the smallest next step and start it now", blocking the site for a
- * while, and (in work hours, not on step 3 itself) a message to your partner.
+ * Shown right away under the firmer window's and step 3's buttons (no "Help me get started" to click first): "pick the
+ * smallest next step and start it now", blocking the site for a while, and (in work hours, not on step 3 itself) a
+ * message to your partner.
  */
 @Composable
 private fun HelpPanel(app: App, iv: Intervention, partner: Boolean) {
@@ -314,7 +315,6 @@ private fun HelpPanel(app: App, iv: Intervention, partner: Boolean) {
 
 @Composable
 private fun StepTwo(app: App, iv: Intervention) {
-    var help by remember(iv) { mutableStateOf(false) }
     Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Time to come back", style = MaterialTheme.typography.headlineMedium)
         Text(app.unblockMessage(), style = MaterialTheme.typography.titleMedium)
@@ -325,9 +325,8 @@ private fun StepTwo(app: App, iv: Intervention) {
             BackButton(app)
             OutlinedButton({ app.interventionWork() }) { Text("It's actually work") }
             if (iv.lunch) OutlinedButton({ app.interventionLunch() }) { Text(if (iv.stillLunch) "Still at lunch" else "I'm at lunch") }
-            if (!help) TextButton({ help = true }) { Text("Help me get started") }
         }
-        if (help) HelpPanel(app, iv, partner = iv.partnerAllowed)
+        HelpPanel(app, iv, partner = iv.partnerAllowed)
     }
 }
 
@@ -337,7 +336,6 @@ private fun StepThree(app: App, iv: Intervention) {
     val what = remember { dev.ontask.classify.domainOf(s?.url) ?: s?.app ?: "something else" }
     var text by remember { mutableStateOf("I've been drifting on $what. I'm getting back to work.\nNo need to reply — but a 👍 helps.") }
     var status by remember { mutableStateOf("") }
-    var help by remember(iv) { mutableStateOf(false) }
     Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Want to let your partner know?", style = MaterialTheme.typography.headlineMedium)
         Text("It's your call. You can edit the message.", style = MaterialTheme.typography.bodyMedium)
@@ -352,9 +350,8 @@ private fun StepThree(app: App, iv: Intervention) {
             }) { Text("Send, and back to work") }
             OutlinedButton({ app.backToWork() }) { Text("Not now, back to work") }
             if (iv.lunch) OutlinedButton({ app.interventionLunch() }) { Text(if (iv.stillLunch) "Still at lunch" else "I'm at lunch") }
-            if (!help) TextButton({ help = true }) { Text("Help me get started") }
         }
-        if (help) HelpPanel(app, iv, partner = false)
+        HelpPanel(app, iv, partner = false)
     }
 }
 

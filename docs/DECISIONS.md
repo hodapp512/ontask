@@ -672,3 +672,5 @@ when it comes to the front.*
   minute later.
 - **15 minutes off time-wasting ends a drift** (was 1 minute). Shorter stretches elsewhere only pause it. *Rejected:*
   5 minutes (too easy to slip between work and time-wasting and reset).
+- **No "Help me get started" button:** what it opened (pick the smallest next step, *Block YouTube for 15 minutes*,
+  *Message my partner*) shows right away on the firmer window and step 3, and on the phone's full-screen prompt.

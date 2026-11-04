@@ -134,7 +134,6 @@ class PromptActivity : ComponentActivity() {
     @androidx.compose.runtime.Composable
     private fun Screen(step: Int) {
         val p = Tracker.running?.prompts
-        var help by remember { mutableStateOf(false) }
         val uid = Cloud.uid
         val checkin by remember { Cloud.doc("users/$uid/checkins/${dayKey()}") }.collectAsState(null)
         val inWork = step == 3
@@ -147,8 +146,8 @@ class PromptActivity : ComponentActivity() {
             Button({ p?.backToWork(); finish() }, Modifier.fillMaxWidth()) { Text("Back to work") }
             OutlinedButton({ p?.working(); finish() }, Modifier.fillMaxWidth()) { Text("It's actually work") }
             if (p?.lunchOffered() == true) OutlinedButton({ p.startBreak(lunch = true); finish() }, Modifier.fillMaxWidth()) { Text("I'm at lunch") }
-            if (!help) TextButton({ help = true }) { Text("Help me get started") }
-            else {
+            // What used to be behind "Help me get started", shown right away.
+            run {
                 Muted("Pick the smallest next step from your plan and give it 10 minutes. Put the phone face down.")
                 if (inWork) {
                     var text by remember { mutableStateOf("I've been drifting on my phone. I'm getting back to work.\nNo need to reply — but a 👍 helps.") }

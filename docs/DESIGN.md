@@ -154,7 +154,7 @@ At lunchtime (11–2, once a day) every drift prompt, the countdown and the remi
   minutes. Back to work?"** (break totals: last hour and today) → *Back to work / 5 more minutes* (once). Still drifting a minute after a break or lunch → straight to step 2.
 - **Lunch** (11:00–2:00, once a day, offered on step 1): no drift prompts; **"Is lunch over?" at 30 min** (*Back to work / 15
   more minutes*), over at 45 min. Working during lunch doesn't end it. Lunch time isn't work time in the totals.
-- **Help me get started** (steps 2–3): today's plan with "pick the smallest next step and start it
+- **Getting started help** (steps 2–3, shown right away, no button to open it): today's plan with "pick the smallest next step and start it
   now", *Block <site> for 15 minutes*, and in work hours *Message my partner*.
 - **Closing any prompt with the window's close button only hides it:** drift prompts and break cards come back after
   30 s, category questions after a minute, until answered.
