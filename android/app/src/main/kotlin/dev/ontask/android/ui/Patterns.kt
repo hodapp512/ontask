@@ -64,7 +64,7 @@ private suspend fun loadDays(uid: String): Map<LocalDate, List<Patterns.Seg>> = 
 fun PatternsCard(uid: String, workRanges: List<Pair<Int, Int>>) {
     val prefs = LocalContext.current.getSharedPreferences("patterns", Context.MODE_PRIVATE)
     var metric by remember { mutableStateOf(runCatching { Metric.valueOf(prefs.getString("metric", "FOCUSED")!!) }.getOrDefault(Metric.FOCUSED)) }
-    var range by remember { mutableStateOf(runCatching { Range.valueOf(prefs.getString("range", "LAST_30")!!) }.getOrDefault(Range.LAST_30)) }
+    var range by remember { mutableStateOf(Range.saved(prefs.getString("range", null))) }
     var slot by remember { mutableStateOf(prefs.getInt("slot", Patterns.DEFAULT_SLOT).takeIf { it in Patterns.SLOTS && it >= 30 } ?: Patterns.DEFAULT_SLOT) }
     var days by remember { mutableStateOf<Map<LocalDate, List<Patterns.Seg>>?>(null) }
     LaunchedEffect(uid) { days = loadDays(uid) }
@@ -81,8 +81,8 @@ fun PatternsCard(uid: String, workRanges: List<Pair<Int, Int>>) {
         Row(Modifier.fillMaxWidth()) {
             listOf(
                 "Today" to Patterns.total(d, today, today, first, metric),
-                "This week" to Patterns.total(d, Range.THIS_WEEK.from(today), today, first, metric),
-                "This month" to Patterns.total(d, today.withDayOfMonth(1), today, first, metric),
+                "Last 7 days" to Patterns.total(d, Range.LAST_7.from(today), today, first, metric),
+                "Last 30 days" to Patterns.total(d, Range.LAST_30.from(today), today, first, metric),
                 "Since ${first.format(java.time.format.DateTimeFormatter.ofPattern("MMM d"))}" to Patterns.total(d, first, today, first, metric),
             ).forEach { (label, t) ->
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -102,19 +102,19 @@ fun PatternsCard(uid: String, workRanges: List<Pair<Int, Int>>) {
         val bars = remember(d, range, slot, metric) { Patterns.distribution(d, range.from(today), today, first, slot, metric, now.hour * 60 + now.minute) }
         val from = maxOf(range.from(today), first)
         val since = if (from > range.from(today)) "Since ${first.format(java.time.format.DateTimeFormatter.ofPattern("MMM d"))} (${java.time.temporal.ChronoUnit.DAYS.between(from, today) + 1} days). " else ""
-        Chart(bars, slot, metric, workRanges, since)
+        Chart(bars, slot, metric, workRanges, since, oneDay = range == Range.TODAY)
     }
 }
 
 @Composable
-private fun Chart(bars: List<Patterns.Bar>, slot: Int, metric: Metric, work: List<Pair<Int, Int>>, since: String) {
+private fun Chart(bars: List<Patterns.Bar>, slot: Int, metric: Metric, work: List<Pair<Int, Int>>, since: String, oneDay: Boolean) {
     var picked by remember(bars) { mutableStateOf<Int?>(null) }
     val color = metricColor(metric)
     val shade = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
     val grid = MaterialTheme.colorScheme.outlineVariant
     val maxMin = (bars.maxOfOrNull { it.avgSec } ?: 0.0) / 60
     val top = listOf(10, 20, 30, 40, 60, 90, 120).firstOrNull { it >= maxMin } ?: (Math.ceil(maxMin / 60) * 60).toInt()
-    Muted(picked?.let { Patterns.describe(bars[it], slot, metric) } ?: (since + "Average minutes per day. Tap a bar for details."))
+    Muted(picked?.let { Patterns.describe(bars[it], slot, metric, oneDay) } ?: (since + (if (oneDay) "Minutes in each slot today." else "Average minutes per day.") + " Tap a bar for details."))
     Row {
         Box(Modifier.width(24.dp).height(140.dp)) {
             listOf(top, top / 2, 0).forEachIndexed { i, v ->

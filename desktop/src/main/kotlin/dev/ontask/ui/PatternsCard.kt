@@ -52,7 +52,7 @@ fun metricColor(m: Metric): Color = when (m) { Metric.FOCUSED -> levelColor(Leve
 @Composable
 fun PatternsCard(app: App, today: LocalDate, version: Int, sample: Map<LocalDate, List<Patterns.Seg>>? = null) {
     var metric by remember { mutableStateOf(runCatching { Metric.valueOf(app.prefs.str("patterns.metric", "FOCUSED")) }.getOrDefault(Metric.FOCUSED)) }
-    var range by remember { mutableStateOf(runCatching { Range.valueOf(app.prefs.str("patterns.range", "LAST_30")) }.getOrDefault(Range.LAST_30)) }
+    var range by remember { mutableStateOf(Range.saved(app.prefs.get("patterns.range"))) }
     var slot by remember { mutableStateOf(app.prefs.int("patterns.slot", Patterns.DEFAULT_SLOT).takeIf { it in Patterns.SLOTS } ?: Patterns.DEFAULT_SLOT) }
     var days by remember { mutableStateOf<Map<LocalDate, List<Patterns.Seg>>?>(null) }
     LaunchedEffect(today, version) { days = sample ?: withContext(Dispatchers.IO) { app.patternDays() } }
@@ -69,11 +69,10 @@ fun PatternsCard(app: App, today: LocalDate, version: Int, sample: Map<LocalDate
         if (first == null) { Text("Nothing yet: your days show here once they've synced.", color = MaterialTheme.colorScheme.onSurfaceVariant); return@PlainCard }
         // The four numbers.
         Row(Modifier.fillMaxWidth()) {
-            val monday = Range.THIS_WEEK.from(today)
             listOf(
                 "Today" to Patterns.total(d, today, today, first, metric),
-                "This week" to Patterns.total(d, monday, today, first, metric),
-                "This month" to Patterns.total(d, today.withDayOfMonth(1), today, first, metric),
+                "Last 7 days" to Patterns.total(d, Range.LAST_7.from(today), today, first, metric),
+                "Last 30 days" to Patterns.total(d, Range.LAST_30.from(today), today, first, metric),
                 "Since ${first.format(java.time.format.DateTimeFormatter.ofPattern("MMM d"))}" to Patterns.total(d, first, today, first, metric),
             ).forEach { (label, t) ->
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -97,13 +96,13 @@ fun PatternsCard(app: App, today: LocalDate, version: Int, sample: Map<LocalDate
         val from = maxOf(range.from(today), first)
         val work = remember(today) { (app.settings.schedule.rangesFor(today).ifEmpty { app.settings.schedule.rangesFor(today.with(java.time.DayOfWeek.MONDAY)) }).map { it.startMin to it.endMin } }
         val since = if (from > range.from(today)) "Since ${first.format(java.time.format.DateTimeFormatter.ofPattern("MMM d"))} (${java.time.temporal.ChronoUnit.DAYS.between(from, today) + 1} days). " else ""
-        DistributionChart(bars, slot, metric, work, since)
+        DistributionChart(bars, slot, metric, work, since, oneDay = range == Range.TODAY)
     }
 }
 
 /** The bars over the whole day, work hours shaded; hovering one says what it is. */
 @Composable
-private fun DistributionChart(bars: List<Patterns.Bar>, slot: Int, metric: Metric, work: List<Pair<Int, Int>>, since: String) {
+private fun DistributionChart(bars: List<Patterns.Bar>, slot: Int, metric: Metric, work: List<Pair<Int, Int>>, since: String, oneDay: Boolean) {
     var hover by remember { mutableStateOf<Int?>(null) }
     val color = metricColor(metric)
     val shade = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
@@ -111,7 +110,7 @@ private fun DistributionChart(bars: List<Patterns.Bar>, slot: Int, metric: Metri
     val maxMin = (bars.maxOfOrNull { it.avgSec } ?: 0.0) / 60
     // A tidy top for the y-axis: 5, 10, 15, 30, 60…
     val top = listOf(10, 20, 30, 40, 60, 90, 120).firstOrNull { it >= maxMin } ?: (Math.ceil(maxMin / 60) * 60).toInt()
-    Text(hover?.let { Patterns.describe(bars[it], slot, metric) } ?: (since + "Average minutes per day. Hover a bar for details."),
+    Text(hover?.let { Patterns.describe(bars[it], slot, metric, oneDay) } ?: (since + (if (oneDay) "Minutes in each slot today." else "Average minutes per day.") + " Hover a bar for details."),
         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     Row {
         // y-axis: minutes per day.

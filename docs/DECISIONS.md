@@ -687,3 +687,11 @@ when it comes to the front.*
 - **Phone app rules go under the package** (com.bambuna.podcastaddict), replacing an older rule for it by name, so
   the two can't disagree. *Rejected:* waiting for the phone before showing anything; changing the Mac's view only.
 - Checked with a UI test that drives the real window (`TimelineDetailsTest`).
+
+## 2026-11-05 · Your patterns: rolling ranges only (grilled)
+
+- **Ranges: Today · Last 7 days · Last 30 days · Last 365 days**; numbers: Today · Last 7 days · Last 30 days ·
+  Since <first day>. *Rejected:* calendar week and month, and 6 months; a Last 365 days number (same as Since for a
+  year). A saved calendar choice becomes Last 7 or Last 30 days.
+- **The hover no longer says "on x of y days"**: x (days with at least a minute in that slot) read as wrong.
+  On Today it drops "on average".

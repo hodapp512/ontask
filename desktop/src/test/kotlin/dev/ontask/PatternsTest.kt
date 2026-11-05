@@ -28,12 +28,14 @@ class PatternsTest {
         val s = Patterns.distribution(days, today, today, today, 60, Metric.SCREEN, 24 * 60)
         assertEquals(listOf(3600.0, 0.0), listOf(s[10].avgSec, s[11].avgSec)) // Neutral counts as screen time, Away doesn't
         assertEquals(Patterns.Total(9000, 9000, 1), Patterns.total(days, today, today, today, Metric.SCREEN))
-        assertEquals("9–10 AM · 60 min wasted on average · on 1 of 1 days", Patterns.describe(w[9], 60, Metric.WASTED))
+        assertEquals("9–10 AM · 60 min wasted on average", Patterns.describe(w[9], 60, Metric.WASTED))
+        assertEquals("9–10 AM · 60 min wasted", Patterns.describe(w[9], 60, Metric.WASTED, oneDay = true))
     }
 
     @Test fun ranges() {
-        assertEquals(LocalDate.of(2026, 11, 2), Patterns.Range.THIS_WEEK.from(today)) // Monday
-        assertEquals(LocalDate.of(2026, 11, 1), Patterns.Range.THIS_MONTH.from(today))
+        assertEquals(today, Patterns.Range.TODAY.from(today))
+        assertEquals(Patterns.Range.LAST_7, Patterns.Range.saved("THIS_WEEK"))
+        assertEquals(Patterns.Range.LAST_30, Patterns.Range.saved("SIX_MONTHS"))
         assertEquals(LocalDate.of(2026, 10, 6), Patterns.Range.LAST_30.from(today))
     }
 }

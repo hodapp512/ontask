@@ -1,8 +1,6 @@
 package dev.ontask.report
 
-import java.time.DayOfWeek
 import java.time.LocalDate
-import java.time.temporal.TemporalAdjusters
 
 /**
  * "Your patterns": when in the day you tend to be focused, wasting time or on a screen at all, averaged over a range
@@ -18,14 +16,19 @@ object Patterns {
     }
 
     enum class Range(val label: String) {
-        THIS_WEEK("This week"), LAST_7("Last 7 days"), THIS_MONTH("This month"), LAST_30("Last 30 days"), SIX_MONTHS("6 months"), YEAR("Year");
+        TODAY("Today"), LAST_7("Last 7 days"), LAST_30("Last 30 days"), YEAR("Last 365 days");
         fun from(today: LocalDate): LocalDate = when (this) {
-            THIS_WEEK -> today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            TODAY -> today
             LAST_7 -> today.minusDays(6)
-            THIS_MONTH -> today.withDayOfMonth(1)
             LAST_30 -> today.minusDays(29)
-            SIX_MONTHS -> today.minusDays(181)
             YEAR -> today.minusDays(364)
+        }
+        companion object {
+            /** A saved choice, including ones that are gone (calendar week and month, 6 months). */
+            fun saved(name: String?): Range = when (name) {
+                "THIS_WEEK" -> LAST_7; "THIS_MONTH", "SIX_MONTHS" -> LAST_30
+                else -> entries.firstOrNull { it.name == name } ?: LAST_30
+            }
         }
     }
 
@@ -94,13 +97,13 @@ object Patterns {
     /** The axis label under a bar: "12a", "3p". */
     fun axis(min: Int): String { val h = (min / 60) % 24; return (if (h % 12 == 0) 12 else h % 12).toString() + if (h < 12) "a" else "p" }
 
-    /** "9–10 AM · 18 min focused on average · on 14 of 21 days". */
-    fun describe(b: Bar, slotMin: Int, metric: Metric): String {
+    /** "9–10 AM · 18 min focused on average" ([oneDay]: the Today range, "9–10 AM · 18 min focused"). */
+    fun describe(b: Bar, slotMin: Int, metric: Metric, oneDay: Boolean = false): String {
         val avgMin = Math.round(b.avgSec / 60)
         val x = clock(b.startMin); val y = clock(b.startMin + slotMin)
         // "9–10 AM" when both ends share AM or PM.
         val from = if (x.takeLast(2) == y.takeLast(2)) x.dropLast(3) else x
-        return "$from–$y · $avgMin min ${metric.verb} on average · on ${b.daysWithAny} of ${b.days} days"
+        return "$from–$y · $avgMin min ${metric.verb}" + if (oneDay) "" else " on average"
     }
 
     /** "1h 56m", "18m". */
