@@ -358,8 +358,6 @@ private fun RunDetails(run: Run, app: App?, onClose: () -> Unit, onRelabel: () -
         text = {
             Column(Modifier.widthIn(min = 360.dp, max = 560.dp)) {
                 Text("${clockRange(run.start, run.end)} · ${fmtDuration(run.seconds)}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                // Phone time is the phone's own record: a change shows here once the phone has re-sorted and synced it.
-                if (run.phone) Text("📱 On your phone: a change shows here in a minute or two, once the phone syncs.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
                 val items = run.top(Int.MAX_VALUE)
                 if (items.isEmpty()) Text("No app recorded")

@@ -41,15 +41,6 @@ object PhoneRules {
             },
             Cloud.db.document("users/$uid/sync/rules").addSnapshotListener { s, _ ->
                 val items = (s?.get("items") as? Map<String, Any?>) ?: emptyMap()
-                // Rules added or changed since last time (from the Mac, the web or this phone): today's time follows them.
-                // On start every rule counts as new, so today's time also follows rules set while the phone was off.
-                val before = lastRuleItems ?: emptyMap()
-                items.filter { (k, v) -> before[k] != v }.forEach { (k, v) ->
-                    val kind = runCatching { RuleKind.valueOf(k.substringBefore('|')) }.getOrNull() ?: return@forEach
-                    val cat = Category.registry[v as? String ?: return@forEach] ?: return@forEach
-                    runCatching { onRuleChanged(kind, k.substringAfter('|'), cat) }
-                }
-                lastRuleItems = items
                 rules = items.entries.mapIndexedNotNull { i, (k, v) ->
                     val kind = runCatching { RuleKind.valueOf(k.substringBefore('|')) }.getOrNull() ?: return@mapIndexedNotNull null
                     Rule(i + 1L, kind, k.substringAfter('|'), Category.valueOf(v as? String ?: return@mapIndexedNotNull null), user = true)
@@ -76,13 +67,6 @@ object PhoneRules {
     }
 
     private fun rebuild() { classifier = Classifier(rules) }
-
-    private var lastRuleItems: Map<String, Any?>? = null
-    /** The category a synced rule gives [pattern] (an app's package or name, or a site), if any. */
-    fun ruleCategory(kind: RuleKind, pattern: String): String? = lastRuleItems?.get("${kind.name}|$pattern") as? String
-
-    /** Set by the tracker: re-sort today's recorded time for a rule that just changed. */
-    @Volatile var onRuleChanged: (RuleKind, String, Category) -> Unit = { _, _, _ -> }
 
     fun verdict(item: String): Category? = verdicts[item]?.let { Category.registry[it] }
     fun sourceRule(key: String?): Category? = key?.let { sourceRules[it] }?.let { Category.registry[it] }

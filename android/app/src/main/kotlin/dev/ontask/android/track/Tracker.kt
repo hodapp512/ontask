@@ -65,23 +65,6 @@ class Tracker : AccessibilityService() {
         Shots.prune(this)
         prompts = Prompts(this)
         running = this
-        // A category changed elsewhere (the Mac's timeline, the web): today's phone time follows it, and the day
-        // report goes up at the next tick so every view shows it.
-        PhoneRules.onRuleChanged = { kind, pattern, cat ->
-            when (kind) {
-                RuleKind.APP -> {
-                    log.recategorize({ it.item == null && (it.pkg.equals(pattern, true) || it.app.equals(pattern, true) || it.subject.equals(pattern, true)) }, cat)
-                    // Set by its name (the Mac's timeline shows "Podcast Addict"): a rule for its package saying otherwise
-                    // would still win here, so it follows.
-                    log.snapshot().filter { it.app.equals(pattern, true) || it.subject.equals(pattern, true) }.map { it.pkg }.distinct()
-                        .filter { pkg -> pkg != pattern && PhoneRules.ruleCategory(RuleKind.APP, pkg).let { it != null && it != cat.name } }
-                        .forEach { pkg -> PhoneRules.saveRule(RuleKind.APP, pkg, cat.name) }
-                }
-                RuleKind.DOMAIN -> log.recategorize({ it.item == null && (it.subject.equals(pattern, true) || siteDomain(it.subject).equals(pattern, true)) }, cat)
-                else -> {}
-            }
-            lastUpload = 0
-        }
         Cloud.uid?.let { PhoneRules.start(it) }
         registerReceiver(screenOff, IntentFilter(Intent.ACTION_SCREEN_OFF))
         scope.launch { while (isActive) { runCatching { tick() }; delay(TICK_MS) } }
