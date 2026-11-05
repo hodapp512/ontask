@@ -1,7 +1,7 @@
 :root { --bg:#f6f8f6; --surface:#fff; --text:#191c1a; --muted:#5d665f; --primary:#1f7a44; --primary-c:#cfefdb; --line:#d7ddd8; --danger:#ba1a1a; }
 @media (prefers-color-scheme: dark) { :root { --bg:#121513; --surface:#1a1d1b; --text:#e1e3df; --muted:#9aa49c; --primary:#6fdb9b; --primary-c:#00522c; --line:#2f3631; --danger:#ffb4ab; } }
 * { box-sizing: border-box; }
-body { margin:0; background:var(--bg); color:var(--text); font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; padding-bottom:env(safe-area-inset-bottom); }
+body { overflow-wrap:anywhere; margin:0; background:var(--bg); color:var(--text); font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; padding-bottom:env(safe-area-inset-bottom); }
 main { max-width:640px; margin:0 auto; padding:16px; display:flex; flex-direction:column; gap:14px; }
 h1 { font-size:24px; margin:8px 0 0; } h2 { font-size:17px; margin:0 0 6px; } p { margin:0; } .muted { color:var(--muted); font-size:14px; }
 .card { background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:10px; }
@@ -14,7 +14,7 @@ label { display:flex; flex-direction:column; gap:4px; font-size:14px; color:var(
 .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; } .row > * { flex:0 0 auto; } .grow { flex:1 1 auto !important; }
 
 
-.msg { border-left:4px solid var(--primary); padding:6px 10px; white-space:pre-wrap; } .msg small { color:var(--muted); display:block; }
+.msg { border-left:4px solid var(--primary); padding:6px 10px; white-space:pre-wrap; overflow-wrap:anywhere; } .msg small { color:var(--muted); display:block; }
 .bar { display:flex; height:10px; border-radius:6px; overflow:hidden; background:var(--line); } .legend { display:flex; gap:12px; flex-wrap:wrap; font-size:13px; }
 .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; }
 .notice { background:var(--primary-c); border-radius:10px; padding:10px 12px; font-size:14px; } .error { color:var(--danger); }
@@ -50,3 +50,8 @@ select.cat { width:auto; max-width:100%; padding:4px 8px; font-size:14px; }
 .hm-on { fill:#2e9e5b; cursor:pointer; } .hm-off { fill:var(--line); cursor:pointer; }
 .hm-legend { display:flex; align-items:center; gap:3px; } .hm-sw { display:inline-block; width:11px; height:11px; border-radius:2px; background:var(--line); } .hm-sw.hm-on-bg { background:#2e9e5b; }
 .hm-detail:empty { display:none; }
+
+/* Check-in notes on a supported person's day. */
+.note-h { font-weight:600; font-size:14px; margin-bottom:2px; } ul.plan { margin:0; padding-left:20px; } ul.plan li.done { text-decoration:line-through; color:var(--muted); }
+.quote { font-style:italic; } button.link { border:0; background:none; padding:4px 0; color:var(--primary); align-self:flex-start; }
+[hidden] { display:none !important; }

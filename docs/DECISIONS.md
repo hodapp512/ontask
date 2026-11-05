@@ -695,3 +695,14 @@ when it comes to the front.*
   year). A saved calendar choice becomes Last 7 or Last 30 days.
 - **The hover no longer says "on x of y days"**: x (days with at least a minute in that slot) read as wrong.
   On Today it drops "on average".
+
+## 2026-11-05 · Partner web app tidy-up (grilled)
+
+- **Someone you support is first** on the partner's home, above Your day.
+- **The supported person's card drops the raw last message** (a daily report printed whole, with a link running
+  off the screen) and repeats nothing: day, longest sessions, where the time went (open, top 5, Show all) and new
+  **Check-in notes** (plan, midday, evening, note). Also on the full-day page. Text can't overflow anywhere.
+- **"Backup contact" became "Your phone number and email":** a phone number for texts; email is the Google account's
+  (the server uses it when no address was saved), so nothing to type. It was never a second person.
+- **"How you hear about X" → "Notifications for X".**
+- Linked devices unchanged for now: the same phone shows as the Android app and as the web app in its browser.

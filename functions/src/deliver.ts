@@ -33,7 +33,9 @@ export async function deliverToPartner(
 
   const [userSnap, contactSnap] = await Promise.all([db.doc(`users/${link.partnerUid}`).get(), db.doc(`users/${link.partnerUid}/contact/main`).get()]);
   const tokens = Object.keys((userSnap.get("fcmTokens") as Record<string, unknown> | undefined) ?? {});
-  const phone = contactSnap.get("phone") as string | undefined, email = contactSnap.get("email") as string | undefined;
+  const phone = contactSnap.get("phone") as string | undefined;
+  // Email: an address they saved earlier, else the Google account they signed in with.
+  const email = (contactSnap.get("email") as string | undefined) || (await accountEmail(link.partnerUid));
   const d = decide(prefs, type, now, { lastSeenMs: userSnap.get("lastSeenMs"), hasPushToken: tokens.length > 0, hasPhone: !!phone, hasEmail: !!email });
 
   if (d.channel === "off") {
@@ -103,4 +105,9 @@ export async function releaseDeferred(db: Firestore, senders: Senders, now: Date
     if (r.delivered) n++;
   }
   return n;
+}
+
+/** The email of the Google account [uid] signed in with (none in tests or for accounts without one). */
+async function accountEmail(uid: string): Promise<string | undefined> {
+  try { return (await (await import("firebase-admin")).auth().getUser(uid)).email ?? undefined; } catch { return undefined; }
 }

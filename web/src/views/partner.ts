@@ -4,7 +4,7 @@ import { httpsCallable } from "firebase/functions";
 import { db, fns } from "../firebase";
 import { h } from "../dom";
 import { REACTIONS, fmtDate, fmtDateTime, todayKey } from "../format";
-import { reportBody } from "./home";
+import { checkinNotes, reportBody } from "./home";
 import { heatmapEl } from "./heat";
 
 export async function joinView(u: User, code: string): Promise<HTMLElement> {
@@ -47,14 +47,18 @@ export async function personView(u: User, linkId: string): Promise<HTMLElement> 
       stop = onSnapshot(doc(db, "users", tracked, "reports", key), (s) => {
         body.replaceChildren(s.exists() ? reportBody(s.data()) : h("p", { class: "muted" }, today ? `${link.trackedName ?? "They"} hasn't been at the computer yet today.` : "No report for this day."));
       }, () => body.replaceChildren(h("p", { class: "muted" }, "Couldn't load this day.")));
-      // Their plan for the day: finished tasks struck through.
-      stopPlan = onSnapshot(doc(db, "users", tracked, "plans", key), (s) => planSlot.replaceChildren(...planEl(s.get("items"))), () => planSlot.replaceChildren());
+      // What they wrote that day: the plan (finished tasks struck through), midday and evening check-ins.
+      let chk: any, items: any;
+      const notes = () => { const n = checkinNotes(chk, items); planSlot.replaceChildren(...(n ? [n] : [])); };
+      const a = onSnapshot(doc(db, "users", tracked, "checkins", key), (s) => { chk = s.data(); notes(); }, () => {});
+      const b = onSnapshot(doc(db, "users", tracked, "plans", key), (s) => { items = s.get("items"); notes(); }, () => {});
+      stopPlan = () => { a(); b(); };
     };
     next.onclick = () => { day = new Date(day.getTime() + 86_400_000); show(); };
     const prev = h("button", { class: "icon-btn", "aria-label": "Previous day", onclick: () => { day = new Date(day.getTime() - 86_400_000); show(); } }, "←");
     show();
     window.addEventListener("hashchange", () => { stop?.(); stopPlan?.(); }, { once: true });
-    reportCard = h("div", { class: "card" }, h("div", { class: "row" }, prev, label, next), planSlot, body);
+    reportCard = h("div", { class: "card" }, h("div", { class: "row" }, prev, label, next), body, planSlot);
     // Their year; tapping a day opens it above.
     const heatSlot = h("div", {});
     getDoc(doc(db, "users", tracked, "heat", "year")).then((s) => { if (s.exists()) heatSlot.replaceChildren(heatmapEl(s.data(), (d) => { day = d; show(); reportCard.scrollIntoView({ behavior: "smooth" }); })); }).catch(() => {});
@@ -77,12 +81,3 @@ export async function personView(u: User, linkId: string): Promise<HTMLElement> 
   );
 }
 
-/** "Plan · 1 of 3 done" and the tasks, finished ones struck through. */
-function planEl(raw: unknown): HTMLElement[] {
-  const items = (Array.isArray(raw) ? raw : []).filter((x: any) => x && typeof x.text === "string" && x.text.trim()) as { text: string; done?: boolean }[];
-  if (!items.length) return [];
-  return [
-    h("h3", {}, `Plan · ${items.filter((x) => x.done).length} of ${items.length} done`),
-    h("ul", { class: "plan" }, items.map((x) => h("li", x.done ? { style: "text-decoration:line-through;opacity:.6" } : {}, x.text))),
-  ];
-}

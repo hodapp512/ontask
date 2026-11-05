@@ -27,10 +27,11 @@ export async function homeView(u: User, onLeave: (fn: Cleanup) => void): Promise
       h("a", { href: "#/settings", class: "icon-btn", "aria-label": "Settings" }, "⚙︎"),
     ),
     await pushBanner(u),
+    // The people you support come first: that's what a partner opens the app for.
+    await supportSection(u, supportLinks.docs),
     yourDay(u, sched.data(), checkin.get("evening") === true, onLeave),
     heatCard(u.uid, onLeave),
     await partnerSection(u, myLinks.docs),
-    await supportSection(u, supportLinks.docs),
   );
 }
 
@@ -154,9 +155,37 @@ export function reportBody(r: DocumentData, edit?: { uid: string; categories: Ca
     sessions > 0 && h("details", {}, h("summary", {}, "Longest focused sessions"),
       ([...(r.deepSessions ?? [])] as { a: number; b: number }[]).sort((x, y) => (y.b - y.a) - (x.b - x.a)).slice(0, 5)
         .map((s) => h("p", { class: "row between" }, h("span", {}, `${clockAt(s.a, day)}–${clockAt(s.b, day)}`), h("span", { class: "muted" }, fmtDuration(s.b - s.a))))),
-    (r.topSites ?? []).length > 0 && h("details", {}, h("summary", {}, "Where the time went"),
-      (r.topSites as any[]).slice(0, 8).map((s) => siteRow(s, edit))),
+    (r.topSites ?? []).length > 0 && whereTimeWent(r.topSites as any[], edit),
   );
+}
+
+/** "Where the time went", open: the top 5 apps and sites, and "Show all" for the rest. */
+function whereTimeWent(sites: any[], edit?: { uid: string; categories: Cat[] }): HTMLElement {
+  const rest = h("div", { class: "stack", hidden: true }, sites.slice(5).map((s) => siteRow(s, edit)));
+  const more = sites.length > 5 && h("button", { class: "link", onclick: () => { rest.hidden = false; (more as HTMLElement).remove(); } }, `Show all ${sites.length}`);
+  return h("details", { open: true }, h("summary", {}, "Where the time went"), sites.slice(0, 5).map((s) => siteRow(s, edit)), rest, more);
+}
+
+/**
+ * What they wrote in the day's check-ins, as far as they've got: the plan (finished tasks struck through), the midday
+ * check-in and the evening one with their note to you. Nothing yet: no section.
+ */
+export function checkinNotes(c: DocumentData | undefined, planItems: { text: string; done?: boolean }[] | undefined): HTMLElement | null {
+  const tasks = (planItems ?? []).filter((t) => t?.text?.trim());
+  const planText = !tasks.length ? String(c?.plan ?? "").split("\n").map((t) => t.trim()).filter(Boolean) : [];
+  const md = c?.midday as { done?: string; should?: string; chips?: string } | undefined;
+  const parts: (HTMLElement | false)[] = [];
+  if (tasks.length || planText.length) parts.push(h("div", {}, h("p", { class: "note-h" }, "Plan"),
+    h("ul", { class: "plan" }, tasks.length ? tasks.map((t) => h("li", t.done ? { class: "done" } : {}, t.text)) : planText.map((t) => h("li", {}, t)))));
+  const line = (label: string, v?: string) => v?.trim() ? h("p", {}, h("span", { class: "muted" }, `${label}: `), v.trim()) : false;
+  const mid = md && [line("Got done", md.done), line("Should have", md.should), line("In the way", md.chips)].filter(Boolean);
+  if (mid && mid.length) parts.push(h("div", {}, h("p", { class: "note-h" }, "Midday"), ...(mid as HTMLElement[])));
+  if (c?.evening === true) {
+    const eve = [line("Felt", c.feeling), line("Helped", c.helped), line("Hurt", c.hurt), line("Tomorrow", c.change)].filter(Boolean) as HTMLElement[];
+    parts.push(h("div", {}, h("p", { class: "note-h" }, "Evening"), ...eve, c.note?.trim() && h("p", { class: "quote" }, `“${c.note.trim()}”`)));
+  }
+  if (!parts.length) return null;
+  return h("details", { open: true }, h("summary", {}, "Check-in notes"), h("div", { class: "stack" }, parts));
 }
 
 function siteRow(s: { name: string; category?: string; categoryId?: string; seconds: number; itemKey?: string; title?: string }, edit?: { uid: string; categories: Cat[] }): HTMLElement {
@@ -266,11 +295,12 @@ async function supportSection(u: User, links: { id: string; data(): DocumentData
 
 async function personCard(u: User, linkId: string, l: DocumentData): Promise<HTMLElement> {
   const who = firstName(l.trackedName ?? "Your friend");
-  const [rep, msgs] = await Promise.all([
-    l.share === "report" ? getDoc(doc(db, "users", l.trackedUid, "reports", todayKey())).catch(() => null) : Promise.resolve(null),
-    getDocs(query(collection(db, "links", linkId, "messages"), orderBy("ts", "desc"), limit(1))),
+  const share = l.share === "report";
+  const [rep, chk, plan] = await Promise.all([
+    share ? getDoc(doc(db, "users", l.trackedUid, "reports", todayKey())).catch(() => null) : Promise.resolve(null),
+    share ? getDoc(doc(db, "users", l.trackedUid, "checkins", todayKey())).catch(() => null) : Promise.resolve(null),
+    share ? getDoc(doc(db, "users", l.trackedUid, "plans", todayKey())).catch(() => null) : Promise.resolve(null),
   ]);
-  const last = msgs.docs[0]?.data();
   const status = h("p", { class: "muted small" });
   const send = (kind: string) => async () => {
     try { await addDoc(collection(db, "links", linkId, "reactions"), { kind, fromUid: u.uid, trackedUid: l.trackedUid, ts: Date.now() }); status.textContent = `Sent to ${who}. ✔`; }
@@ -279,7 +309,8 @@ async function personCard(u: User, linkId: string, l: DocumentData): Promise<HTM
   return h("div", { class: "card" },
     h("div", { class: "row" }, h("div", { class: "avatar" }, initial(l.trackedName)), h("h3", { class: "grow" }, l.trackedName ?? "Your friend")),
     rep?.exists() ? reportBody(rep.data()!) : h("p", { class: "muted" }, l.share === "report" ? `${who} hasn't been at the computer yet today.` : `${who} shares only the messages they send.`),
-    last && h("div", { class: "msg" }, h("small", {}, ago(last.ts)), last.text),
+    // What they wrote today (the raw messages are on the full-day page).
+    checkinNotes(chk?.data(), plan?.get("items")),
     h("div", { class: "row" }, REACTIONS.map((r) => h("button", { onclick: send(r.kind) }, r.label))),
     status,
     h("a", { href: `#/person/${encodeURIComponent(linkId)}` }, "Full day, earlier days and messages →"),

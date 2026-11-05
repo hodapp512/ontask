@@ -20,7 +20,6 @@ export async function settingsView(u: User): Promise<HTMLElement> {
   const say = (t: string, err = false) => { note.textContent = t; note.className = err ? "error" : "muted"; };
 
   const phone = h("input", { type: "tel", placeholder: "+1 555 010 0000", value: contact.phone ?? "" }) as HTMLInputElement;
-  const email = h("input", { type: "email", placeholder: "you@example.com", value: contact.email ?? "" }) as HTMLInputElement;
 
   const linkCards = links.docs.map((d) => {
     const prefs = d.get("partnerPrefs") ?? { channels: {}, quietHours: null };
@@ -33,8 +32,8 @@ export async function settingsView(u: User): Promise<HTMLElement> {
     const qs = h("input", { type: "time", value: prefs.quietHours?.start ?? "" }) as HTMLInputElement;
     const qe = h("input", { type: "time", value: prefs.quietHours?.end ?? "" }) as HTMLInputElement;
     return h("div", { class: "card" },
-      h("h2", {}, `How you hear about ${d.get("trackedName") ?? "your friend"}`),
-      h("p", { class: "muted" }, "Pick how each kind of message reaches you. Text and email use the backup contact above."), rows,
+      h("h2", {}, `Notifications for ${d.get("trackedName") ?? "your friend"}`),
+      h("p", { class: "muted" }, "Pick how each kind of message reaches you. Text and email go to the number and address above."), rows,
       h("div", { class: "row" }, h("label", { class: "grow" }, "Quiet from", qs), h("label", { class: "grow" }, "until", qe)),
       h("div", { class: "row" },
         h("button", { class: "primary", onclick: async () => {
@@ -57,9 +56,12 @@ export async function settingsView(u: User): Promise<HTMLElement> {
       h("p", { class: "muted" }, push === "on" ? "On ✓" : push === "needs-home-screen" ? "On iPhone, add OnTask to your Home Screen first (Share → Add to Home Screen), then open it from there." : push === "unsupported-desktop" ? "This browser can't receive notifications." : "Off"),
       push === "off" && h("button", { class: "primary", onclick: async () => { const r = await enablePush(u).catch((e) => ({ ok: false, message: String(e?.message ?? e) })); say(r.message, !r.ok); } }, "Turn on notifications")),
     h("div", { class: "card" }, h("h2", {}, "Linked devices"), deviceRows.length ? deviceRows : h("p", { class: "muted" }, "None yet. Link your Mac from the home screen.")),
-    h("div", { class: "card" }, h("h2", {}, "Backup contact (optional)"), h("p", { class: "muted" }, "Used only if push can't reach you (for example, you haven't opened the app in a few days). Stored privately in your account, never in the code."),
-      h("label", {}, "Phone (for texts)", phone), h("label", {}, "Email", email),
-      h("button", { onclick: async () => { await setDoc(contactRef, { phone: phone.value.trim() || null, email: email.value.trim() || null }, { merge: true }); say("Saved."); } }, "Save contact details")),
+    // Where texts and emails go: the phone number you give, and the email of the Google account you signed in with.
+    h("div", { class: "card" }, h("h2", {}, "Your phone number and email"),
+      h("p", { class: "muted" }, "For notifications by text or email: choose Text or Email for any message type below. If you haven't opened OnTask in 3 days, notifications that would go to this app come this way instead. Only you can see these."),
+      h("label", {}, "Phone number (for texts)", phone),
+      h("p", { class: "small" }, h("span", { class: "muted" }, "Email: "), contact.email || u.email || "none"),
+      h("button", { onclick: async () => { await setDoc(contactRef, { phone: phone.value.trim() || null }, { merge: true }); say("Saved."); } }, "Save phone number")),
     linkCards.length ? linkCards : h("div", { class: "card" }, h("p", { class: "muted" }, "When you support someone, you'll choose here how their messages reach you.")),
     note,
   );

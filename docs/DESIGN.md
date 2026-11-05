@@ -381,10 +381,16 @@ scrolling scrolls the page; focused sessions of 25+ min (count, longest); distra
   see individual website page titles" is on; your own phone reads them from `users/{uid}/reportItems` (owner-only).
   Raw activity log never.
 - **Partner settings:** per message type (struggling alerts, unblocks during work hours, check-ins, work-hours changes,
-  missed check-ins, work unblocks) choose push / text / email / off; quiet hours. Default push, text fallback if the PWA hasn't been opened in a while.
+  missed check-ins, work unblocks) choose push / text / email / off ("Notifications for <name>"); quiet hours. Default
+  push, text fallback if the PWA hasn't been opened in 3 days. "Your phone number and email": a phone number for texts;
+  email goes to the Google account you signed in with (or an address saved earlier).
 - **Partner reactions:** one-tap (👍 / Proud of you / Call me when you can / Take a walk) + optional short reply → notification on user's Mac and phone. No partner-initiated nudging, no unblock approvals.
 - **Partner view:** the same "Today so far" view you see (bar, timeline, where the time went, longest focused
-  sessions), live, with earlier days.
+  sessions), live, with earlier days, plus **Check-in notes** (the plan with finished tasks struck through, the
+  midday and evening check-ins and the note to the partner, as far as filled in).
+  - On the partner's home, **Someone you support comes first** (above Your day). Its card is the day, longest
+    sessions, where the time went (open, top 5, "Show all") and check-in notes; the raw messages are only on the
+    full-day page. No text runs off the screen (long words and links wrap).
 
 ## Server (Firebase)
 
