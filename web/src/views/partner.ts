@@ -25,9 +25,17 @@ export async function personView(u: User, linkId: string): Promise<HTMLElement> 
   const status = h("p", { class: "muted" });
 
   const msgs = await getDocs(query(collection(db, "links", linkId, "messages"), orderBy("ts", "desc"), limit(30)));
+  // A daily report is one line that opens its day above (laid out, with the check-in notes); alerts keep their text.
+  let openDay: (d: Date) => void = () => {};
   const feed = msgs.docs.length ? msgs.docs.map((m) => {
     const d = m.data();
-    return h("div", { class: "msg" }, h("small", {}, fmtDateTime(d.ts) + " · " + String(d.type).replace(/_/g, " ")), d.text);
+    const head = h("small", {}, fmtDateTime(d.ts) + " · " + (d.type === "checkin" ? "daily report" : String(d.type).replace(/_/g, " ")));
+    if (d.type === "checkin" && link.share === "report") {
+      const day = d.date ? new Date(`${d.date}T12:00:00`) : new Date(d.ts);
+      const label = day.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+      return h("div", { class: "msg" }, head, h("a", { href: "#", onclick: (e: Event) => { e.preventDefault(); openDay(day); } }, `Daily report · ${label} →`));
+    }
+    return h("div", { class: "msg" }, head, d.text);
   }) : [h("p", { class: "muted" }, "No messages yet. You'll see check-ins and alerts here.")];
 
   // The same "Today so far" view they see, live, with earlier days a tap away.
@@ -62,6 +70,8 @@ export async function personView(u: User, linkId: string): Promise<HTMLElement> 
     // Their year; tapping a day opens it above.
     const heatSlot = h("div", {});
     getDoc(doc(db, "users", tracked, "heat", "year")).then((s) => { if (s.exists()) heatSlot.replaceChildren(heatmapEl(s.data(), (d) => { day = d; show(); reportCard.scrollIntoView({ behavior: "smooth" }); })); }).catch(() => {});
+    const dayCard = reportCard;
+    openDay = (d) => { day = d; show(); dayCard.scrollIntoView({ behavior: "smooth" }); };
     reportCard = h("div", { class: "stack" }, reportCard, heatSlot);
   } else reportCard = h("div", { class: "card" }, h("h2", {}, "Today"), h("p", { class: "muted" }, `${link.trackedName} shares messages only.`));
 

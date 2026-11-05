@@ -706,3 +706,5 @@ when it comes to the front.*
   (the server uses it when no address was saved), so nothing to type. It was never a second person.
 - **"How you hear about X" → "Notifications for X".**
 - Linked devices unchanged for now: the same phone shows as the Android app and as the web app in its browser.
+- **Messages list: daily reports are one line** that opens that day (laid out, with check-in notes); alerts keep
+  their text. Approved from a mockup.

@@ -391,6 +391,8 @@ scrolling scrolls the page; focused sessions of 25+ min (count, longest); distra
   - On the partner's home, **Someone you support comes first** (above Your day). Its card is the day, longest
     sessions, where the time went (open, top 5, "Show all") and check-in notes; the raw messages are only on the
     full-day page. No text runs off the screen (long words and links wrap).
+  - The full-day page's **Messages** list shows a daily report as one line, "Daily report · Wed, Nov 4 →", which opens
+    that day above; alerts keep their text. (Reports carry their `date` since 2026-11-05; older ones use the day sent.)
 
 ## Server (Firebase)
 

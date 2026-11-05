@@ -286,7 +286,7 @@ async function dailyReportSweep(uid: string, s: ScheduleDoc, now: Date, date: st
     const extra = await takeQueuedAlerts(db, l.id, s.tz);
     extra.forEach((e) => { if (!alsoToday.includes(e)) alsoToday.push(e); });
     const parts = { ...partnerParts(first), report, checkin, alsoToday: extra, link: `${WEB_URL}/#/person/${encodeURIComponent(l.id)}` };
-    await deliverToPartner(db, senders, l.id, l.data() as Link, name, "checkin", reportText(parts), now, { html: reportHtml(parts) });
+    await deliverToPartner(db, senders, l.id, l.data() as Link, name, "checkin", reportText(parts), now, { html: reportHtml(parts), date });
   }
   if (s.reportEmail !== false) {
     const email = await admin.auth().getUser(uid).then((u) => u.email).catch(() => undefined);

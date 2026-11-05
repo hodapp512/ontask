@@ -14,9 +14,11 @@ const TITLES: Record<MessageType, string> = {
 
 /** Sends one message to one partner over their configured channel and records it on the link. */
 export async function deliverToPartner(
-  db: Firestore, senders: Senders, linkId: string, link: Link, trackedName: string, type: MessageType, text: string, now: Date, opts: { force?: boolean; html?: string } = {},
+  db: Firestore, senders: Senders, linkId: string, link: Link, trackedName: string, type: MessageType, text: string, now: Date, opts: { force?: boolean; html?: string; date?: string } = {},
 ): Promise<{ delivered: boolean; reason?: string; channel?: string }> {
   const prefs = link.partnerPrefs ?? DEFAULT_PARTNER_PREFS;
+  // The day a daily report is about, so the partner's Messages list can open that day.
+  const dated = opts.date ? { date: opts.date } : {};
   const msgs = db.collection("links").doc(linkId).collection("messages");
   const body = withClose(type, text);
 
@@ -26,7 +28,7 @@ export async function deliverToPartner(
     const snap = await msgs.where("ts", ">=", halfDayStart(now, tz)).get();
     const sent = snap.docs.filter((d) => DRIFT_TYPES.includes(d.get("type")) && !d.get("queuedForCheckin") && !d.get("includedInCheckin")).length;
     if (!driftAllowed(sent)) {
-      await msgs.add({ type, text: body, ts: now.getTime(), fromUid: link.trackedUid, queuedForCheckin: true, delivery: { channel: "none", ok: false, detail: "over the limit of 2 alerts per morning/afternoon; listed in the evening review" } });
+      await msgs.add({ type, text: body, ts: now.getTime(), fromUid: link.trackedUid, ...dated, queuedForCheckin: true, delivery: { channel: "none", ok: false, detail: "over the limit of 2 alerts per morning/afternoon; listed in the evening review" } });
       return { delivered: false, reason: "rate_limited" };
     }
   }
@@ -39,11 +41,11 @@ export async function deliverToPartner(
   const d = decide(prefs, type, now, { lastSeenMs: userSnap.get("lastSeenMs"), hasPushToken: tokens.length > 0, hasPhone: !!phone, hasEmail: !!email });
 
   if (d.channel === "off") {
-    await msgs.add({ type, text: body, ts: now.getTime(), fromUid: link.trackedUid, delivery: { channel: "off", ok: true, detail: "partner turned this message type off (still visible in the app)" } });
+    await msgs.add({ type, text: body, ts: now.getTime(), fromUid: link.trackedUid, ...dated, delivery: { channel: "off", ok: true, detail: "partner turned this message type off (still visible in the app)" } });
     return { delivered: false, reason: "off" };
   }
   if (d.defer && !opts.force) {
-    await msgs.add({ type, text: body, ts: now.getTime(), fromUid: link.trackedUid, deferred: true, delivery: { channel: d.channel, ok: false, detail: "held for quiet hours" } });
+    await msgs.add({ type, text: body, ts: now.getTime(), fromUid: link.trackedUid, ...dated, deferred: true, delivery: { channel: d.channel, ok: false, detail: "held for quiet hours" } });
     return { delivered: false, reason: "quiet_hours", channel: d.channel };
   }
 
@@ -61,7 +63,7 @@ export async function deliverToPartner(
     res = { ok: false, detail: `send failed: ${String(e).slice(0, 200)}` };
   }
 
-  await msgs.add({ type, text: body, ts: now.getTime(), fromUid: link.trackedUid, delivery: { channel: d.channel, ok: res.ok, detail: res.detail, fellBackToText: d.fellBackToText ?? false } });
+  await msgs.add({ type, text: body, ts: now.getTime(), fromUid: link.trackedUid, ...dated, delivery: { channel: d.channel, ok: res.ok, detail: res.detail, fellBackToText: d.fellBackToText ?? false } });
   return { delivered: res.ok, channel: d.channel };
 }
 
