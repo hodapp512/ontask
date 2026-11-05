@@ -10,7 +10,7 @@ import dev.ontask.Level
  * What a row of [Run.activity] is, for changing its category: the app or site a rule would match, and for a page or
  * video on a Varies site its item key and title.
  */
-data class ItemRef(val subject: String, val itemKey: String? = null, val title: String? = null)
+data class ItemRef(val subject: String, val itemKey: String? = null, val title: String? = null, /** A phone app's package. */ val pkg: String? = null)
 
 /**
  * [phone]: a stretch on the phone (from its uploaded report). [absorbed]: glances under 15 s drawn as part of this

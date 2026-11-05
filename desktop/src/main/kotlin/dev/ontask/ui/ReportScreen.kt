@@ -46,6 +46,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -215,7 +216,8 @@ fun SummaryCard(r: DailyReport, title: String, app: App? = null, onRelabel: () -
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text((if (s.phone) "📱 " else "") + s.name, Modifier.weight(0.5f), maxLines = 1)
                     Row(Modifier.weight(0.3f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        if (app != null) CategoryPicker(app, s.name, s.category, onRelabel, item = s.itemKey?.let { it to s.title })
+                        if (app != null) CategoryPicker(app, s.name, s.category, onRelabel, item = s.itemKey?.let { it to s.title },
+                            save = if (s.phone && s.pkg != null && s.itemKey == null) { c: Category -> app.reclassifyPhoneApp(s.pkg, s.name, c, s.category) } else null)
                         else { Dot(levelColor(s.category.level), 8); Text(s.category.label, style = MaterialTheme.typography.bodySmall) }
                     }
                     Text(fmtDuration(s.seconds), Modifier.weight(0.2f), style = MaterialTheme.typography.bodyMedium)
@@ -247,7 +249,8 @@ private fun Timeline(r: DailyReport, app: App?, onRelabel: () -> Unit) {
     var hover by remember(r) { mutableStateOf<Pair<Run, Float>?>(null) }
     var dragX by remember { mutableStateOf<Float?>(null) }
     var pressX by remember { mutableStateOf<Float?>(null) }
-    var selected by remember(r) { mutableStateOf<Run?>(null) }
+    // The stretch you clicked: kept while Home reloads every minute (the details window shows it as it was).
+    var selected by remember(r.date) { mutableStateOf<Run?>(null) }
     // Both read the current view (not the values from the last redraw): a pinch delivers many steps in a row.
     fun zoom(factor: Double, atFrac: Double = 0.5) {
         val (from, to) = view; val span = to - from
@@ -272,7 +275,7 @@ private fun Timeline(r: DailyReport, app: App?, onRelabel: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         androidx.compose.foundation.layout.Box {
             Canvas(
-                Modifier.fillMaxWidth().height(32.dp)
+                Modifier.fillMaxWidth().height(32.dp).testTag("timeline")
                     .onSizeChanged { width = it.width.coerceAtLeast(1) }
                     .onPointerEvent(PointerEventType.Move) { e ->
                         val x = e.changes.first().position.x
@@ -326,7 +329,7 @@ private fun Timeline(r: DailyReport, app: App?, onRelabel: () -> Unit) {
                 }
             }
         }
-        selected?.let { run -> RunDetails(run, app, { selected = null }) { selected = null; onRelabel() } }
+        selected?.let { run -> RunDetails(run, app, { selected = null }, onRelabel) }
         // Clock ticks placed at their times (5-minute steps when zoomed in, hours when zoomed out).
         androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth().height(16.dp)) {
             val w = maxWidth
@@ -345,7 +348,11 @@ private fun Timeline(r: DailyReport, app: App?, onRelabel: () -> Unit) {
     }
 }
 
-/** A clicked stretch of the timeline: when, how long, and everything in it, each with its category to change. */
+/**
+ * A clicked stretch of the timeline: when, how long, and everything in it, each with its category to change. It stays
+ * open while you change several (Close, Escape or a click outside closes it) and stays as it was opened, apart from the
+ * categories you pick; Home behind it redraws with each change.
+ */
 @Composable
 private fun RunDetails(run: Run, app: App?, onClose: () -> Unit, onRelabel: () -> Unit) {
     androidx.compose.material3.AlertDialog(
@@ -361,6 +368,7 @@ private fun RunDetails(run: Run, app: App?, onClose: () -> Unit, onRelabel: () -
                 androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
                 val items = run.top(Int.MAX_VALUE)
                 if (items.isEmpty()) Text("No app recorded")
+                val picked = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateMapOf<String, Category>() }
                 Column(Modifier.heightIn(max = 380.dp).verticalScroll(androidx.compose.foundation.rememberScrollState())) {
                     // Glances drawn as part of this stretch aren't listed: they were in passing.
                     items.forEachIndexed { i, (name, sec) ->
@@ -368,8 +376,10 @@ private fun RunDetails(run: Run, app: App?, onClose: () -> Unit, onRelabel: () -
                         Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, maxLines = 2)
                             Text(fmtDuration(sec), Modifier.padding(horizontal = 8.dp), style = MaterialTheme.typography.bodySmall)
-                            val ref = run.refs[name]; val cat = run.category ?: Category.UNKNOWN
-                            if (app != null && ref != null) CategoryPicker(app, ref.subject, cat, onRelabel, item = ref.itemKey?.let { it to ref.title })
+                            val ref = run.refs[name]; val cat = picked[name] ?: run.category ?: Category.UNKNOWN
+                            // A phone app: the rule goes under its package, which is how the phone knows it.
+                            val save = if (app != null && run.phone && ref?.pkg != null && ref.itemKey == null) { c: Category -> app.reclassifyPhoneApp(ref.pkg, ref.subject, c, cat) } else null
+                            if (app != null && ref != null) CategoryPicker(app, ref.subject, cat, onRelabel, item = ref.itemKey?.let { it to ref.title }, onPicked = { picked[name] = it }, save = save)
                             else { Dot(levelColor(run.level), 8); Text("  ${dev.ontask.report.runLabel(run)}", style = MaterialTheme.typography.bodySmall) }
                         }
                     }

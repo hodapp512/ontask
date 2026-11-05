@@ -308,8 +308,15 @@ it; today doesn't until it's over). The Mac uploads one small `heat/year` docume
   name, the rest in proportion) and the heat map (a negative `deviceHeat/overlap` entry per day), on the server and
   on the Mac's Home.
 - **Reclassify from the timeline popup, either device's stretches:** each device uploads privately what every
-  timeline name refers to (`refs` in its report copy: the app or site, or the page/video with its key); the popup's
-  menu makes a rule (apps, sites) or a verdict (pages, videos) shared by both devices.
+  timeline name refers to (`refs` in its report copy: the app or site and, on the phone, the app's package, or the
+  page/video with its key); the popup's menu makes a rule (apps, sites) or a verdict (pages, videos) shared by both
+  devices. A phone app's rule is saved under its package, replacing an older one for it by name.
+  - **The details window stays open** while you change several items (Close, Escape or a click outside closes it),
+    and stays as opened apart from the categories you pick; Home's minute reload doesn't close it.
+  - **Changes show at once:** the Mac applies your rules to the phone's stretches straight away (a stretch whose
+    items now differ is split in proportion until the phone's upload puts them at their exact times), with the
+    totals and "Where the time went". When the rule reaches the phone it re-sorts the 14 days it keeps and uploads
+    the days that changed, so reports and the partner view follow.
 - **Updates without a cable:** `android/release.sh` publishes the APK and `version.json` with the web app
   (`/android/`, no-cache); the phone checks when the app is opened (Install / Later; no notification) and in Settings →
   App, downloads, and Android's installer asks to confirm. Version = commit count.

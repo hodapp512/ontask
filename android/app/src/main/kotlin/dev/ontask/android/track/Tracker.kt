@@ -65,6 +65,20 @@ class Tracker : AccessibilityService() {
         Shots.prune(this)
         prompts = Prompts(this)
         running = this
+        // A category rule changed (here, on the Mac or the web): today's and the 14 kept days' time follows it; changed
+        // earlier days go up again at once, today's with the next tick.
+        PhoneRules.onRuleChanged = { kind, pattern, cat ->
+            val match: ((Seg) -> Boolean)? = when (kind) {
+                RuleKind.APP -> { s -> s.item == null && (s.pkg.equals(pattern, true) || s.app.equals(pattern, true) || s.subject.equals(pattern, true)) }
+                RuleKind.DOMAIN -> { s -> s.item == null && (s.subject.equals(pattern, true) || siteDomain(s.subject).equals(pattern, true)) }
+                else -> null
+            }
+            if (match != null) {
+                val (today, past) = log.recategorizeAll(match, cat)
+                if (today) lastUpload = 0
+                if (past.isNotEmpty()) scope.launch { past.forEach { d -> runCatching { Uploader.uploadPast(log, Cloud.deviceId(this@Tracker), d) } } }
+            }
+        }
         Cloud.uid?.let { PhoneRules.start(it) }
         registerReceiver(screenOff, IntentFilter(Intent.ACTION_SCREEN_OFF))
         scope.launch { while (isActive) { runCatching { tick() }; delay(TICK_MS) } }

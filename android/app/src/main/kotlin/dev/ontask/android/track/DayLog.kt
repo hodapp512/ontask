@@ -69,6 +69,37 @@ class DayLog(ctx: Context, private val zone: ZoneId = ZoneId.systemDefault()) {
         heat[date.toString()] = p
     }
 
+    /** An earlier day's stretches (today's are [snapshot]). */
+    @Synchronized fun segsFor(d: LocalDate): List<Seg> = if (d == date) segs.map { it.copy() } else load(d)
+
+    /**
+     * A rule changed: today's and the earlier days' stretches it covers (the 14 days kept) take its category, and their
+     * heat numbers are recounted. Returns the earlier days that changed (today's go up with the next upload).
+     */
+    @Synchronized
+    fun recategorizeAll(match: (Seg) -> Boolean, cat: Category): Pair<Boolean, List<LocalDate>> {
+        val todayChanged = segs.any { match(it) && it.cat != cat.name }
+        if (todayChanged) recategorize(match, cat)
+        val past = (1L..14L).map { date.minusDays(it) }.filter { d ->
+            val day = load(d); val hit = day.filter { match(it) && (it.cat != cat.name || it.level != cat.level.name) }
+            if (hit.isEmpty()) return@filter false
+            hit.forEach { it.cat = cat.name; it.level = cat.level.name }
+            runCatching { file(d).writeText(json.encodeToString(day.toList())) }
+            heat[d.toString()] = partsOf(day)
+            true
+        }
+        if (past.isNotEmpty()) runCatching { heatFile.writeText(json.encodeToString(heat.toMap())) }
+        return todayChanged to past
+    }
+
+    private fun partsOf(day: List<Seg>) = Parts().also { p ->
+        day.forEach { s ->
+            val sec = s.end - s.start; val l = Level.valueOf(s.level)
+            p.active += sec; if (l == Level.DEEP) p.deep += sec
+            if (s.work) { p.workActive += sec; if (l == Level.DEEP) p.workDeep += sec } else { p.offActive += sec; if (l == Level.WASTED) p.offWasted += sec }
+        }
+    }
+
     @Synchronized
     fun save() {
         runCatching { file(date).writeText(json.encodeToString(segs.toList())) }

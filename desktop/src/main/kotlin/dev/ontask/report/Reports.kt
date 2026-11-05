@@ -7,7 +7,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 /** A row of "where the time went": an app, a site, or a page or video on a Varies site ("YouTube: …"). */
-data class Subject(val name: String, val category: Category, val seconds: Long, val itemKey: String? = null, val title: String? = null, val phone: Boolean = false) {
+data class Subject(val name: String, val category: Category, val seconds: Long, val itemKey: String? = null, val title: String? = null, val phone: Boolean = false, /** A phone app's package. */ val pkg: String? = null) {
     /** A page or video on a Varies site: its dropdown changes just this one. Its category is Unsure (Varies) while undecided. */
     val isItem get() = itemKey != null
 }

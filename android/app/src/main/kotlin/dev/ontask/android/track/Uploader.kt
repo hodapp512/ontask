@@ -12,13 +12,17 @@ object Uploader {
     private const val MERGE_GAP = 15L
     private const val DEEP_MIN = 25 * 60L
 
-    fun upload(log: DayLog, deviceId: String) {
+    fun upload(log: DayLog, deviceId: String) = uploadDay(log, deviceId, log.snapshot(), log.dayStart, log.date.toString())
+
+    /** An earlier day the phone still keeps (re-sorted after a category change): its report goes up again. */
+    fun uploadPast(log: DayLog, deviceId: String, date: java.time.LocalDate) =
+        uploadDay(log, deviceId, log.segsFor(date), date.atStartOfDay(java.time.ZoneId.systemDefault()).toEpochSecond(), date.toString())
+
+    private fun uploadDay(log: DayLog, deviceId: String, segs: List<Seg>, dayStart: Long, date: String) {
         val uid = Cloud.uid ?: return
-        val segs = log.snapshot()
-        val date = log.date.toString()
         val device = mapOf("id" to deviceId, "kind" to "phone", "name" to "${Build.MANUFACTURER.replaceFirstChar { it.uppercase() }} ${Build.MODEL}")
         val now = System.currentTimeMillis()
-        Cloud.db.document("users/$uid/deviceReports/${date}_$deviceId").set(report(segs, log.dayStart, date) + mapOf("device" to device, "updatedAt" to now))
+        Cloud.db.document("users/$uid/deviceReports/${date}_$deviceId").set(report(segs, dayStart, date) + mapOf("device" to device, "updatedAt" to now))
         Cloud.db.document("users/$uid/deviceReportItems/${date}_$deviceId").set(mapOf("date" to date, "device" to device, "topSites" to sites(segs, titles = true), "refs" to refs(segs), "updatedAt" to now))
         Cloud.db.document("users/$uid/deviceHeat/$deviceId").set(mapOf(
             "device" to device, "updatedAt" to now,
@@ -46,7 +50,8 @@ object Uploader {
     /** What each timeline name refers to (the app or site, or the page or video), so any device can reclassify it. */
     private fun refs(segs: List<Seg>): Map<String, Map<String, Any?>> = segs.associate { s ->
         val name = s.title?.takeIf { s.item != null }?.let { "${s.subject} – $it" } ?: s.subject
-        name to buildMap { put("subject", s.subject); s.item?.let { put("itemKey", it) }; s.title?.let { put("title", it) }; put("categoryId", Category.valueOf(s.cat).name) }
+        // pkg: the app's package, so a category picked on the Mac makes the same rule the phone uses.
+        name to buildMap { put("subject", s.subject); put("pkg", s.pkg); s.item?.let { put("itemKey", it) }; s.title?.let { put("title", it) }; put("categoryId", Category.valueOf(s.cat).name) }
     }
 
     private class Run(val start: Long, var end: Long, val level: String, val cat: String, val top: HashMap<String, Long>)
@@ -78,6 +83,7 @@ object Uploader {
     private fun sites(segs: List<Seg>, titles: Boolean): List<Map<String, Any?>> {
         data class K(val name: String, val cat: String, val item: String?, val title: String?)
         val sums = LinkedHashMap<K, Long>()
+        val pkgs = segs.associate { it.subject to it.pkg }
         segs.forEach { s ->
             val k = if (titles && s.item != null) K("${s.subject}: ${s.title ?: s.item}", s.cat, s.item, s.title) else K(s.subject, s.cat, null, null)
             sums.merge(k, s.end - s.start, Long::plus)
@@ -87,6 +93,7 @@ object Uploader {
                 put("name", k.name); put("seconds", sec); put("categoryId", Category.valueOf(k.cat).name)
                 put("category", Category.valueOf(k.cat).let { if (it.variable && k.item != null) "Unsure" else it.label })
                 k.item?.let { put("itemKey", it) }; k.title?.let { put("title", it) }
+                if (k.item == null) pkgs[k.name]?.let { put("pkg", it) }
             }
         }
     }

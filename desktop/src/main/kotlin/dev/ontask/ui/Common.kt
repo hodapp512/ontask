@@ -225,6 +225,8 @@ fun CategoryPicker(
     item: Pair<String, String?>? = null,
     /** Told which category was picked (after it's saved). */
     onPicked: (dev.ontask.Category) -> Unit = {},
+    /** Saves the pick itself instead of the usual rule (a phone app: a rule for its package). */
+    save: ((dev.ontask.Category) -> Unit)? = null,
 ) {
     var open by remember { mutableStateOf(false) }
     val unsure = item != null && current.variable
@@ -241,7 +243,10 @@ fun CategoryPicker(
                     leadingIcon = { Box(Modifier.size(8.dp).background(levelColor(cat.level), androidx.compose.foundation.shape.CircleShape)) },
                     onClick = {
                         open = false
-                        if (cat != current) { if (item != null) app.answerVariable(item.first, item.second, cat) else reclassify(app, name, current, cat); onPicked(cat); onChanged() }
+                        if (cat != current) {
+                            when { save != null -> save(cat); item != null -> app.answerVariable(item.first, item.second, cat); else -> reclassify(app, name, current, cat) }
+                            onPicked(cat); onChanged()
+                        }
                     },
                 )
             }

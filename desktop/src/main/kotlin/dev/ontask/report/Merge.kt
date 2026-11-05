@@ -14,7 +14,12 @@ import kotlinx.serialization.json.longOrNull
  * stretches join the timeline (marked [Run.phone]), its focused sessions and sites join the lists. Each `other` is a
  * device's shared report and, if there is one, its private copy with page and video titles.
  */
-fun withDevices(r: DailyReport, others: List<Pair<JsonObject, JsonObject?>>): DailyReport {
+/**
+ * [rule]: the category your rules give a phone app or site now. A change made here shows at once, before the phone has
+ * re-sorted its own record and uploaded it: a phone stretch whose items now differ is split (pieces in proportion, until
+ * the phone's upload puts them at their exact times), and the totals and "Where the time went" follow.
+ */
+fun withDevices(r: DailyReport, others: List<Pair<JsonObject, JsonObject?>>, rule: (ItemRef) -> Category? = { null }): DailyReport {
     if (others.isEmpty()) return r
     val all = HashMap(r.totalsAll); val work = HashMap(r.totalsWork)
     val runs = ArrayList(r.timeline); val deep = ArrayList(r.deepSessions); val subjects = ArrayList(r.topSubjects)
@@ -25,7 +30,7 @@ fun withDevices(r: DailyReport, others: List<Pair<JsonObject, JsonObject?>>): Da
         // What each of the phone's names refers to, so its rows and stretches can be reclassified here.
         val refs = (items?.get("refs") as? JsonObject)?.mapValues { (_, v) ->
             val o = v.jsonObject
-            ItemRef(o["subject"]?.jsonPrimitive?.contentOrNull ?: "", o["itemKey"]?.jsonPrimitive?.contentOrNull, o["title"]?.jsonPrimitive?.contentOrNull)
+            ItemRef(o["subject"]?.jsonPrimitive?.contentOrNull ?: "", o["itemKey"]?.jsonPrimitive?.contentOrNull, o["title"]?.jsonPrimitive?.contentOrNull, o["pkg"]?.jsonPrimitive?.contentOrNull)
         } ?: emptyMap()
         (rep["totals"] as? JsonObject)?.forEach { (k, v) -> runCatching { Level.valueOf(k) }.getOrNull()?.let { all.merge(it, v.jsonPrimitive.longOrNull ?: 0, Long::plus) } }
         (rep["workTotals"] as? JsonObject)?.forEach { (k, v) -> runCatching { Level.valueOf(k) }.getOrNull()?.let { work.merge(it, v.jsonPrimitive.longOrNull ?: 0, Long::plus) } }
@@ -34,14 +39,17 @@ fun withDevices(r: DailyReport, others: List<Pair<JsonObject, JsonObject?>>): Da
             val level = Level.entries.firstOrNull { it.name.first().toString() == o["k"]?.jsonPrimitive?.contentOrNull } ?: return@forEach
             val label = o["c"]?.jsonPrimitive?.contentOrNull
             val top = (o["t"] as? JsonArray)?.associate { t -> t.jsonObject["n"]!!.jsonPrimitive.content to num(t.jsonObject, "s") } ?: emptyMap()
-            runs.add(Run(r.dayStart + num(o, "a"), r.dayStart + num(o, "b"), level, top, Category.registry.values.firstOrNull { it.label == label }, refs.filterKeys { it in top }, phone = true))
+            val run = Run(r.dayStart + num(o, "a"), r.dayStart + num(o, "b"), level, top, Category.registry.values.firstOrNull { it.label == label }, refs.filterKeys { it in top }, phone = true)
+            runs.addAll(applyRules(run, rule, all))
         }
         (rep["deepSessions"] as? JsonArray)?.forEach { e -> deep.add(DeepSession(r.dayStart + num(e.jsonObject, "a"), r.dayStart + num(e.jsonObject, "b"))) }
         distractions += num(rep, "distractionEvents").toInt()
         ((items ?: rep)["topSites"] as? JsonArray)?.forEach { e ->
             val o = e.jsonObject
-            otherSubjects.add(Subject(o["name"]?.jsonPrimitive?.contentOrNull ?: "?", Category.valueOf(o["categoryId"]?.jsonPrimitive?.contentOrNull ?: "UNKNOWN"),
-                num(o, "seconds"), o["itemKey"]?.jsonPrimitive?.contentOrNull, o["title"]?.jsonPrimitive?.contentOrNull, phone = true))
+            val s = Subject(o["name"]?.jsonPrimitive?.contentOrNull ?: "?", Category.valueOf(o["categoryId"]?.jsonPrimitive?.contentOrNull ?: "UNKNOWN"),
+                num(o, "seconds"), o["itemKey"]?.jsonPrimitive?.contentOrNull, o["title"]?.jsonPrimitive?.contentOrNull, phone = true, pkg = o["pkg"]?.jsonPrimitive?.contentOrNull)
+            val now = if (s.itemKey == null) rule(ItemRef(s.name, pkg = s.pkg)) else null
+            otherSubjects.add(if (now != null && now != s.category) s.copy(category = now) else s)
         }
     }
     // Where the phone was in use, the Mac's overlapping time is cut (timeline and totals), as on the server.
@@ -92,4 +100,27 @@ fun clipToPhone(run: Run, phone: List<Run>): Pair<List<Run>, Long> {
     val kept = parts.sumOf { it.second - it.first }
     if (kept == len) return listOf(run) to 0
     return parts.map { (a, b) -> run.copy(start = a, end = b, activity = run.activity.mapValues { it.value * (b - a) / len }.filterValues { it > 0 }) } to (len - kept)
+}
+
+/**
+ * A phone stretch under today's rules: unchanged if every item still has its category; otherwise split into pieces
+ * (in proportion to each item's time, the rest keeping the old category), with [totals] moved between levels.
+ */
+internal fun applyRules(run: Run, rule: (ItemRef) -> Category?, totals: MutableMap<Level, Long>): List<Run> {
+    val old = run.category ?: return listOf(run)
+    val cats = run.activity.keys.associateWith { n -> run.refs[n]?.takeIf { it.itemKey == null }?.let(rule) ?: old }
+    if (cats.values.all { it == old }) return listOf(run)
+    val len = run.end - run.start
+    val named = run.activity.values.sum().coerceAtLeast(1)
+    val scale = if (named > len) len.toDouble() / named else 1.0
+    val out = ArrayList<Run>(); var t = run.start
+    for ((n, sec) in run.activity.entries.sortedByDescending { it.value }) {
+        val piece = (sec * scale).toLong().coerceAtMost(run.end - t); if (piece <= 0) continue
+        val c = cats[n] ?: old
+        out.add(Run(t, t + piece, c.level, mapOf(n to sec), c, run.refs.filterKeys { it == n }, phone = true))
+        if (c.level != old.level && run.level != Level.AWAY) { totals.merge(old.level, -piece, Long::plus); totals.merge(c.level, piece, Long::plus) }
+        t += piece
+    }
+    if (t < run.end) out.add(Run(t, run.end, run.level, emptyMap(), old, emptyMap(), phone = true))
+    return out
 }

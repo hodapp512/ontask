@@ -41,6 +41,15 @@ object PhoneRules {
             },
             Cloud.db.document("users/$uid/sync/rules").addSnapshotListener { s, _ ->
                 val items = (s?.get("items") as? Map<String, Any?>) ?: emptyMap()
+                // Rules added or changed (from the Mac, the web or this phone; all of them when the phone starts): the
+                // phone's recorded time follows them.
+                val before = lastRuleItems ?: emptyMap()
+                items.filter { (k, v) -> before[k] != v }.forEach { (k, v) ->
+                    val kind = runCatching { RuleKind.valueOf(k.substringBefore('|')) }.getOrNull() ?: return@forEach
+                    val cat = Category.registry[v as? String ?: return@forEach] ?: return@forEach
+                    runCatching { onRuleChanged(kind, k.substringAfter('|'), cat) }
+                }
+                lastRuleItems = items
                 rules = items.entries.mapIndexedNotNull { i, (k, v) ->
                     val kind = runCatching { RuleKind.valueOf(k.substringBefore('|')) }.getOrNull() ?: return@mapIndexedNotNull null
                     Rule(i + 1L, kind, k.substringAfter('|'), Category.valueOf(v as? String ?: return@mapIndexedNotNull null), user = true)
@@ -67,6 +76,10 @@ object PhoneRules {
     }
 
     private fun rebuild() { classifier = Classifier(rules) }
+
+    private var lastRuleItems: Map<String, Any?>? = null
+    /** Set by the tracker: re-sort the recorded time a rule covers. */
+    @Volatile var onRuleChanged: (RuleKind, String, Category) -> Unit = { _, _, _ -> }
 
     fun verdict(item: String): Category? = verdicts[item]?.let { Category.registry[it] }
     fun sourceRule(key: String?): Category? = key?.let { sourceRules[it] }?.let { Category.registry[it] }

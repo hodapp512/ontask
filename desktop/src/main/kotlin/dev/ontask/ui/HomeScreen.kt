@@ -69,7 +69,7 @@ fun HomeScreen(app: App) {
     var report by remember { mutableStateOf<DailyReport?>(null, androidx.compose.runtime.neverEqualPolicy()) }
     LaunchedEffect(date, tick, now / 60) {
         // This Mac's day plus the phone's (from its uploaded report), as on the phone and for your partner.
-        report = withContext(Dispatchers.IO) { app.tracker.flush(); dev.ontask.report.withDevices(app.reports.daily(date), if (app.cloud.signedIn) app.cloud.otherDevices(date) else emptyList()) }
+        report = withContext(Dispatchers.IO) { app.tracker.flush(); dev.ontask.report.withDevices(app.reports.daily(date), if (app.cloud.signedIn) app.cloud.otherDevices(date) else emptyList(), app::phoneRule) }
     }
 
     var unblocking by remember { mutableStateOf(false) }

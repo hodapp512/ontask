@@ -816,7 +816,7 @@ class App(val dir: Path = dataDir()) {
         data class Acc(var name: String, val ref: dev.ontask.report.ItemRef, var sec: Long, var phone: Boolean, val cat: Category)
         val acc = LinkedHashMap<String, Acc>()
         for (date in listOf(today.minusDays(1), today)) {
-            val r = dev.ontask.report.withDevices(reports.daily(date), if (cloud.signedIn) runCatching { cloud.otherDevices(date) }.getOrDefault(emptyList()) else emptyList())
+            val r = dev.ontask.report.withDevices(reports.daily(date), if (cloud.signedIn) runCatching { cloud.otherDevices(date) }.getOrDefault(emptyList()) else emptyList(), ::phoneRule)
             for (run in r.timeline) {
                 if (run.level == Level.AWAY) continue
                 val cat = run.category ?: Category.UNKNOWN
@@ -1098,7 +1098,33 @@ class App(val dir: Path = dataDir()) {
         ladder.workConfirmed(); _intervention.value = null; closedIv = null
     }
 
-    fun reloadRules() { classifier = Classifier(ruleStore.userRules()) }
+    fun reloadRules() { val r = ruleStore.userRules(); userRules = r; classifier = Classifier(r) }
+    @Volatile private var userRules: List<dev.ontask.classify.Rule> = runCatching { ruleStore.userRules() }.getOrDefault(emptyList())
+
+    /**
+     * The category your rules give a phone app or site (its package first, then its name, or its site), so a change made
+     * here shows on the phone's stretches at once. Null: no rule of yours covers it.
+     */
+    fun phoneRule(ref: dev.ontask.report.ItemRef): Category? {
+        if (ref.itemKey != null) return null
+        val rules = userRules
+        fun find(kind: dev.ontask.classify.RuleKind, p: String?) = p?.let { x -> rules.firstOrNull { it.kind == kind && it.pattern.equals(x, true) } }
+        val site = if ('.' in ref.subject && ' ' !in ref.subject) dev.ontask.classify.siteDomain(ref.subject) else null
+        return (find(dev.ontask.classify.RuleKind.APP, ref.pkg) ?: find(dev.ontask.classify.RuleKind.APP, ref.subject) ?: find(dev.ontask.classify.RuleKind.DOMAIN, site))?.category
+    }
+
+    /**
+     * A phone app filed from the Mac: the rule is saved under its package ([pkg]), which is how the phone knows it, and
+     * an older rule for it by name ([label]) goes, so the two can't disagree. The phone re-sorts its days when the rule
+     * reaches it.
+     */
+    fun reclassifyPhoneApp(pkg: String, label: String, to: Category, from: Category) {
+        val now = nowSec()
+        ruleStore.label(dev.ontask.classify.RuleKind.APP, pkg, to, from, now)
+        ruleStore.userRules().filter { it.kind == dev.ontask.classify.RuleKind.APP && it.pattern.equals(label, true) && !it.pattern.equals(pkg, true) }.forEach { ruleStore.delete(it.id) }
+        ai.accuracy.answered(pkg, to, now)
+        reloadRules(); tracker.invalidate()
+    }
 
     /**
      * Files [name] (an app, or a website if it has a dot and no spaces) under [to]: saves a rule for the future and

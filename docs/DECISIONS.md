@@ -674,3 +674,16 @@ when it comes to the front.*
   5 minutes (too easy to slip between work and time-wasting and reset).
 - **No "Help me get started" button:** what it opened (pick the smallest next step, *Block YouTube for 15 minutes*,
   *Message my partner*) shows right away on the firmer window and step 3, and on the phone's full-screen prompt.
+
+## 2026-11-05 · Changing categories from the timeline (grilled)
+
+- **Why:** picking Entertainment for Podcast Addict (a phone app) in a stretch's details closed the window and changed
+  nothing; the window also closed by itself (Home's minute reload reset it).
+- **The details window stays open** while you change several items, and doesn't change while open apart from the
+  categories you pick; the main window behind it updates.
+- **The change shows at once**, as just the new category on that row (no extra marks); the timeline, totals and
+  "Where the time went" behind it redraw. Phone stretches: the Mac applies your rule immediately (splitting a mixed
+  stretch in proportion until the phone syncs); the phone re-sorts the 14 days it keeps and re-uploads changed days.
+- **Phone app rules go under the package** (com.bambuna.podcastaddict), replacing an older rule for it by name, so
+  the two can't disagree. *Rejected:* waiting for the phone before showing anything; changing the Mac's view only.
+- Checked with a UI test that drives the real window (`TimelineDetailsTest`).
