@@ -42,8 +42,9 @@ object PhoneRules {
             Cloud.db.document("users/$uid/sync/rules").addSnapshotListener { s, _ ->
                 val items = (s?.get("items") as? Map<String, Any?>) ?: emptyMap()
                 // Rules added or changed since last time (from the Mac, the web or this phone): today's time follows them.
-                val before = lastRuleItems
-                if (before != null) items.filter { (k, v) -> before[k] != v }.forEach { (k, v) ->
+                // On start every rule counts as new, so today's time also follows rules set while the phone was off.
+                val before = lastRuleItems ?: emptyMap()
+                items.filter { (k, v) -> before[k] != v }.forEach { (k, v) ->
                     val kind = runCatching { RuleKind.valueOf(k.substringBefore('|')) }.getOrNull() ?: return@forEach
                     val cat = Category.registry[v as? String ?: return@forEach] ?: return@forEach
                     runCatching { onRuleChanged(kind, k.substringAfter('|'), cat) }
