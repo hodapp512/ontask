@@ -674,3 +674,7 @@ when it comes to the front.*
   5 minutes (too easy to slip between work and time-wasting and reset).
 - **No "Help me get started" button:** what it opened (pick the smallest next step, *Block YouTube for 15 minutes*,
   *Message my partner*) shows right away on the firmer window and step 3, and on the phone's full-screen prompt.
+- **Changing a phone item's category anywhere re-sorts the phone's own record.** The phone now relabels today's
+  time whenever a rule is added or changed (from the Mac's timeline, the web or the phone), and uploads its day at
+  once. Before, only a change made on the phone did, so picking a category for Podcast Addict on the Mac saved the
+  rule but the timeline kept the old category. The Mac's details say a phone change shows once the phone syncs.
