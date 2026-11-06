@@ -721,3 +721,5 @@ when it comes to the front.*
 - **The chart's y-axis no longer rescales** when you switch range (Today, 7, 30, 365 days) or metric (Focused,
   Wasted, Screen time); its top is the slot's length (15, 30, 60 or 120 min), so only the slot size changes it.
   Bars are comparable at a glance, at the cost of looking shorter on quiet days.
+- **Pop-ups are resized through Compose (the window state), and are resizable,** never by setting the AWT window's
+  size: that left Compose drawing at the old size (a gray band on top, the bottom cut off) on step 3.

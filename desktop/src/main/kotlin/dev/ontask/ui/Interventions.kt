@@ -88,7 +88,7 @@ fun InterventionWindow(app: App, iv: Intervention, mode: ThemeMode) {
             val size = DpSize(540.dp, ((if (iv.reminder) 200 else if (iv.breakSec > 0) 260 else 300) + planHeight(app)).dp)
             val state = rememberWindowState(size = size, position = centeredOnActiveScreen(size))
             Window(
-                onCloseRequest = { app.interventionClosed() }, title = "OnTask — are you on task?", alwaysOnTop = true, resizable = false,
+                onCloseRequest = { app.interventionClosed() }, title = "OnTask — are you on task?", alwaysOnTop = true, resizable = true,
                 state = state,
             ) {
                 LaunchedEffect(Unit) { bringForwardAlone(window) }
@@ -101,7 +101,7 @@ fun InterventionWindow(app: App, iv: Intervention, mode: ThemeMode) {
             val state = rememberWindowState(size = DpSize(560.dp, 480.dp), position = centeredOnActiveScreen(DpSize(560.dp, 480.dp)))
             Window(
                 // Normal-sized window (not full screen), answerable at once; closing it only hides it for a moment.
-                onCloseRequest = { app.interventionClosed() }, title = "OnTask — are you on task?", alwaysOnTop = true, resizable = false,
+                onCloseRequest = { app.interventionClosed() }, title = "OnTask — are you on task?", alwaysOnTop = true, resizable = true,
                 state = state,
             ) {
                 LaunchedEffect(Unit) { bringForwardAlone(window) }
@@ -112,7 +112,7 @@ fun InterventionWindow(app: App, iv: Intervention, mode: ThemeMode) {
         Step.PARTNER -> {
             val state = rememberWindowState(size = DpSize(540.dp, 560.dp), position = centeredOnActiveScreen(DpSize(540.dp, 560.dp)))
             Window(
-                onCloseRequest = { app.interventionClosed() }, title = "OnTask — reach out?", alwaysOnTop = true, resizable = false,
+                onCloseRequest = { app.interventionClosed() }, title = "OnTask — reach out?", alwaysOnTop = true, resizable = true,
                 state = state,
             ) {
                 LaunchedEffect(Unit) { bringForwardAlone(window) }
@@ -135,7 +135,7 @@ private fun CountdownWindow(app: App, iv: Intervention, mode: ThemeMode) {
     val size = DpSize(560.dp, 520.dp)
     val state = rememberWindowState(size = size, position = centeredOnActiveScreen(size))
     Window(
-        onCloseRequest = { app.countdownClosed() }, title = "OnTask — telling your partner", alwaysOnTop = true, resizable = false,
+        onCloseRequest = { app.countdownClosed() }, title = "OnTask — telling your partner", alwaysOnTop = true, resizable = true,
         state = state,
     ) {
         LaunchedEffect(Unit) { bringForwardAlone(window) }
@@ -212,11 +212,11 @@ private fun androidx.compose.ui.window.FrameWindowScope.FitHeight(state: android
     val density = androidx.compose.ui.platform.LocalDensity.current
     androidx.compose.foundation.layout.Box(
         Modifier.fillMaxWidth().wrapContentHeight(Alignment.Top, unbounded = true).onSizeChanged { sz ->
-            // AWT sizes are in points, like dp here; the title bar is the window's top inset.
-            val h = (with(density) { sz.height.toDp() }.value + window.insets.top + window.insets.bottom).toInt().coerceAtMost(900)
-            if (kotlin.math.abs(window.height - h) > 1) javax.swing.SwingUtilities.invokeLater {
-                window.setSize(window.width, h); state.size = DpSize(width, h.dp)
-            }
+            // The title bar is the window's top inset. Sized through Compose (the window state), never the AWT window
+            // itself: that left Compose drawing at the old size, a gray band above and the bottom cut off. Compose only
+            // applies a new size to a resizable window, so these are resizable.
+            val h = (with(density) { sz.height.toDp() }.value + window.insets.top + window.insets.bottom).coerceAtMost(900f)
+            if (kotlin.math.abs(state.size.height.value - h) > 1f) state.size = DpSize(width, h.dp)
         },
     ) { content() }
 }
@@ -361,7 +361,7 @@ fun BreakCardWindow(app: App, c: App.BreakCard, mode: ThemeMode) {
     val size = DpSize(500.dp, (240 + planHeight(app)).dp)
     val state = rememberWindowState(size = size, position = centeredOnActiveScreen(size))
     Window(
-        onCloseRequest = { app.breakCardClosed() }, title = "OnTask", alwaysOnTop = true, resizable = false,
+        onCloseRequest = { app.breakCardClosed() }, title = "OnTask", alwaysOnTop = true, resizable = true,
         state = state,
     ) {
         LaunchedEffect(Unit) { bringForwardAlone(window) }

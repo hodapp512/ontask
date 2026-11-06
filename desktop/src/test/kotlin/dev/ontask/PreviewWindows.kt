@@ -22,7 +22,9 @@ fun main(args: Array<String>) {
     Thread {
         Thread.sleep(3500)
         java.awt.Window.getWindows().filter { it.isShowing }.forEach { println("WINDOW ${(it as? java.awt.Frame)?.title} bounds=${it.bounds}") }
-        Runtime.getRuntime().exec(arrayOf("screencapture", "-x", System.getProperty("java.io.tmpdir") + "/ontask-prompt-${args.firstOrNull() ?: "step1"}.png")).waitFor()
+        val base = System.getProperty("java.io.tmpdir") + "/ontask-prompt-${args.firstOrNull() ?: "step1"}"
+        // Every display (the window follows the pointer's screen): one file each.
+        Runtime.getRuntime().exec(arrayOf("screencapture", "-x", "$base.png", "$base-2.png")).waitFor()
         Thread.sleep(500); kotlin.system.exitProcess(0)
     }.start()
     application { InterventionWindow(app, iv, ThemeMode.LIGHT) }
