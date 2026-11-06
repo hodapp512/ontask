@@ -107,9 +107,9 @@ private fun DistributionChart(bars: List<Patterns.Bar>, slot: Int, metric: Metri
     val color = metricColor(metric)
     val shade = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
     val grid = MaterialTheme.colorScheme.outlineVariant
-    val maxMin = (bars.maxOfOrNull { it.avgSec } ?: 0.0) / 60
-    // A tidy top for the y-axis: 5, 10, 15, 30, 60…
-    val top = listOf(10, 20, 30, 40, 60, 90, 120).firstOrNull { it >= maxMin } ?: (Math.ceil(maxMin / 60) * 60).toInt()
+    // The y-axis is fixed by the slot size (a slot can hold at most its own length), so switching range or metric
+    // never rescales it: 15, 30, 60 or 120 minutes.
+    val top = slot
     Text(hover?.let { Patterns.describe(bars[it], slot, metric, oneDay) } ?: (since + (if (oneDay) "Minutes in each slot today." else "Average minutes per day.") + " Hover a bar for details."),
         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     Row {

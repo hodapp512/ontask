@@ -715,3 +715,9 @@ when it comes to the front.*
   (half an hour before the midpoint of sit-down → end of work) was due at 8 AM and came right after the 9:16 plan.
 - **Use before 4 AM is the night before**, not the start of the day.
 - **The midday check-in waits at least 2 hours after the morning plan.**
+
+## 2026-11-06 · Your patterns: fixed y-axis
+
+- **The chart's y-axis no longer rescales** when you switch range (Today, 7, 30, 365 days) or metric (Focused,
+  Wasted, Screen time); its top is the slot's length (15, 30, 60 or 120 min), so only the slot size changes it.
+  Bars are comparable at a glance, at the cost of looking shorter on quiet days.

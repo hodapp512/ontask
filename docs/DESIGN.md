@@ -262,7 +262,8 @@ At lunchtime (11–2, once a day) every drift prompt, the countdown and the remi
 A card on Home above the heat map (Mac and phone), for you only, inspired by Marinara's daily distribution.
 - **Focused | Wasted | Screen time** (green, red, blue; Screen time = everything but Away). Focused by default.
 - **Numbers** for that metric: Today · Last 7 days · Last 30 days · Since <first day>, each with its daily average.
-- **Bars** over the whole day (12a–12a, work hours lightly shaded): each is the average minutes per day in that slot.
+- **Bars** over the whole day (12a–12a, work hours lightly shaded): each is the average minutes per day in that slot. The y-axis is fixed by the slot size (0 to 15, 30, 60 or
+  120 minutes), so it doesn't rescale between ranges or metrics.
   Ranges: Today · Last 7 days · Last 30 days (default) · Last 365 days. Slots: 15 min (Mac only),
   30 min, 1 hr (default), 2 hr. Every day in the range counts, empty ones as zero, but not before the first tracked
   day; today counts only for slots that have started. Hover (Mac) or tap (phone) a bar: "9–10 AM · 18 min focused on

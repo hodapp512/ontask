@@ -112,8 +112,9 @@ private fun Chart(bars: List<Patterns.Bar>, slot: Int, metric: Metric, work: Lis
     val color = metricColor(metric)
     val shade = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
     val grid = MaterialTheme.colorScheme.outlineVariant
-    val maxMin = (bars.maxOfOrNull { it.avgSec } ?: 0.0) / 60
-    val top = listOf(10, 20, 30, 40, 60, 90, 120).firstOrNull { it >= maxMin } ?: (Math.ceil(maxMin / 60) * 60).toInt()
+    // The y-axis is fixed by the slot size (a slot can hold at most its own length), so switching range or metric
+    // never rescales it: 15, 30, 60 or 120 minutes.
+    val top = slot
     Muted(picked?.let { Patterns.describe(bars[it], slot, metric, oneDay) } ?: (since + (if (oneDay) "Minutes in each slot today." else "Average minutes per day.") + " Tap a bar for details."))
     Row {
         Box(Modifier.width(24.dp).height(140.dp)) {
