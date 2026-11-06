@@ -208,13 +208,14 @@ private fun BreakTotals(hourSec: Long, todaySec: Long) {
  * always show and there's no empty space under them.
  */
 @Composable
-private fun androidx.compose.ui.window.FrameWindowScope.FitHeight(state: androidx.compose.ui.window.WindowState, width: androidx.compose.ui.unit.Dp, content: @Composable () -> Unit) {
+internal fun androidx.compose.ui.window.FrameWindowScope.FitHeight(state: androidx.compose.ui.window.WindowState, width: androidx.compose.ui.unit.Dp, content: @Composable () -> Unit) {
     val density = androidx.compose.ui.platform.LocalDensity.current
     androidx.compose.foundation.layout.Box(
         Modifier.fillMaxWidth().wrapContentHeight(Alignment.Top, unbounded = true).onSizeChanged { sz ->
             // The title bar is the window's top inset. Sized through Compose (the window state), never the AWT window
             // itself: that left Compose drawing at the old size, a gray band above and the bottom cut off. Compose only
-            // applies a new size to a resizable window, so these are resizable.
+            // applies a new size to a resizable window placed at an absolute position (not WindowPosition.Aligned), so
+            // these are resizable and placed with centeredOnActiveScreen.
             val h = (with(density) { sz.height.toDp() }.value + window.insets.top + window.insets.bottom).coerceAtMost(900f)
             if (kotlin.math.abs(state.size.height.value - h) > 1f) state.size = DpSize(width, h.dp)
         },

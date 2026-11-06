@@ -144,40 +144,52 @@ internal fun themeOf(app: App) = runCatching { ThemeMode.valueOf(app.prefs.str("
 
 /** One way to unblock: choose a site, say whether it's for work, then either wait out the delay or state the purpose. */
 @Composable
-internal fun UnblockPickerWindow(app: App, blocked: List<String>, onClose: () -> Unit) {
+internal fun UnblockPickerWindow(app: App, blocked: List<String>, startSite: String? = null, startForWork: Boolean? = null, onClose: () -> Unit) {
     var filter by remember { mutableStateOf("") }
-    var chosen by remember { mutableStateOf<String?>(null) }
+    var chosen by remember { mutableStateOf(startSite) }
     var regular by remember { mutableStateOf(false) }
+    // In work hours, one question first ("Is it for work?" Yes / No); then the work form, or the not-for-work unblock.
+    var forWork by remember(chosen) { mutableStateOf(if (chosen == startSite) startForWork else null) }
+    val state = rememberWindowState(size = DpSize(520.dp, 560.dp), position = centeredOnActiveScreen(DpSize(520.dp, 560.dp)))
+    // The site list has a fixed height; the later steps take exactly their own (see FitHeight), so the yes/no
+    // question isn't a small question in a big empty window.
+    LaunchedEffect(chosen) { if (chosen == null) state.size = DpSize(520.dp, 560.dp) }
     Window(
-        onCloseRequest = onClose, title = "Unblock a site", alwaysOnTop = true, resizable = false,
-        state = rememberWindowState(size = DpSize(520.dp, 560.dp), position = WindowPosition.Aligned(Alignment.Center)),
+        onCloseRequest = onClose, title = "Unblock a site", alwaysOnTop = true, resizable = true,
+        state = state,
     ) {
         OnTaskTheme(remember { themeOf(app) }) { Surface(Modifier.fillMaxSize()) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                val site = chosen
-                val strict = remember { app.blocking.strictNow(App.nowSec()) }
-                if (site == null) {
-                    Text("Which site?", style = MaterialTheme.typography.titleMedium)
-                    if (blocked.isEmpty()) Text("Nothing is blocked right now.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    else OutlinedTextField(filter, { filter = it }, label = { Text("Filter") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-                        blocked.filter { filter.isBlank() || it.contains(filter.trim(), ignoreCase = true) }.forEach { d ->
-                            TextButton({ chosen = d }, Modifier.fillMaxWidth()) { Text(d, Modifier.fillMaxWidth()) }
+            val site = chosen
+            val strict = remember { app.blocking.strictNow(App.nowSec()) }
+            if (site != null) FitHeight(state, 520.dp) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    when {
+                        !strict -> { LeisureUnblockForm(app, site, onDone = onClose); TextButton({ chosen = null }) { Text("← Choose another site") } }
+                        forWork == null -> {
+                            Text("Is $site for work?", style = MaterialTheme.typography.titleLarge)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button({ forWork = true }) { Text("Yes") }
+                                OutlinedButton({ forWork = false; regular = true }) { Text("No") }
+                            }
+                            TextButton({ chosen = null }) { Text("← Choose another site") }
                         }
+                        forWork == true -> {
+                            Text("Unblock $site for work", style = MaterialTheme.typography.titleMedium)
+                            WorkUnblockForm(app, site, onDone = onClose)
+                            TextButton({ forWork = null }) { Text("← Back") }
+                        }
+                        // Not for work: the unblock with a wait opens on its own.
+                        else -> TextButton({ forWork = null; regular = false }) { Text("← Back") }
                     }
-                } else if (!strict) {
-                    LeisureUnblockForm(app, site, onDone = onClose)
-                    Spacer(Modifier.weight(1f))
-                    TextButton({ chosen = null }) { Text("← Choose another site") }
-                } else {
-                    Text("Is $site for work?", style = MaterialTheme.typography.titleMedium)
-                    WorkUnblockForm(app, site, onDone = onClose)
-                    HorizontalDivider()
-                    Text("Not for work?", style = MaterialTheme.typography.titleSmall)
-                    Text("You can still unblock it for 5–15 minutes, after a short wait that grows with each unblock today. Your partner is told.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    OutlinedButton({ regular = true }) { Text("No, just for a bit…") }
-                    Spacer(Modifier.weight(1f))
-                    TextButton({ chosen = null }) { Text("← Choose another site") }
+                }
+            } else Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Which site?", style = MaterialTheme.typography.titleMedium)
+                if (blocked.isEmpty()) Text("Nothing is blocked right now.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                else OutlinedTextField(filter, { filter = it }, label = { Text("Filter") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                    blocked.filter { filter.isBlank() || it.contains(filter.trim(), ignoreCase = true) }.forEach { d ->
+                        TextButton({ chosen = d }, Modifier.fillMaxWidth()) { Text(d, Modifier.fillMaxWidth()) }
+                    }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { TextButton(onClose) { Text("Cancel") } }
             }
@@ -221,7 +233,7 @@ internal fun WorkUnblockForm(app: App, site: String, onDone: () -> Unit) {
     Button({
         try { val now = App.nowSec(); app.blocking.unblocks.startPurpose(site, purpose, minutes, now); app.blocking.tick(now); onDone() }
         catch (e: dev.ontask.block.UnblockRejected) { error = e.message }
-    }, enabled = purpose.isNotBlank()) { Text("Yes, unblock for work") }
+    }, enabled = purpose.isNotBlank()) { Text("Unblock for work") }
 }
 
 @Composable

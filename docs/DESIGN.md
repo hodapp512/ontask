@@ -20,7 +20,8 @@ This file describes how OnTask works now. **Why** each choice was made, and what
 - **The block list is blocked around the clock.** Work hours only change how hard unblocking is.
 - **Work hours** are built in: weekly template + per-day exceptions, edited in a visual calendar.
   - Removing/shortening work hours → asks for a reason → partner is told. Adding hours never notifies.
-- **Unblocking in work hours** first asks "for work?":
+- **Unblocking in work hours** first asks "Is <site> for work?" on its own, with just Yes / No; the next step is
+  the work form (purpose and length) or the not-for-work unblock with its wait:
   - **For work:** purpose (e.g. "Acme customer: onboarding videos"), 15 min / 30 min / 1 h / 2 h / 3 h, no delay,
     partner always told.
   - **Not for work:** delay that grows per day (10 s, 30 s, 2 min, then 5 min; resets at 4 AM), 5 / 10 / 15 min,

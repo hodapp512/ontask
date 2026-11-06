@@ -27,5 +27,11 @@ fun main(args: Array<String>) {
         Runtime.getRuntime().exec(arrayOf("screencapture", "-x", "$base.png", "$base-2.png")).waitFor()
         Thread.sleep(500); kotlin.system.exitProcess(0)
     }.start()
-    application { InterventionWindow(app, iv, ThemeMode.LIGHT) }
+    application {
+        when (args.firstOrNull()) {
+            "unblock" -> dev.ontask.ui.UnblockPickerWindow(app, listOf("usatoday.com"), startSite = "usatoday.com") {}
+            "unblockwork" -> dev.ontask.ui.UnblockPickerWindow(app, listOf("usatoday.com"), startSite = "usatoday.com", startForWork = true) {}
+            else -> InterventionWindow(app, iv, ThemeMode.LIGHT)
+        }
+    }
 }

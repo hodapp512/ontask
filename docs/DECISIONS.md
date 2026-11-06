@@ -723,3 +723,10 @@ when it comes to the front.*
   Bars are comparable at a glance, at the cost of looking shorter on quiet days.
 - **Pop-ups are resized through Compose (the window state), and are resizable,** never by setting the AWT window's
   size: that left Compose drawing at the old size (a gray band on top, the bottom cut off) on step 3.
+
+## 2026-11-06 · Unblocking: one question first
+
+- **"Is <site> for work?" comes alone, with Yes / No**, then the work form or the not-for-work unblock. Before, the
+  work form and the not-for-work option were on one screen, which was confusing. Each step's window fits its content.
+- Windows sized to their content need an absolute position (centeredOnActiveScreen): with WindowPosition.Aligned the
+  new size wasn't applied.
