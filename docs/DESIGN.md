@@ -208,7 +208,9 @@ At lunchtime (11–2, once a day) every drift prompt, the countdown and the remi
   - Shared: `users/{uid}/plans/{date}` `{items: [{id, text, done}], updatedAt, by}`; the whole list is rewritten on
     each change and the newest wins. The Mac sends a change at once and checks for the phone's every 10 s while
     you're at it; the phone listens live. Older free-form plans were split into tasks by line and by sentence.
-- **Midday check-in** 30 minutes before the midpoint of actual working time (first sit-down → end of work hours); skipped if the day started < ~2h before end of work hours.
+- **Midday check-in** 30 minutes before the midpoint of actual working time (first sit-down → end of work hours), and at
+  least 2 hours after the morning plan; skipped if the day started < ~2h before end of work hours. Use before 4 AM is
+  the night before, not the first sit-down.
   - **Do this later ▾** at the top (10 min / 30 min / 1 h).
   1. **This morning:** one line: focused time, wasted time, longest focused stretch.
   2. **How's the day going?** *What did you get done?* and *What should have been done or improved?* (free text).

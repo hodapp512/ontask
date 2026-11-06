@@ -15,6 +15,8 @@ data class DayState(
     val middayDone: Boolean,
     val eveningDone: Boolean,
     val lastPresentTs: Long?,
+    /** When the morning plan was done: the midday check-in waits at least 2 hours after it. */
+    val planningTs: Long? = null,
 )
 
 /**
@@ -53,7 +55,7 @@ class Rhythm(private val zone: ZoneId = ZoneId.systemDefault(), private val midd
             if (endTs - first < 2 * 3600L) return null
             // Half an hour before the midpoint of the day, so it lands before lunch and leaves the afternoon to act on it.
             val midpoint = first + (endTs - first) / 2 - 30 * 60
-            if (now >= midpoint) return Prompt.MIDDAY
+            if (now >= midpoint && (s.planningTs == null || now - s.planningTs >= 2 * 3600L)) return Prompt.MIDDAY
         }
         return null
     }

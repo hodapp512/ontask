@@ -708,3 +708,10 @@ when it comes to the front.*
 - Linked devices unchanged for now: the same phone shows as the Android app and as the web app in its browser.
 - **Messages list: daily reports are one line** that opens that day (laid out, with check-in notes); alerts keep
   their text. Approved from a mockup.
+
+## 2026-11-06 · Midday check-in right after the morning plan
+
+- **Why:** two minutes at the Mac just after midnight counted as the day's first sit-down, so the midday check-in
+  (half an hour before the midpoint of sit-down → end of work) was due at 8 AM and came right after the 9:16 plan.
+- **Use before 4 AM is the night before**, not the start of the day.
+- **The midday check-in waits at least 2 hours after the morning plan.**

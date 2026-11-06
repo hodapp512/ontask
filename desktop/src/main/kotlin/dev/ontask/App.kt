@@ -548,7 +548,7 @@ class App(val dir: Path = dataDir()) {
         // Started with "Start my day" (tasks added on Home before that don't count yet).
         val planned = checkins.done(date, "planning")
         dayStarted = if (planned) date else null
-        val state = DayState(date, first, !away, planned, checkins.done(date, "midday"), checkins.done(date, "evening"), last)
+        val state = DayState(date, first, !away, planned, checkins.done(date, "midday"), checkins.done(date, "evening"), last, checkins.get(date, "planning")?.ts)
         val due = Rhythm(zone, prefs.bool("rhythm.midday", true), prefs.bool("rhythm.evening_at_end", true), prefs.int("rhythm.evening_lead_min", 30)).due(settings.schedule, state, now)
         // What's due whether or not you're at the Mac, so the phone can offer it when you're on the phone instead.
         rhythmDue = Rhythm(zone, prefs.bool("rhythm.midday", true), prefs.bool("rhythm.evening_at_end", true), prefs.int("rhythm.evening_lead_min", 30))

@@ -129,11 +129,16 @@ class Reports(private val db: Db, private val zone: ZoneId = ZoneId.systemDefaul
     }
 
     /** First non-away moment of [date] (the anchor of the daily rhythm), and the most recent one. */
+    /**
+     * The first sit-down and the last moment at the computer on [date]. Use before 4 AM is the night before running
+     * late, not the start of the day (a few minutes after midnight once made the midday check-in due at breakfast).
+     */
     fun presence(date: LocalDate): Pair<Long?, Long?> {
         val start = date.atStartOfDay(zone).toEpochSecond(); val end = date.plusDays(1).atStartOfDay(zone).toEpochSecond()
+        val dayStarts = date.atTime(4, 0).atZone(zone).toEpochSecond()
         return db.use { c ->
-            c.prepareStatement("SELECT MIN(start_ts), MAX(end_ts) FROM ticks WHERE level != 'AWAY' AND start_ts >= ? AND start_ts < ?").use { ps ->
-                ps.setLong(1, start); ps.setLong(2, end)
+            c.prepareStatement("SELECT MIN(CASE WHEN start_ts >= ? THEN start_ts END), MAX(end_ts) FROM ticks WHERE level != 'AWAY' AND start_ts >= ? AND start_ts < ?").use { ps ->
+                ps.setLong(1, dayStarts); ps.setLong(2, start); ps.setLong(3, end)
                 ps.executeQuery().use { rs -> rs.next(); rs.getLong(1).takeIf { !rs.wasNull() } to rs.getLong(2).takeIf { !rs.wasNull() } }
             }
         }

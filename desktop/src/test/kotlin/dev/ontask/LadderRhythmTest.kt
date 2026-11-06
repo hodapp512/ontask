@@ -204,6 +204,14 @@ class LadderRhythmTest {
     private fun at(h: Int, m: Int = 0) = ZonedDateTime.of(2026, 10, 26, h, m, 0, 0, utc).toEpochSecond()
     private val sched = WorkSchedule(WorkWeek(mapOf(1 to listOf(TimeRange(9 * 60, 17 * 60)))))
     private val date = LocalDate.of(2026, 10, 26)
+    @Test fun middayWaitsTwoHoursAfterTheMorningPlan() {
+        val r = Rhythm(utc)
+        // Started at 6 AM: the midpoint (10:30) has passed, but the plan was only just done at 11.
+        val late = DayState(date, at(6, 0), true, true, false, false, null, planningTs = at(11, 0))
+        assertEquals(null, r.due(sched, late, at(11, 5)))
+        assertEquals(Prompt.MIDDAY, r.due(sched, late, at(13, 0)))
+    }
+
     private fun st(first: Long? = at(9, 5), present: Boolean = true, plan: Boolean = false, mid: Boolean = false, eve: Boolean = false) = DayState(date, first, present, plan, mid, eve, null)
     private val r = Rhythm(utc)
 
