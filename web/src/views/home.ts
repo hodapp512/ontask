@@ -86,7 +86,7 @@ function yourDay(u: User, schedule: DocumentData | undefined, eveningDone: boole
       const go = (n: number) => () => { day = n === 0 ? new Date() : new Date(day.getTime() + n * 86_400_000); watch(); };
       kids.push(h("div", { class: "card" },
         h("div", { class: "row" },
-          h("h3", { class: "grow" }, isToday() ? "Today so far" : fmtDate(day, true)),
+          h("h3", { class: "grow" }, isToday() ? "Today so far" : day.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })),
           h("button", { class: "icon-btn", "aria-label": "Previous day", onclick: go(-1) }, "←"),
           !isToday() && h("button", { class: "small", onclick: go(0) }, "Today"),
           h("button", { class: "icon-btn", "aria-label": "Next day", disabled: isToday(), onclick: go(1) }, "→")),

@@ -17,7 +17,8 @@ object DefaultRules {
         // Work or personal: judged window by window (the title names the mailbox or account).
         VARIABLE to listOf("Mail", "Calendar", "Microsoft Outlook"),
         // Moments between things: count as what's around them (see Borrow).
-        OTHER to listOf("UserNotificationCenter", "loginwindow", "Spotlight", "Dock", "Control Center", "ControlCenter", "Notification Center",
+        // OnTask itself is Other: its windows aren't work (and the drift ladder pauses while one is in front).
+        OTHER to listOf("OnTask", "dev.ontask.app", "UserNotificationCenter", "loginwindow", "Spotlight", "Dock", "Control Center", "ControlCenter", "Notification Center",
             "NotificationCenter", "Screenshot", "screencaptureui", "SecurityAgent", "CoreServicesUIAgent", "Finder", "Raycast", "Alfred", "Launchpad"),
         PERSONAL_ADMIN to listOf("Messages", "FaceTime", "WhatsApp", "Telegram", "Signal"),
         ENTERTAINMENT to listOf("Spotify", "Music", "TV", "Netflix", "VLC", "Steam", "Discord"),
@@ -25,12 +26,12 @@ object DefaultRules {
 
     /** Android apps by package name (APP rules also match the bundle/package id). */
     private val androidApps = mapOf(
-        // OnTask itself counts as work adjacent, so its own prompts never borrow the time-wasting you were on.
-        WORK_SUPPORT to listOf("com.microsoft.teams", "com.Slack", "us.zoom.videomeetings", "dev.ontask.android"),
+        WORK_SUPPORT to listOf("com.microsoft.teams", "com.Slack", "us.zoom.videomeetings"),
         VARIABLE to listOf("com.google.android.gm", "com.google.android.calendar", "com.samsung.android.calendar", "com.google.android.apps.docs",
             "com.google.android.apps.docs.editors.docs", "com.google.android.apps.docs.editors.sheets", "com.microsoft.office.outlook",
             "com.google.android.youtube", "com.reddit.frontpage", "com.facebook.katana", "com.linkedin.android", "com.medium.reader", "com.substack.app"),
-        OTHER to listOf("com.android.systemui", "com.google.android.permissioncontroller", "com.android.permissioncontroller",
+        // OnTask itself is Other, not work (its prompt screens pause the drift instead).
+        OTHER to listOf("dev.ontask.android", "com.android.systemui", "com.google.android.permissioncontroller", "com.android.permissioncontroller",
             "com.samsung.android.app.galaxyfinder", "com.android.intentresolver"),
         PERSONAL_ADMIN to listOf("com.samsung.android.messaging", "com.google.android.apps.messaging", "com.whatsapp", "org.telegram.messenger",
             "org.thoughtcrime.securesms", "com.samsung.android.dialer", "com.google.android.dialer", "com.android.settings",

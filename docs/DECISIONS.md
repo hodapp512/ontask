@@ -742,3 +742,12 @@ when it comes to the front.*
 
 - **Your day card on the Android app and the web app goes back a day at a time** (◀ ▶, Today) and opens the day you
   tap in the year, like the Mac. Today's plan and check-in rows stay on today.
+
+## 2026-11-07 · OnTask itself is Other
+
+- **OnTask's own windows count as Other by default** (Mac and phone), not Work or Work adjacent: time on its prompts
+  isn't work. The drift ladder pauses while an OnTask window is in front (Mac and phone), so a prompt or the
+  countdown neither feeds nor ends a drift. *Rejected before (2026-11-03):* Other, because its borrowing would keep
+  a drift going on the countdown; the pause fixes that.
+- **"I'm working" / "It's actually work" never files OnTask itself** as work (it files what you were on before).
+- Your existing "OnTask → Work" rule became Other, and past OnTask time was re-sorted to match.

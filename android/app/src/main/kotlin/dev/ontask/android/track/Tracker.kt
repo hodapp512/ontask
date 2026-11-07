@@ -159,9 +159,11 @@ class Tracker : AccessibilityService() {
             val level = borrow.level(now, cat, away = false) ?: cat.level
             if (cat != Category.OTHER) borrow.solid(now, level)
             log.add(now, TICK_MS / 1000, p, app, subject, t, item, cat, work, level)
-            currentKey = item ?: if (domain != null) "DOMAIN|$domain" else "APP|$p"
+            // What "It's actually work" files: never OnTask's own prompt screen, but what you were on before it.
+            if (p != packageName) currentKey = item ?: if (domain != null) "DOMAIN|$domain" else "APP|$p"
             prompts.lastSite = if (level == dev.ontask.Level.WASTED && cat != Category.OTHER) subject else prompts.lastSite
-            prompts.tick(now, level, work)
+            // OnTask's own screens (a prompt, the countdown) pause the drift: they're neither drifting nor work.
+            prompts.tick(now, level, work, held = p == packageName)
         } else { borrow.level(now, Category.AWAY, away = true); prompts.tick(now, null, PhoneRules.isWork(now)) }
         prompts.bedtimeTick(now, power.isInteractive && !keyguard.isKeyguardLocked)
         prompts.checkinTick(power.isInteractive && !keyguard.isKeyguardLocked)

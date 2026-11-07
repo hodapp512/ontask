@@ -56,7 +56,7 @@ class Prompts(private val svc: AccessibilityService) {
     private fun now() = System.currentTimeMillis() / 1000
 
     /** One tick: [level] of what's in front (null = screen off). */
-    fun tick(now: Long, level: Level?, work: Boolean) {
+    fun tick(now: Long, level: Level?, work: Boolean, held: Boolean = false) {
         // A break that ran out: "That's 5 minutes. Back to work?" once, and drifting on escalates at once.
         val a = (state["active"] as? Map<*, *>)
         val until = a?.get("until").num()
@@ -64,7 +64,7 @@ class Prompts(private val svc: AccessibilityService) {
         ladder.cfg = ladder.cfg.copy(step1WastedSec = if (earnedSec > 0) 60 else 120)
         ladder.partnerAuto = work && hasPartner
         // The screen off (level null) isn't time-wasting, and it pauses rather than ends things, as away does on the Mac.
-        val iv = ladder.tick(now, level == Level.WASTED, work && !onBreak, 0)
+        val iv = ladder.tick(now, level == Level.WASTED, work && !onBreak, 0, held)
         when {
             iv == null -> {}
             iv.send != null -> autoSend(iv)

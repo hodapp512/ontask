@@ -871,7 +871,8 @@ class App(val dir: Path = dataDir()) {
         val seg = tracker.currentSegment()
         // On a Varies site (YouTube…) it's this page or video that's work, not the whole site.
         if (seg != null && seg.category.variable) answerVariable(dev.ontask.classify.itemKey(seg.app, seg.title, seg.url), seg.title, Category.CORE_WORK)
-        else if (s != null && c != null) {
+        // OnTask's own window in front (the prompt you just clicked) is never what gets filed as work.
+        else if (s != null && c != null && s.bundleId != "dev.ontask.app" && s.app != "OnTask") {
             val domain = dev.ontask.classify.domainOf(s.url)
             val (kind, pattern) = if (domain != null) dev.ontask.classify.RuleKind.DOMAIN to domain else dev.ontask.classify.RuleKind.APP to (s.app ?: "")
             if (pattern.isNotBlank()) { ruleStore.label(kind, pattern, Category.CORE_WORK, c.category, nowSec()); reloadRules() }
