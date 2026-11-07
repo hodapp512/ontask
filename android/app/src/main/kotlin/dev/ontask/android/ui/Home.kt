@@ -15,6 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.material3.TextButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -38,8 +39,10 @@ import java.time.LocalTime
 fun HomeScreen(uid: String, name: String) {
     val today = remember { LocalDate.now() }
     val schedule by remember { Cloud.doc("users/$uid/schedule/current") }.collectAsState(null)
-    val report by remember { Cloud.doc("users/$uid/reports/${dayKey(today)}") }.collectAsState(null)
-    val items by remember { Cloud.doc("users/$uid/reportItems/${dayKey(today)}") }.collectAsState(null)
+    // The day shown in the day card: today, or an earlier one (◀ ▶, or a tap on the year below).
+    var date by remember { mutableStateOf(today) }
+    val report by remember(date) { Cloud.doc("users/$uid/reports/${dayKey(date)}") }.collectAsState(null)
+    val items by remember(date) { Cloud.doc("users/$uid/reportItems/${dayKey(date)}") }.collectAsState(null)
     val checkin by remember { Cloud.doc("users/$uid/checkins/${dayKey(today)}") }.collectAsState(null)
     val heat by remember { Cloud.doc("users/$uid/heat/year") }.collectAsState(null)
     val devices by remember { Cloud.query(Cloud.db.collection("users/$uid/devices")) }.collectAsState(null)
@@ -56,10 +59,15 @@ fun HomeScreen(uid: String, name: String) {
         val mac = devices?.documents?.map { it.data ?: emptyMap() }?.filter { it["kind"] == "mac" }?.maxByOrNull { it["lastSyncMs"].num() }
         if (mac == null && devices != null) LinkMacCard()
         OCard {
-            Text("Today so far", style = MaterialTheme.typography.titleMedium)
-            mac?.let { Muted("💻 ${it["name"] ?: "Mac"} · " + if (it["lastSyncMs"].num() > 0) "updated ${ago(it["lastSyncMs"].num())}" else "not synced yet") }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(if (date == today) "Today so far" else fmtDate(date, weekday = true), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                TextButton({ date = date.minusDays(1) }) { Text("◀") }
+                if (date != today) TextButton({ date = today }) { Text("Today") }
+                TextButton({ date = date.plusDays(1) }, enabled = date < today) { Text("▶") }
+            }
+            if (date == today) mac?.let { Muted("💻 ${it["name"] ?: "Mac"} · " + if (it["lastSyncMs"].num() > 0) "updated ${ago(it["lastSyncMs"].num())}" else "not synced yet") }
             val r = report?.data
-            if (r == null) Muted("Nothing tracked yet today.")
+            if (r == null) Muted(if (date == today) "Nothing tracked yet today." else "Nothing tracked this day.")
             else ReportBody((items?.data?.get("topSites")?.let { r + ("topSites" to it) } ?: r), categoriesOf(s),
                 @Suppress("UNCHECKED_CAST") ((items?.data?.get("refs") as? Map<String, Map<String, Any?>>) ?: emptyMap()))
         }
@@ -72,7 +80,7 @@ fun HomeScreen(uid: String, name: String) {
             }
         }
         PatternsCard(uid, ranges)
-        HeatCard(heat?.data)
+        HeatCard(heat?.data) { d -> date = d }
     }
 }
 

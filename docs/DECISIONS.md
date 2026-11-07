@@ -737,3 +737,8 @@ when it comes to the front.*
   the same kind replaces the older. Server pushes stacked up forever because Android showed them itself; the server
   now sends them to the Android app as data (the web app still gets a normal notification, tagged by kind).
 - Rollout order: phone app first (older versions ignore data-only pushes), then the server.
+
+## 2026-11-07 · Earlier days on the phone and web
+
+- **Your day card on the Android app and the web app goes back a day at a time** (◀ ▶, Today) and opens the day you
+  tap in the year, like the Mac. Today's plan and check-in rows stay on today.

@@ -320,6 +320,8 @@ it; today doesn't until it's over). The Mac uploads one small `heat/year` docume
     items now differ is split in proportion until the phone's upload puts them at their exact times), with the
     totals and "Where the time went". When the rule reaches the phone it re-sorts the 14 days it keeps and uploads
     the days that changed, so reports and the partner view follow.
+- **Earlier days on the phone and the web app:** the day card has ◀ ▶ (and Today), and tapping a day in the year opens
+  it, as on the Mac.
 - **Phone notifications dismiss themselves** when they no longer apply, and the same kind replaces the older one:
   drift prompts and reminders when the drift ends (30 min at most), break/lunch over after 10 min, "Which category
   is this?" when answered or after 30 min, bedtime after 20 min, check-in reminders (the phone's and the server's)

@@ -20,6 +20,8 @@ export async function homeView(u: User, onLeave: (fn: Cleanup) => void): Promise
     getDoc(doc(db, "users", u.uid, "checkins", todayKey())),
   ]);
   const name = firstName(profile.get("displayName") ?? u.displayName ?? "there");
+  // A tap on a day of the year opens it in Your day.
+  let openDay: (d: Date) => void = () => {};
 
   return h("main", {},
     h("header", { class: "top" },
@@ -29,16 +31,16 @@ export async function homeView(u: User, onLeave: (fn: Cleanup) => void): Promise
     await pushBanner(u),
     // The people you support come first: that's what a partner opens the app for.
     await supportSection(u, supportLinks.docs),
-    yourDay(u, sched.data(), checkin.get("evening") === true, onLeave),
-    heatCard(u.uid, onLeave),
+    yourDay(u, sched.data(), checkin.get("evening") === true, onLeave, (open) => { openDay = open; }),
+    heatCard(u.uid, onLeave, (d) => openDay(d)),
     await partnerSection(u, myLinks.docs),
   );
 }
 
 /** The year heat map, live from the Mac's upload; shown once there's something in it. */
-function heatCard(uid: string, onLeave: (fn: Cleanup) => void): HTMLElement {
+function heatCard(uid: string, onLeave: (fn: Cleanup) => void, onPick?: (d: Date) => void): HTMLElement {
   const slot = h("div", {});
-  onLeave(onSnapshot(doc(db, "users", uid, "heat", "year"), (s) => slot.replaceChildren(...(s.exists() ? [heatmapEl(s.data())] : [])), () => {}));
+  onLeave(onSnapshot(doc(db, "users", uid, "heat", "year"), (s) => slot.replaceChildren(...(s.exists() ? [heatmapEl(s.data(), onPick)] : [])), () => {}));
   return slot;
 }
 
@@ -60,7 +62,7 @@ async function pushBanner(u: User): Promise<HTMLElement | null> {
 
 // ---- Your day (from your Mac) -------------------------------------------------------------------------------
 
-function yourDay(u: User, schedule: DocumentData | undefined, eveningDone: boolean, onLeave: (fn: Cleanup) => void): HTMLElement {
+function yourDay(u: User, schedule: DocumentData | undefined, eveningDone: boolean, onLeave: (fn: Cleanup) => void, expose?: (open: (d: Date) => void) => void): HTMLElement {
   const section = h("section", {}, h("h2", { class: "section" }, "Your day"));
   const body = h("div", { class: "stack" }, h("div", { class: "card" }, h("p", { class: "muted" }, "Loading…")));
   section.append(body);
@@ -72,17 +74,25 @@ function yourDay(u: User, schedule: DocumentData | undefined, eveningDone: boole
   let waitingForMac = false;
   const linkCard = macLinkCard(() => { waitingForMac = true; });
 
+  // The day shown: today, or an earlier one (← →, or a tap on the year).
+  let day = new Date();
+  const isToday = () => todayKey(day) === todayKey();
   const draw = () => {
     const mac = macs.sort((a, b) => (b.lastSyncMs ?? 0) - (a.lastSyncMs ?? 0))[0];
     const kids: (HTMLElement | null)[] = [];
     if (!mac) kids.push(linkCard);
     else {
       if (waitingForMac) { kids.push(h("div", { class: "notice" }, `✓ Linked to ${mac.name ?? "your Mac"}. Your day will show up here.`)); waitingForMac = false; }
+      const go = (n: number) => () => { day = n === 0 ? new Date() : new Date(day.getTime() + n * 86_400_000); watch(); };
       kids.push(h("div", { class: "card" },
-        h("div", {},
-          h("h3", {}, "Today so far"),
-          h("p", { class: "muted small" }, `💻 ${mac.name ?? "Mac"} · ${mac.lastSyncMs ? "updated " + ago(mac.lastSyncMs) : "not synced yet"}`)),
-        report ? reportBody(items?.topSites ? { ...report, topSites: items.topSites } : report, { uid: u.uid, categories: (schedule?.categories ?? []) as Cat[] }) : h("p", { class: "muted" }, "Nothing tracked yet today. Your Mac sends an update every few minutes while you work."),
+        h("div", { class: "row" },
+          h("h3", { class: "grow" }, isToday() ? "Today so far" : fmtDate(day, true)),
+          h("button", { class: "icon-btn", "aria-label": "Previous day", onclick: go(-1) }, "←"),
+          !isToday() && h("button", { class: "small", onclick: go(0) }, "Today"),
+          h("button", { class: "icon-btn", "aria-label": "Next day", disabled: isToday(), onclick: go(1) }, "→")),
+        isToday() && h("p", { class: "muted small" }, `💻 ${mac.name ?? "Mac"} · ${mac.lastSyncMs ? "updated " + ago(mac.lastSyncMs) : "not synced yet"}`),
+        report ? reportBody(items?.topSites ? { ...report, topSites: items.topSites } : report, { uid: u.uid, categories: (schedule?.categories ?? []) as Cat[] })
+          : h("p", { class: "muted" }, isToday() ? "Nothing tracked yet today. Your Mac sends an update every few minutes while you work." : "Nothing tracked this day."),
       ));
     }
     kids.push(scheduleCard(schedule, eveningDone));
@@ -90,8 +100,19 @@ function yourDay(u: User, schedule: DocumentData | undefined, eveningDone: boole
   };
 
   onLeave(onSnapshot(collection(db, "users", u.uid, "devices"), (s) => { macs = s.docs.map((d) => d.data()).filter((d) => d.kind === "mac"); draw(); }, () => draw()));
-  onLeave(onSnapshot(doc(db, "users", u.uid, "reports", todayKey()), (s) => { report = s.data(); draw(); }, () => draw()));
-  onLeave(onSnapshot(doc(db, "users", u.uid, "reportItems", todayKey()), (s) => { items = s.data(); draw(); }, () => draw()));
+  // The shown day's report, live; re-watched when the day changes.
+  let stops: (() => void)[] = [];
+  const watch = () => {
+    stops.forEach((f) => f()); report = undefined; items = undefined; draw();
+    const key = todayKey(day);
+    stops = [
+      onSnapshot(doc(db, "users", u.uid, "reports", key), (s) => { report = s.data(); draw(); }, () => draw()),
+      onSnapshot(doc(db, "users", u.uid, "reportItems", key), (s) => { items = s.data(); draw(); }, () => draw()),
+    ];
+  };
+  watch();
+  onLeave(() => stops.forEach((f) => f()));
+  expose?.((d) => { day = d; watch(); section.scrollIntoView({ behavior: "smooth" }); });
   return section;
 }
 
