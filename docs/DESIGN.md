@@ -320,6 +320,12 @@ it; today doesn't until it's over). The Mac uploads one small `heat/year` docume
     items now differ is split in proportion until the phone's upload puts them at their exact times), with the
     totals and "Where the time went". When the rule reaches the phone it re-sorts the 14 days it keeps and uploads
     the days that changed, so reports and the partner view follow.
+- **Phone notifications dismiss themselves** when they no longer apply, and the same kind replaces the older one:
+  drift prompts and reminders when the drift ends (30 min at most), break/lunch over after 10 min, "Which category
+  is this?" when answered or after 30 min, bedtime after 20 min, check-in reminders (the phone's and the server's)
+  when the check-in is done or after 3 h, habits after 1 h, partner reactions after 12 h (newest only), and, as a
+  partner, each kind of message per person after 12 h (daily report 24 h). The server sends Android pushes as data so
+  the app shows them with these rules; the web app gets ordinary notifications, one per kind.
 - **Updates without a cable:** `android/release.sh` publishes the APK and `version.json` with the web app
   (`/android/`, no-cache); the phone checks when the app is opened (Install / Later; no notification) and in Settings →
   App, downloads, and Android's installer asks to confirm. Version = commit count.

@@ -190,6 +190,8 @@ class Tracker : AccessibilityService() {
     /** Saves a decision: a rule for an app or site, a verdict for a page or video; today's stretches follow it. */
     fun file(key: String, cat: Category, t: String?, source: Source) {
         synchronized(asked) { asked.add(key) }
+        // Answered (here, or from the Mac's question): "Which category is this?" goes.
+        runCatching { NotificationManagerCompat.from(this).cancel(ASK_NOTIFICATION) }
         if (!cat.variable) Shots.delete(this, when {
             key.startsWith("DOMAIN|") -> Shots.siteKey(key.substringAfter('|'))
             key.startsWith("APP|") -> Shots.siteKey(appLabel(key.substringAfter('|')))
@@ -235,7 +237,7 @@ class Tracker : AccessibilityService() {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val n = NotificationCompat.Builder(this, OnTaskApp.CHANNEL).setSmallIcon(R.drawable.ic_notify)
             .setContentTitle(if (isItem) "Is this work?" else "Which category is this?").setContentText(label)
-            .setContentIntent(open).setAutoCancel(true).build()
+            .setContentIntent(open).setAutoCancel(true).setTimeoutAfter(30 * 60_000L).build()
         runCatching { NotificationManagerCompat.from(this).notify(ASK_NOTIFICATION, n) }
     }
 

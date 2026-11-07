@@ -730,3 +730,10 @@ when it comes to the front.*
   work form and the not-for-work option were on one screen, which was confusing. Each step's window fits its content.
 - Windows sized to their content need an absolute position (centeredOnActiveScreen): with WindowPosition.Aligned the
   new size wasn't applied.
+
+## 2026-11-06 · Phone notifications don't pile up
+
+- **Every phone notification dismisses itself once it no longer applies** (table in DESIGN), and a newer one of
+  the same kind replaces the older. Server pushes stacked up forever because Android showed them itself; the server
+  now sends them to the Android app as data (the web app still gets a normal notification, tagged by kind).
+- Rollout order: phone app first (older versions ignore data-only pushes), then the server.

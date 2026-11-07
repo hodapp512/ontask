@@ -17,7 +17,14 @@ export function realSenders(secrets: () => Secrets): Senders {
       if (!tokens.length) return { ok: false, detail: "no push tokens", invalidTokens: [] };
       // There is no FCM emulator; do not reach for real credentials while developing locally.
       if (process.env.FUNCTIONS_EMULATOR === "true") return { ok: false, detail: "push skipped (emulator)", invalidTokens: [] };
-      const res = await admin.messaging().sendEachForMulticast({ tokens, notification: { title, body }, data, webpush: { fcmOptions: { link: "/" } } });
+      // Android gets the message as data and the OnTask app shows it, so it can replace older ones of the same kind
+      // and dismiss itself when it no longer applies (Android would otherwise keep every one forever). The web app
+      // still gets an ordinary notification, one per kind (tag).
+      const tag = data?.type ?? "ontask";
+      const res = await admin.messaging().sendEachForMulticast({
+        tokens, data: { ...(data ?? {}), title, body }, android: { priority: "high" },
+        webpush: { notification: { title, body, tag }, fcmOptions: { link: "/" } },
+      });
       const invalid: string[] = [];
       res.responses.forEach((r, i) => {
         const code = r.error?.code ?? "";

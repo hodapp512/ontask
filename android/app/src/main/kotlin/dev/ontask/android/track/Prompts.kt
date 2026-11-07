@@ -97,7 +97,7 @@ class Prompts(private val svc: AccessibilityService) {
         val n = NotificationCompat.Builder(svc, OnTaskApp.CHANNEL).setSmallIcon(R.drawable.ic_notify).setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_REMINDER).setOngoing(true)
             .setContentTitle("Still on $site. Back to work?").setContentText("You said you'd get back to it.")
-            .addAction(action(BACK, "Back to work")).addAction(action(WORKING, "I'm working")).build()
+            .addAction(action(BACK, "Back to work")).addAction(action(WORKING, "I'm working")).setTimeoutAfter(30 * 60_000L).build()
         runCatching { NotificationManagerCompat.from(svc).notify(NOTE, n) }
     }
 
@@ -108,6 +108,7 @@ class Prompts(private val svc: AccessibilityService) {
         val earned = earnedSec / 60
         val b = NotificationCompat.Builder(svc, OnTaskApp.CHANNEL).setSmallIcon(R.drawable.ic_notify)
             .setPriority(NotificationCompat.PRIORITY_HIGH).setCategory(NotificationCompat.CATEGORY_REMINDER).setOngoing(true).setOnlyAlertOnce(false)
+            .setTimeoutAfter(30 * 60_000L) // cleared when the drift ends; this is the backstop
         if (earned > 0) {
             b.setContentTitle("Is this a break?").setContentText("You've focused ${focusedSec / 60} min, so you've got $earned minutes.")
                 .addAction(action(BREAK, "Yes, $earned-min break")).addAction(action(WORKING, "I'm working")).addAction(action(BACK, "Back to work"))
@@ -124,7 +125,7 @@ class Prompts(private val svc: AccessibilityService) {
     private fun breakOverNotice(lunch: Boolean) {
         val n = NotificationCompat.Builder(svc, OnTaskApp.CHANNEL).setSmallIcon(R.drawable.ic_notify).setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentTitle(if (lunch) "Lunch is over. Back to work?" else "Break's over. Back to work?")
-            .addAction(action(BACK, "Back to work")).setAutoCancel(true).build()
+            .addAction(action(BACK, "Back to work")).setAutoCancel(true).setTimeoutAfter(10 * 60_000L).build()
         runCatching { NotificationManagerCompat.from(svc).notify(NOTE, n) }
     }
 
@@ -145,7 +146,7 @@ class Prompts(private val svc: AccessibilityService) {
         val text = when (n.level) { 1 -> "Time to put the phone down. Whatever's left will still be there tomorrow."; 2 -> "Still up? Late nights borrow from tomorrow."; else -> "Reminder number ${n.level} tonight. Put the phone down and get some sleep." }
         val note = NotificationCompat.Builder(svc, OnTaskApp.CHANNEL).setSmallIcon(R.drawable.ic_notify).setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentTitle(title).setStyle(NotificationCompat.BigTextStyle().bigText(text))
-            .addAction(action(BED, "Going to bed")).addAction(action(SNOOZE, "10 more minutes")).setAutoCancel(true).build()
+            .addAction(action(BED, "Going to bed")).addAction(action(SNOOZE, "10 more minutes")).setAutoCancel(true).setTimeoutAfter(20 * 60_000L).build()
         runCatching { NotificationManagerCompat.from(svc).notify(BED_NOTE, note) }
         if (n.level >= 3) svc.startActivity(Intent(svc, PromptActivity::class.java).putExtra("bedtime", "$title\n$text").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
@@ -199,7 +200,8 @@ class Prompts(private val svc: AccessibilityService) {
     fun checkinTick(inUse: Boolean) {
         Cloud.uid?.let { listenCheckins(it) }
         val due = dueCheckin()
-        if (due == null) { NotificationManagerCompat.from(svc).cancel(CHECKIN_NOTE); return }
+        // Done (on either device) or not due: this phone's reminder and the server's both go.
+        if (due == null) { NotificationManagerCompat.from(svc).cancel(CHECKIN_NOTE); NotificationManagerCompat.from(svc).cancel(dev.ontask.android.Push.CHECKIN_PUSH); return }
         val now = System.currentTimeMillis()
         if (!inUse || now - macActiveMs < 5 * 60_000 || now - lastCheckinNote < 20 * 60_000) return
         lastCheckinNote = now
@@ -207,7 +209,8 @@ class Prompts(private val svc: AccessibilityService) {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val title = when (due) { "MIDDAY" -> "Midday check-in"; "EVENING" -> "Evening check-in"; else -> "Plan your day" }
         val n = NotificationCompat.Builder(svc, OnTaskApp.CHANNEL).setSmallIcon(R.drawable.ic_notify).setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setContentTitle(title).setContentText("A couple of minutes, right here on your phone.").setContentIntent(open).setAutoCancel(true).build()
+            .setContentTitle(title).setContentText("A couple of minutes, right here on your phone.").setContentIntent(open).setAutoCancel(true)
+            .setTimeoutAfter(25 * 60_000L).build()
         runCatching { NotificationManagerCompat.from(svc).notify(CHECKIN_NOTE, n) }
     }
 
