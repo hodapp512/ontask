@@ -111,7 +111,29 @@ fun ApplicationScope.OnTaskTray(app: App, open: (Dest?) -> Unit) {
     var picking by remember { mutableStateOf(false) }
     var adding by remember { mutableStateOf(false) }
 
-    Tray(
+    // macOS can drop a Java app's menu bar icon across sleep and display changes (it went missing after a day of lid
+    // closes and an unplugged display). The icon is re-created after every wake, whenever the displays change, and if
+    // Java's own list of icons comes up empty.
+    var trayGen by remember { mutableStateOf(0) }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val l = object : java.awt.desktop.SystemSleepListener {
+            override fun systemAboutToSleep(e: java.awt.desktop.SystemSleepEvent) {}
+            override fun systemAwoke(e: java.awt.desktop.SystemSleepEvent) { javax.swing.SwingUtilities.invokeLater { trayGen++ } }
+        }
+        runCatching { java.awt.Desktop.getDesktop().addAppEventListener(l) }
+        onDispose { runCatching { java.awt.Desktop.getDesktop().removeAppEventListener(l) } }
+    }
+    LaunchedEffect(Unit) {
+        var screens = displaysKey()
+        while (true) {
+            delay(15_000)
+            val next = displaysKey()
+            val lost = runCatching { java.awt.SystemTray.getSystemTray().trayIcons.isEmpty() }.getOrDefault(false)
+            if (next != screens || lost) { screens = next; trayGen++ }
+        }
+    }
+
+    androidx.compose.runtime.key(trayGen) { Tray(
         icon = remember { TrayGlyph() },
         tooltip = "OnTask — focused ${fmtDuration(deep)}, wasted ${fmtDuration(wasted)}",
         onAction = { open(null) },
@@ -135,10 +157,15 @@ fun ApplicationScope.OnTaskTray(app: App, open: (Dest?) -> Unit) {
             Separator()
             Item("Quit OnTask", onClick = { exitApplication() })
         },
-    )
+    ) }
     if (picking) UnblockPickerWindow(app, blocked) { picking = false; changed() }
     if (adding) AddSitesWindow(app) { adding = false; changed() }
 }
+
+/** The connected displays and their sizes, to notice when one is plugged in or out. */
+private fun displaysKey(): String = runCatching {
+    java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().screenDevices.joinToString { it.iDstring + ":" + it.defaultConfiguration.bounds }
+}.getOrDefault("")
 
 internal fun themeOf(app: App) = runCatching { ThemeMode.valueOf(app.prefs.str("theme", "SYSTEM")) }.getOrDefault(ThemeMode.SYSTEM)
 

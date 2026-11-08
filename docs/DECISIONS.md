@@ -751,3 +751,10 @@ when it comes to the front.*
   a drift going on the countdown; the pause fixes that.
 - **"I'm working" / "It's actually work" never files OnTask itself** as work (it files what you were on before).
 - Your existing "OnTask → Work" rule became Other, and past OnTask time was re-sorted to match.
+
+## 2026-11-08 · Menu bar icon comes back by itself
+
+- **Why:** after a day of lid closes and an unplugged display, OnTask was running and tracking but had no menu bar
+  icon (macOS had dropped it; OnTask only created it at start).
+- **The icon is re-created after every wake, whenever the displays change, and if Java's list of icons is empty**
+  (checked every 15 s).
