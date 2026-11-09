@@ -273,8 +273,23 @@ func openSettings(_ req: [String: Any]) -> Result<[String: Any], HelperError> {
     return .success(["opened": NSWorkspace.shared.open(url)])
 }
 
+/// {"cmd":"status_items","pid":123} -> {"count": n}: how many menu bar icons that app really has, as macOS sees them
+/// (its AXExtrasMenuBar). OnTask asks about itself: macOS can drop a Java app's icon while Java still thinks it's there.
+func statusItems(_ req: [String: Any]) -> Result<[String: Any], HelperError> {
+    guard let pid = (req["pid"] as? NSNumber)?.int32Value else { return .failure(HelperError(message: "no_pid")) }
+    let app = AXUIElementCreateApplication(pid)
+    var bar: CFTypeRef?
+    let err = AXUIElementCopyAttributeValue(app, "AXExtrasMenuBar" as CFString, &bar)
+    if err == .noValue || err == .attributeUnsupported { return .success(["count": 0]) }
+    guard err == .success, let b = bar else { return .failure(HelperError(message: "ax_error_\(err.rawValue)")) }
+    var kids: CFTypeRef?
+    AXUIElementCopyAttributeValue(b as! AXUIElement, kAXChildrenAttribute as CFString, &kids)
+    return .success(["count": (kids as? [AXUIElement])?.count ?? 0])
+}
+
 let handlers: [String: Handler] = [
     "ping": { _ in .success(["pong": true]) },
+    "status_items": statusItems,
     "battery": battery,
     "screen_capture_status": { _ in .success(["granted": CGPreflightScreenCaptureAccess()]) },
     "request_screen_capture": requestScreenRecording,

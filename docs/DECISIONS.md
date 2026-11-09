@@ -758,3 +758,6 @@ when it comes to the front.*
   icon (macOS had dropped it; OnTask only created it at start).
 - **The icon is re-created after every wake, whenever the displays change, and if Java's list of icons is empty**
   (checked every 15 s).
+- **2026-11-09: and whenever macOS itself says OnTask has no menu bar icon** (checked once a minute through the
+  helper's accessibility access: `status_items`). The icon had vanished again at 8:05 when macOS's menu bar service
+  disconnected it ("Unhandled disconnected scene"), with no sleep or display change and Java still listing it.

@@ -50,6 +50,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Screen requests from outside the main window (the menu bar). [MainScreen] consumes [requested]. */
 object Nav {
@@ -125,10 +126,17 @@ fun ApplicationScope.OnTaskTray(app: App, open: (Dest?) -> Unit) {
     }
     LaunchedEffect(Unit) {
         var screens = displaysKey()
+        var ticks = 0
         while (true) {
             delay(15_000)
             val next = displaysKey()
-            val lost = runCatching { java.awt.SystemTray.getSystemTray().trayIcons.isEmpty() }.getOrDefault(false)
+            var lost = runCatching { java.awt.SystemTray.getSystemTray().trayIcons.isEmpty() }.getOrDefault(false)
+            // Once a minute, ask macOS itself (through the helper's accessibility access) whether the icon is really
+            // there: macOS's menu bar service can drop it ("disconnected scene") while Java still lists it.
+            if (++ticks % 4 == 0 && !lost) lost = withContext(Dispatchers.IO) {
+                runCatching { app.helper.request("status_items", params = mapOf("pid" to ProcessHandle.current().pid())) }.getOrNull()
+                    ?.get("count")?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content?.toIntOrNull() } == 0
+            }
             if (next != screens || lost) { screens = next; trayGen++ }
         }
     }
