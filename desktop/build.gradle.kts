@@ -126,6 +126,14 @@ compose.desktop {
                     extraKeysRawXml = """
                         <key>LSUIElement</key>
                         <true/>
+                        <!-- Never nap or auto-terminate OnTask: with no window open and its menu bar icon dropped, macOS
+                             once treated it as idle and starved its windows (no prompts all morning) while tracking ran on. -->
+                        <key>NSAppSleepDisabled</key>
+                        <true/>
+                        <key>NSSupportsAutomaticTermination</key>
+                        <false/>
+                        <key>NSSupportsSuddenTermination</key>
+                        <false/>
                         <key>NSAppleEventsUsageDescription</key>
                         <string>OnTask reads the current page URL and title of your browser to classify what you're doing.</string>
                         <key>NSScreenCaptureUsageDescription</key>

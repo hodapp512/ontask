@@ -761,3 +761,11 @@ when it comes to the front.*
 - **2026-11-09: and whenever macOS itself says OnTask has no menu bar icon** (checked once a minute through the
   helper's accessibility access: `status_items`). The icon had vanished again at 8:05 when macOS's menu bar service
   disconnected it ("Unhandled disconnected scene"), with no sleep or display change and Java still listing it.
+
+## 2026-11-09 · OnTask is never napped
+
+- **Why:** a morning with no prompts (the plan coming back, Are you on task?, the countdown) while tracking and the
+  automatic partner message still worked. After macOS dropped OnTask's menu bar icon at 8:05, OnTask had no visible
+  window or icon, macOS marked it as terminable and napped it, starving its windows.
+- **Info.plist: NSAppSleepDisabled, and no automatic or sudden termination.** Together with re-creating the menu
+  bar icon when macOS reports none, OnTask stays fully awake.
