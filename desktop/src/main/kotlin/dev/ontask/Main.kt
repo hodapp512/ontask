@@ -15,7 +15,25 @@ import dev.ontask.ui.MainScreen
 import dev.ontask.ui.Nav
 import dev.ontask.ui.OnTaskTray
 
+/**
+ * Errors go to errors.log in OnTask's folder (launchd keeps no output), so a failure can be traced afterwards. The file
+ * is started over once it passes 2 MB (the previous one is kept as errors.old.log).
+ */
+private fun logErrors() = runCatching {
+    val dir = java.nio.file.Path.of(System.getProperty("user.home"), "Library", "Application Support", "OnTask")
+    java.nio.file.Files.createDirectories(dir)
+    val f = dir.resolve("errors.log").toFile()
+    if (f.length() > 2_000_000) f.renameTo(dir.resolve("errors.old.log").toFile())
+    val out = java.io.PrintStream(java.io.FileOutputStream(f, true), true)
+    out.println("---- OnTask started ${java.time.LocalDateTime.now()}")
+    System.setErr(out)
+    Thread.setDefaultUncaughtExceptionHandler { t, e ->
+        System.err.println("${java.time.LocalDateTime.now()} uncaught in ${t.name}:"); e.printStackTrace()
+    }
+}
+
 fun main() {
+    logErrors()
     // Black-and-alpha tray icon is drawn as a template image, so it adapts to light and dark menu bars.
     System.setProperty("apple.awt.enableTemplateImages", "true")
     System.setProperty("apple.awt.application.name", "OnTask")
@@ -50,7 +68,20 @@ fun main() {
     }
     // exitProcessOnExit = false: the menu bar's Quit ends here too, so it reaches exitProcess(exitCode()) below
     // (Compose's default exits with 0 first, and launchd only brings OnTask back after a non-zero exit).
-    application(exitProcessOnExit = false) {
+    // An error that escapes the interface used to end it while tracking kept running: no pop-ups, no menu bar icon,
+    // and launchd never restarted OnTask because it hadn't exited. Now it's logged and OnTask exits so it's restarted.
+    // Watchdog: if the interface ever ends without OnTask exiting, exit so launchd starts a fresh copy.
+    val mainThread = Thread.currentThread()
+    Thread {
+        while (true) {
+            Thread.sleep(30_000)
+            if (!mainThread.isAlive) {
+                System.err.println("${java.time.LocalDateTime.now()} the interface ended but OnTask was still running; restarting")
+                Runtime.getRuntime().halt(if (login.managed) dev.ontask.block.LoginItem.QUIT_REOPEN else 1)
+            }
+        }
+    }.apply { isDaemon = true; name = "ui-watchdog" }.start()
+    try { application(exitProcessOnExit = false) {
         var visible by remember { mutableStateOf(showWindow) }
         // Sized from the screen (about 80% × 85% of the usable area) and centered; kept while OnTask runs so a resize sticks.
         val windowState = remember {
@@ -84,6 +115,10 @@ fun main() {
                 MainScreen(app)
             }
         }
+    } } catch (t: Throwable) {
+        System.err.println("${java.time.LocalDateTime.now()} the interface stopped:"); t.printStackTrace()
+        runCatching { app.shutdown() }
+        kotlin.system.exitProcess(if (login.managed) dev.ontask.block.LoginItem.QUIT_REOPEN else 1)
     }
     app.shutdown()
     kotlin.system.exitProcess(exitCode())

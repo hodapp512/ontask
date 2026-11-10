@@ -769,3 +769,14 @@ when it comes to the front.*
   window or icon, macOS marked it as terminable and napped it, starving its windows.
 - **Info.plist: NSAppSleepDisabled, and no automatic or sudden termination.** Together with re-creating the menu
   bar icon when macOS reports none, OnTask stays fully awake.
+
+## 2026-11-10 · When the interface stops, OnTask restarts
+
+- **Why:** two mornings with no pop-ups and no menu bar icon. OnTask's main program had ended (an error escaped the
+  interface; the thread dump showed no main thread), but tracking and syncing threads kept the process alive, so
+  launchd never restarted it: it tracked and even messaged the partner while showing nothing.
+- **An error that ends the interface now exits OnTask** (code 75, so launchd starts a fresh copy), and a watchdog
+  exits it within 30 s if the interface ever ends without exiting.
+- **Errors are written to `~/Library/Application Support/OnTask/errors.log`** (started over past 2 MB), since launchd
+  keeps no output; the original error was lost.
+- Earlier guesses (the icon dropped by macOS, App Nap) were real but secondary; their fixes stay.
