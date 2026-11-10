@@ -153,3 +153,11 @@ tasks.register<JavaExec>("previewWindows") {
     systemProperty("ontask.noCloud", "true")
     args(project.findProperty("which")?.toString() ?: "step1")
 }
+
+// Home's day card with sample data, to try the timeline's hover on screen.
+tasks.register<JavaExec>("previewTimeline") {
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("dev.ontask.PreviewTimelineKt")
+    systemProperty("ontask.noCloud", "true")
+    args(project.findProperty("secs")?.toString() ?: "120", project.findProperty("what")?.toString() ?: "card", project.findProperty("data")?.toString() ?: "sample")
+}

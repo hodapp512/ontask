@@ -780,3 +780,11 @@ when it comes to the front.*
 - **Errors are written to `~/Library/Application Support/OnTask/errors.log`** (started over past 2 MB), since launchd
   keeps no output; the original error was lost.
 - Earlier guesses (the icon dropped by macOS, App Nap) were real but secondary; their fixes stay.
+
+## 2026-11-10 · Timeline hover pop-up stays off the bar
+
+- **Why:** the hover pop-up flickered. With a real day (tall pop-ups with long titles) and the timeline near the
+  window's bottom, the pop-up was pushed up over the bar, under the pointer; the bar lost the hover, the pop-up
+  closed, and so on.
+- **It goes below the bar when it fits, above it otherwise, never on top of it** (BesideBar). Reproduced and checked
+  on screen with `./gradlew previewTimeline -Pwhat=main -Pdata=real` (a copy of the real data, no server).

@@ -313,7 +313,9 @@ private fun Timeline(r: DailyReport, app: App?, onRelabel: () -> Unit) {
                 }
             }
             hover?.let { (run, x) ->
-                androidx.compose.ui.window.Popup(offset = androidx.compose.ui.unit.IntOffset((x - 120).toInt().coerceAtLeast(0), 90)) {
+                // Below the bar when it fits, above it when it doesn't, never on top of it: a pop-up pushed up over the bar
+                // (a tall one near the window's bottom) sat under the pointer, so the bar lost the hover and it flickered.
+                androidx.compose.ui.window.Popup(popupPositionProvider = remember(x) { BesideBar(x) }) {
                     androidx.compose.material3.Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), tonalElevation = 6.dp, shadowElevation = 6.dp) {
                         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp).widthIn(max = 320.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -345,6 +347,20 @@ private fun Timeline(r: DailyReport, app: App?, onRelabel: () -> Unit) {
             TextButton({ zoom(1.5) }, enabled = span < 86_400.0) { Text("−") }
             TextButton({ zoom(1 / 1.5) }, enabled = span > MIN_SPAN_SEC) { Text("+") }
         }
+    }
+}
+
+/** Places the timeline's hover pop-up beside the bar (below if it fits, else above), centred on the pointer's [x]. */
+private class BesideBar(private val x: Float) : androidx.compose.ui.window.PopupPositionProvider {
+    override fun calculatePosition(
+        anchorBounds: androidx.compose.ui.unit.IntRect, windowSize: androidx.compose.ui.unit.IntSize,
+        layoutDirection: androidx.compose.ui.unit.LayoutDirection, popupContentSize: androidx.compose.ui.unit.IntSize,
+    ): androidx.compose.ui.unit.IntOffset {
+        val gap = 24
+        val left = (anchorBounds.left + x.toInt() - popupContentSize.width / 2).coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
+        val below = anchorBounds.bottom + gap
+        val top = if (below + popupContentSize.height <= windowSize.height) below else (anchorBounds.top - gap - popupContentSize.height).coerceAtLeast(0)
+        return androidx.compose.ui.unit.IntOffset(left, top)
     }
 }
 
