@@ -74,7 +74,7 @@ fun UnknownAskWindow(app: App, ask: App.UnknownAsk, mode: ThemeMode) {
     val cats = remember { Category.assignable }
     val size = DpSize(480.dp, 250.dp)
     Window(
-        onCloseRequest = { app.unknownClosed(ask.name) }, title = "OnTask", alwaysOnTop = true, resizable = false, focusable = false,
+        onCloseRequest = { KeepMainBack.handBackThen { app.unknownClosed(ask.name) } }, title = "OnTask", alwaysOnTop = true, resizable = false, focusable = false,
         state = rememberWindowState(size = size, position = centeredOnActiveScreen(size)),
     ) {
         OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) {
@@ -83,13 +83,13 @@ fun UnknownAskWindow(app: App, ask: App.UnknownAsk, mode: ThemeMode) {
                 Text(ask.name, style = MaterialTheme.typography.bodyMedium, maxLines = 2)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     cats.forEach { c ->
-                        OutlinedButton({ app.answerUnknown(ask.name, c) }) {
+                        OutlinedButton({ KeepMainBack.handBackThen { app.answerUnknown(ask.name, c) } }) {
                             Box(Modifier.size(8.dp).background(levelColor(c.level), CircleShape)); Text("  ${c.label}")
                         }
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton({ app.answerUnknown(ask.name, null) }) { Text("Not now") }
+                    TextButton({ KeepMainBack.handBackThen { app.answerUnknown(ask.name, null) } }) { Text("Not now") }
                     PauseAskingButton(app)
                 }
             }
@@ -104,7 +104,7 @@ private fun PauseAskingButton(app: App) {
         TextButton({ pause = true }) { Text("Pause asking ▾") }
         DropdownMenu(pause, { pause = false }) {
             listOf(15 to "15 minutes", 30 to "30 minutes", 60 to "1 hour", 120 to "2 hours", 1440 to "1 day").forEach { (m, l) ->
-                DropdownMenuItem({ Text(l) }, { pause = false; app.pauseAsking(m) })
+                DropdownMenuItem({ Text(l) }, { pause = false; KeepMainBack.handBackThen { app.pauseAsking(m) } })
             }
         }
     }

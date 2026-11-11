@@ -788,3 +788,10 @@ when it comes to the front.*
   closed, and so on.
 - **It goes below the bar when it fits, above it otherwise, never on top of it** (BesideBar). Reproduced and checked
   on screen with `./gradlew previewTimeline -Pwhat=main -Pdata=real` (a copy of the real data, no server).
+
+## 2026-11-11 · No main-window flash when the category question closes
+
+- **Why:** answering "Which category is this?" made OnTask the active app; when the question closed, macOS brought
+  the main window forward for a moment before OnTask sent it back.
+- **Answering (or closing, Not now, Pause asking) first gives the front back to the app you were in, then closes
+  the question** (KeepMainBack.handBackThen), unless you were using OnTask's main window.

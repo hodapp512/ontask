@@ -346,6 +346,22 @@ object KeepMainBack {
         m.toBack()
     }
 
+    /**
+     * Closing a pop-up you answered while OnTask's main window wasn't in use: give the front back to the app you were
+     * in first, then close it (after [action]). Closed the other way round, macOS makes the main window the front one
+     * for a moment, a flash behind the closing pop-up.
+     */
+    fun handBackThen(action: () -> Unit) {
+        val id = lastOtherApp()?.takeIf { it.isNotBlank() && it != "dev.ontask.app" }
+        val m = main
+        if (id == null || allowed() || mainWasFront || (m != null && m.isActive)) { action(); return }
+        Thread {
+            runCatching { ProcessBuilder("open", "-b", id).start().waitFor(1, java.util.concurrent.TimeUnit.SECONDS) }
+            Thread.sleep(120)
+            javax.swing.SwingUtilities.invokeLater(action)
+        }.apply { isDaemon = true }.start()
+    }
+
     private fun afterPopups() {
         val m = main ?: return
         if (allowed()) return
