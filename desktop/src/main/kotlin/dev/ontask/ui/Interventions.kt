@@ -221,10 +221,10 @@ internal fun androidx.compose.ui.window.FrameWindowScope.FitHeight(state: androi
         if (kotlin.math.abs(state.size.height.value - h) > 1f) state.size = DpSize(width, h.dp)
     }
     // Before the window is on screen its insets can read 0, which left it a title bar short (no bottom padding, the
-    // last button clipped): fit again once it's open and whenever the native window changes.
+    // last button clipped): fit again once it's open. Not on every resize, so you can still drag it bigger.
     androidx.compose.runtime.DisposableEffect(window) {
         val w = object : java.awt.event.WindowAdapter() { override fun windowOpened(e: java.awt.event.WindowEvent?) = fit() }
-        val c = object : java.awt.event.ComponentAdapter() { override fun componentShown(e: java.awt.event.ComponentEvent?) = fit(); override fun componentResized(e: java.awt.event.ComponentEvent?) = fit() }
+        val c = object : java.awt.event.ComponentAdapter() { override fun componentShown(e: java.awt.event.ComponentEvent?) = fit() }
         window.addWindowListener(w); window.addComponentListener(c)
         onDispose { window.removeWindowListener(w); window.removeComponentListener(c) }
     }

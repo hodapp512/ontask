@@ -56,9 +56,12 @@ internal fun BlocklistCard(app: App, changed: () -> Unit) {
     }
 }
 
-/** The friction screen: pick a duration, wait out the delay (showing today's count, your plan and your own message). */
+/**
+ * The friction screen, as a step of the "Unblock a site" window (not a dialog over it: in the small fitted window a
+ * dialog was clipped): pick a duration, wait out the delay (showing today's count, your plan and your own message).
+ */
 @Composable
-fun UnblockDialog(app: App, domains: List<String>, onClose: () -> Unit) {
+fun UnblockRegularForm(app: App, domains: List<String>, onDone: () -> Unit, onBack: () -> Unit) {
     val now0 = remember { App.nowSec() }
     val delay = remember { app.unblocks.nextDelaySec(now0) }
     val count = remember { app.unblocks.todayCount(now0) }
@@ -67,29 +70,24 @@ fun UnblockDialog(app: App, domains: List<String>, onClose: () -> Unit) {
     var error by remember { mutableStateOf<String?>(null) }
     val message = remember { app.unblockMessage() }
     LaunchedEffect(Unit) { while (remaining > 0) { delay(1000); remaining-- } }
-    AlertDialog(
-        onDismissRequest = onClose,
-        title = { Text("Unblock ${domains.joinToString()}?") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(message, style = MaterialTheme.typography.titleSmall)
-                Text("Unblocks so far today: $count. Your partner is told about this one.", style = MaterialTheme.typography.bodyMedium)
-                val priorities = remember { app.priorities.today(now0) }
-                if (priorities.isNotEmpty()) {
-                    Text("Today's plan:", style = MaterialTheme.typography.labelMedium)
-                    PlanList(app)
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    app.unblocks.durationsMin.forEach { m -> FilterChip(minutes == m, { minutes = m }, label = { Text("$m min") }) }
-                }
-                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            }
-        },
-        confirmButton = {
-            Button({
-                try { app.unblockRegular(domains, minutes, delay); onClose() } catch (e: UnblockRejected) { error = e.message }
-            }, enabled = remaining <= 0) { Text(if (remaining > 0) "Wait ${remaining}s" else "Unblock for $minutes min") }
-        },
-        dismissButton = { TextButton(onClose) { Text("Never mind") } },
-    )
+    Text("Unblock ${domains.joinToString()}?", style = MaterialTheme.typography.titleLarge)
+    Text(message, style = MaterialTheme.typography.titleSmall)
+    Text("Unblocks so far today: $count. Your partner is told about this one.", style = MaterialTheme.typography.bodyMedium)
+    val priorities = remember { app.priorities.today(now0) }
+    if (priorities.isNotEmpty()) {
+        Text("Today's plan:", style = MaterialTheme.typography.labelMedium)
+        PlanList(app)
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        app.unblocks.durationsMin.forEach { m -> FilterChip(minutes == m, { minutes = m }, label = { Text("$m min") }) }
+    }
+    error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+        Button({
+            try { app.unblockRegular(domains, minutes, delay); onDone() } catch (e: UnblockRejected) { error = e.message }
+        }, enabled = remaining <= 0) { Text(if (remaining > 0) "Wait ${remaining}s" else "Unblock for $minutes min") }
+        TextButton(onBack) { Text("← Back") }
+        androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+        TextButton(onDone) { Text("Never mind") }
+    }
 }

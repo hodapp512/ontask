@@ -802,3 +802,11 @@ when it comes to the front.*
   is on screen its title-bar inset can read 0, so it was sized one title bar short.
 - **FitHeight sizes the window again when it opens and whenever it's resized**, from the last measured content
   height, so every fitted pop-up keeps its bottom padding.
+
+## 2026-11-11 · Not-for-work unblock is a step of the "Unblock a site" window
+
+- **Why:** after "No" to "Is it for work?", the window fitted itself to a lone "← Back" button and the unblock opened
+  as a dialog inside it, clipped to a sliver. Re-fitting on every resize also stopped you dragging it bigger.
+- **The wait, durations, plan and "Unblock for N min" now show in the window itself** (UnblockRegularForm, with
+  ← Back and Never mind), sized to fit like the other steps. FitHeight fits when a window opens and when its content
+  changes, not when you resize it.

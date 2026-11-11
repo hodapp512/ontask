@@ -31,6 +31,7 @@ fun main(args: Array<String>) {
         when (args.firstOrNull()) {
             "unblock" -> dev.ontask.ui.UnblockPickerWindow(app, listOf("usatoday.com"), startSite = "usatoday.com") {}
             "unblockwork" -> dev.ontask.ui.UnblockPickerWindow(app, listOf("usatoday.com"), startSite = "usatoday.com", startForWork = true) {}
+            "unblockno" -> dev.ontask.ui.UnblockPickerWindow(app, listOf("usatoday.com"), startSite = "usatoday.com", startForWork = false) {}
             else -> InterventionWindow(app, iv, ThemeMode.LIGHT)
         }
     }

@@ -213,8 +213,8 @@ internal fun UnblockPickerWindow(app: App, blocked: List<String>, startSite: Str
                             WorkUnblockForm(app, site, onDone = onClose)
                             TextButton({ forWork = null }) { Text("← Back") }
                         }
-                        // Not for work: the unblock with a wait opens on its own.
-                        else -> TextButton({ forWork = null; regular = false }) { Text("← Back") }
+                        // Not for work: the unblock with a wait, as a step of this window.
+                        else -> UnblockRegularForm(app, listOf(site), onDone = onClose, onBack = { forWork = null; regular = false })
                     }
                 }
             } else Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -228,7 +228,6 @@ internal fun UnblockPickerWindow(app: App, blocked: List<String>, startSite: Str
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { TextButton(onClose) { Text("Cancel") } }
             }
-            if (regular) chosen?.let { UnblockDialog(app, listOf(it), onClose = onClose) }
         } }
     }
 }
