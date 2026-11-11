@@ -795,3 +795,10 @@ when it comes to the front.*
   the main window forward for a moment before OnTask sent it back.
 - **Answering (or closing, Not now, Pause asking) first gives the front back to the app you were in, then closes
   the question** (KeepMainBack.handBackThen), unless you were using OnTask's main window.
+
+## 2026-11-11 · Pop-ups fit again once they're on screen
+
+- **Why:** the "Want to let your partner know?" pop-up showed with no space under its last button. Before a window
+  is on screen its title-bar inset can read 0, so it was sized one title bar short.
+- **FitHeight sizes the window again when it opens and whenever it's resized**, from the last measured content
+  height, so every fitted pop-up keeps its bottom padding.

@@ -210,14 +210,28 @@ private fun BreakTotals(hourSec: Long, todaySec: Long) {
 @Composable
 internal fun androidx.compose.ui.window.FrameWindowScope.FitHeight(state: androidx.compose.ui.window.WindowState, width: androidx.compose.ui.unit.Dp, content: @Composable () -> Unit) {
     val density = androidx.compose.ui.platform.LocalDensity.current
+    val contentH = remember { floatArrayOf(-1f) }
+    // The title bar is the window's top inset. Sized through Compose (the window state), never the AWT window
+    // itself: that left Compose drawing at the old size, a gray band above and the bottom cut off. Compose only
+    // applies a new size to a resizable window placed at an absolute position (not WindowPosition.Aligned), so
+    // these are resizable and placed with centeredOnActiveScreen.
+    fun fit() {
+        if (contentH[0] < 0) return
+        val h = (contentH[0] + window.insets.top + window.insets.bottom).coerceAtMost(900f)
+        if (kotlin.math.abs(state.size.height.value - h) > 1f) state.size = DpSize(width, h.dp)
+    }
+    // Before the window is on screen its insets can read 0, which left it a title bar short (no bottom padding, the
+    // last button clipped): fit again once it's open and whenever the native window changes.
+    androidx.compose.runtime.DisposableEffect(window) {
+        val w = object : java.awt.event.WindowAdapter() { override fun windowOpened(e: java.awt.event.WindowEvent?) = fit() }
+        val c = object : java.awt.event.ComponentAdapter() { override fun componentShown(e: java.awt.event.ComponentEvent?) = fit(); override fun componentResized(e: java.awt.event.ComponentEvent?) = fit() }
+        window.addWindowListener(w); window.addComponentListener(c)
+        onDispose { window.removeWindowListener(w); window.removeComponentListener(c) }
+    }
     androidx.compose.foundation.layout.Box(
         Modifier.fillMaxWidth().wrapContentHeight(Alignment.Top, unbounded = true).onSizeChanged { sz ->
-            // The title bar is the window's top inset. Sized through Compose (the window state), never the AWT window
-            // itself: that left Compose drawing at the old size, a gray band above and the bottom cut off. Compose only
-            // applies a new size to a resizable window placed at an absolute position (not WindowPosition.Aligned), so
-            // these are resizable and placed with centeredOnActiveScreen.
-            val h = (with(density) { sz.height.toDp() }.value + window.insets.top + window.insets.bottom).coerceAtMost(900f)
-            if (kotlin.math.abs(state.size.height.value - h) > 1f) state.size = DpSize(width, h.dp)
+            contentH[0] = with(density) { sz.height.toDp() }.value
+            fit()
         },
     ) { content() }
 }
