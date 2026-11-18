@@ -810,3 +810,11 @@ when it comes to the front.*
 - **The wait, durations, plan and "Unblock for N min" now show in the window itself** (UnblockRegularForm, with
   ← Back and Never mind), sized to fit like the other steps. FitHeight fits when a window opens and when its content
   changes, not when you resize it.
+
+## 2026-11-18 · An unblocked site never brings "Are you on task?"
+
+- **Why:** after unblocking a site in work hours, OnTask still treated time on it as drifting and kept prompting.
+  You chose to open it, so you shouldn't be bothered.
+- **While any unblock of a site is on (with the wait, for work, or outside work hours), time on it isn't drifting.**
+  Unblocking also closes an open drift prompt and starts the ladder over.
+- **No "You unblocked X for N min" pop-up right after unblocking.** The "Time's up" note when it ends stays.

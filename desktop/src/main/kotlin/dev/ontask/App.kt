@@ -132,7 +132,16 @@ class App(val dir: Path = dataDir()) {
         val started = unblocks.startRegular(domains, minutes, now, delayWaitedSec)
         synchronized(openRegular) { started.forEach { openRegular[it.id] = it.domain } }
         blocking.tick(now)
-        _unblockNudge.value = UnblockNudge(ending = false, domains, minutes, unblocks.todayCount(now))
+        // No pop-up while it's open (you chose this); the "Time's up" note comes when it ends.
+        unblockSettlesDrift()
+    }
+
+    /** For work: opens [site] at once for [minutes], with the reason you gave. */
+    fun unblockForWork(site: String, purpose: String, minutes: Int) {
+        val now = nowSec()
+        blocking.unblocks.startPurpose(site, purpose, minutes, now)
+        blocking.tick(now)
+        unblockSettlesDrift()
     }
 
     /** Outside work hours: opens the sites at once, until [minutes] pass or work hours start. */
@@ -140,6 +149,7 @@ class App(val dir: Path = dataDir()) {
         val now = nowSec()
         unblocks.startLeisure(domains, minutes, now, settings.schedule.nextWorkStart(now))
         blocking.tick(now)
+        unblockSettlesDrift()
     }
 
     // ---- Blocking helper -------------------------------------------------------------------------------------
@@ -331,8 +341,9 @@ class App(val dir: Path = dataDir()) {
         // Stepping away: sync now, so the server sees the final numbers and when you stopped.
         if (live.away && !wasAway && cloud.configured) { lastCloud = now; scope.launch(IO) { cloud.syncOnce(now, force = true) } }
         wasAway = live.away
-        // A site you unblocked outside work hours (the instant kind) isn't drifting while that unblock lasts.
-        val wasted = !live.away && live.classification?.level == Level.WASTED && !leisureUnblocked(now)
+        // A site you unblocked (any kind: with the wait, for work, or outside work hours) isn't drifting while that
+        // unblock lasts: you chose it, so no "Are you on task?" about it.
+        val wasted = !live.away && live.classification?.level == Level.WASTED && !siteUnblocked(now)
         if (wasted) driftSite()?.let { lastWastedSite = it }
         val (due, earned, onBreak) = synchronized(breaks) {
             breaks.forgetBefore(LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toEpochSecond())
@@ -945,11 +956,14 @@ class App(val dir: Path = dataDir()) {
     @Volatile private var lastWastedSite: String? = null
 
     /** The site you're drifting on, for the prompts' "Block YouTube for 15 minutes" (whole site, e.g. youtube.com). */
-    /** Whether the site in front is one you unblocked outside work hours and that unblock is still on. */
-    private fun leisureUnblocked(now: Long): Boolean {
+    /** Whether the site in front is one you unblocked and that unblock is still on. */
+    private fun siteUnblocked(now: Long): Boolean {
         val site = driftSite() ?: return false
-        return runCatching { unblocks.active(now).any { it.kind == dev.ontask.block.UnblockKind.LEISURE && dev.ontask.classify.siteDomain(it.domain) == site } }.getOrDefault(false)
+        return runCatching { unblocks.active(now).any { dev.ontask.classify.siteDomain(it.domain) == site } }.getOrDefault(false)
     }
+
+    /** Unblocking a site settles the drift: any open "Are you on task?" closes and the ladder starts over. */
+    private fun unblockSettlesDrift() { ladder.reset(); _intervention.value = null }
 
     fun driftSite(): String? = dev.ontask.classify.domainOf(tracker.live.value.sample?.url)?.let { dev.ontask.classify.siteDomain(it) }
 

@@ -265,7 +265,7 @@ internal fun WorkUnblockForm(app: App, site: String, onDone: () -> Unit) {
     }
     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     Button({
-        try { val now = App.nowSec(); app.blocking.unblocks.startPurpose(site, purpose, minutes, now); app.blocking.tick(now); onDone() }
+        try { app.unblockForWork(site, purpose, minutes); onDone() }
         catch (e: dev.ontask.block.UnblockRejected) { error = e.message }
     }, enabled = purpose.isNotBlank()) { Text("Unblock for work") }
 }
