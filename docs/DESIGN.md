@@ -52,7 +52,7 @@ This file describes how OnTask works now. **Why** each choice was made, and what
    (macOS checks the app, not the helper); a toggle left over from an older, differently signed build looks on but
    doesn't count, so Diagnostics offers "Reset and ask again".
 2. **AI** (a decision model, see below) for what no rule covers, from app / title / address, plus **on-screen text**
-   (Apple Vision OCR) when Screen Recording is allowed. Answers below 60% count as unsure.
+   (Apple Vision OCR) when Screen Recording is allowed. Answers below 50% count as unsure (Settings → AI labeling → How sure it must be: 40–80%).
 3. **Varies sites** are judged page by page (see *Pages on Varies sites*).
 
 - Skip ticks when idle or when the screen hasn't changed. OCR text is never stored.
@@ -302,7 +302,7 @@ it; today doesn't until it's over). The Mac uploads one small `heat/year` docume
   shared rules, categories, source rules and verdicts from Firestore. Uploads its own day report and heat numbers
   every 2 minutes and on screen-off; raw activity stays on the phone.
 - **Unknown apps and undecided pages** go to the `judgeSeen` Cloud Function (Jev, key in Secret Manager; one-time
-  notice on the phone). Sure (60%+) → a rule or verdict for every device; otherwise a notification asks.
+  notice on the phone). Sure (50%+) → a rule or verdict for every device; otherwise a notification asks.
 - The Mac's Home and heat map add the phone's day (rows marked 📱; on the timeline phone stretches share the one bar, 📱 on hover).
 - **Timelines don't draw Away time** (Mac, phone, web): the gaps say it.
 - **No overlaps: while the phone is in use, you're on the phone.** The phone counts only while its screen is on and

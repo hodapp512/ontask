@@ -818,3 +818,10 @@ when it comes to the front.*
 - **While any unblock of a site is on (with the wait, for work, or outside work hours), time on it isn't drifting.**
   Unblocking also closes an open drift prompt and starts the ladder over.
 - **No "You unblocked X for N min" pop-up right after unblocking.** The "Time's up" note when it ends stays.
+
+## 2026-11-21 · AI sureness threshold is a setting; default 50%
+
+- **Why:** Kev and Jev answers under 60% counted as unsure, which left too much undecided or asked.
+- **Default lowered to 50%** on the Mac and for the phone (the server's `judgeSeen`).
+- **Settings → AI labeling → "How sure it must be": 40, 50, 60, 70 or 80%.** Mac only; the phone's server cutoff
+  stays at 50%.

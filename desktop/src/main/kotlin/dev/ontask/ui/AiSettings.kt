@@ -52,6 +52,14 @@ fun AiSettingsBody(app: App) {
             }
         }
     }
+    var threshold by remember { mutableStateOf(app.ai.threshold) }
+    SettingRow("How sure it must be", "Kev and Jev's answers below this count as unsure: nothing is decided and, on Varies sites, you're asked. Lower means fewer questions and more guesses.") {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(0.4, 0.5, 0.6, 0.7, 0.8).forEach { t ->
+                FilterChip(kotlin.math.abs(threshold - t) < 0.001, { threshold = t; app.ai.threshold = t }, label = { Text("${Math.round(t * 100)}%") })
+            }
+        }
+    }
     when (provider) {
         AiProvider.KEV -> KevSetup(app)
         AiProvider.JEV -> JevSetup(app)

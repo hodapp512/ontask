@@ -49,7 +49,9 @@ class AiService(
         set(v) { prefs.set("ai.provider", v.name); waitUntil = 0 }
 
     /** Below this probability the model counts as unsure (and, for Varies pages, you're asked). */
-    val threshold: Double get() = prefs.str("ai.threshold", "0.6").toDoubleOrNull() ?: 0.6
+    var threshold: Double
+        get() = prefs.str("ai.threshold", DEFAULT_THRESHOLD.toString()).toDoubleOrNull() ?: DEFAULT_THRESHOLD
+        set(v) = prefs.set("ai.threshold", v.toString())
 
     fun jevAcknowledged() = prefs.bool("ai.notice.JEV", false)
     fun acknowledgeJev() = prefs.set("ai.notice.JEV", true)
@@ -143,6 +145,8 @@ class AiService(
     companion object {
         const val JEV_URL = "https://api.typesafe.ai"
         const val JEV_KEY = "typesafe"
+        /** Kev and Jev answers below this probability count as unsure (changeable in Settings). */
+        const val DEFAULT_THRESHOLD = 0.5
         /** TypeSafe's list price: $42 per billion input tokens. */
         const val JEV_USD_PER_TOKEN = 42.0 / 1e9
 

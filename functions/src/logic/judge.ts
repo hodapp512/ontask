@@ -3,7 +3,7 @@
  * category descriptions as the Mac. Pure apart from [fetchFn].
  */
 export const JEV_URL = "https://api.typesafe.ai/v1/systemone";
-export const THRESHOLD = 0.6;
+export const THRESHOLD = 0.5;
 
 const DESCRIPTIONS: Record<string, string> = {
   CORE_WORK: "doing their job or project, such as building software, its tools, docs and tutorials",

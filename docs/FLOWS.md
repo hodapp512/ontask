@@ -38,7 +38,7 @@ flowchart TD
     VD -- yes --> C
     VD -- no --> SR{Source rule?<br/>2 matching answers for its<br/>subreddit, channel, group…}
     SR -- yes --> C
-    SR -- no --> AI1{AI sure, 60%+?<br/>Kev on the Mac, Jev for the phone,<br/>once per page}
+    SR -- no --> AI1{AI sure, 50%+?<br/>Kev on the Mac, Jev for the phone,<br/>once per page}
     AI1 -- yes --> C
     AI1 -- no --> UN[Unsure, counted as Neutral]
 
