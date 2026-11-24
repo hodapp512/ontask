@@ -841,3 +841,9 @@ when it comes to the front.*
 - **The 3rd stop within 10 minutes exits with 0 instead** (launchd doesn't restart that), after a macOS alert:
   "OnTask keeps stopping… Open OnTask to try again", with "Show error log". Stops are kept in crashes.txt across
   relaunches (CrashGuard); 10 minutes up clears them. Opening OnTask by hand starts it again.
+
+## 2026-11-24 · A day off finishes the morning plan without tasks
+
+- **Why:** "Start my day" needed at least one task, so after "Take the day off" on the Good morning page there was
+  no way forward.
+- **On a day off the button works with no tasks and reads "Done"** (with tasks it's still "Start my day").

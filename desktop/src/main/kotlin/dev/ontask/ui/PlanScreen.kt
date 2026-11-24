@@ -59,14 +59,19 @@ fun PlanPromptContent(app: App, prompt: Prompt, onDone: () -> Unit, onLater: (In
 @Composable
 private fun PlanBody(app: App, prompt: Prompt, date: LocalDate, onDone: () -> Unit) {
     when (prompt) {
-        Prompt.PLANNING, Prompt.PLANNING_SHORT -> { HoursCheckCard(app, date); PrioritiesCard(app, date, prompt == Prompt.PLANNING_SHORT, onDone = onDone) }
+        Prompt.PLANNING, Prompt.PLANNING_SHORT -> {
+            // A day off needs no tasks: "Start my day" (then "Done") works without any.
+            var dayOff by remember { mutableStateOf(app.settings.schedule.rangesFor(date).isEmpty()) }
+            HoursCheckCard(app, date, onSaved = { dayOff = it.isEmpty() })
+            PrioritiesCard(app, date, prompt == Prompt.PLANNING_SHORT, dayOff = dayOff, onDone = onDone)
+        }
         Prompt.MIDDAY -> MiddayCard(app, date, onDone)
         else -> EveningCard(app, date, onDone)
     }
 }
 
 @Composable
-internal fun PrioritiesCard(app: App, date: LocalDate, short: Boolean, onDone: () -> Unit) {
+internal fun PrioritiesCard(app: App, date: LocalDate, short: Boolean, dayOff: Boolean = false, onDone: () -> Unit) {
     val change = remember { app.checkins.get(date.minusDays(1), "evening")?.change.orEmpty() }
     val v by app.priorities.version.collectAsState()
     val any = remember(v) { app.priorities.items(date).isNotEmpty() }
@@ -76,7 +81,7 @@ internal fun PrioritiesCard(app: App, date: LocalDate, short: Boolean, onDone: (
         PlanList(app, date, editable = true)
         Button({
             app.checkins.save(Checkin(date, "planning", App.nowSec(), null, null, null, null, null, false)); onDone()
-        }, enabled = any) { Text(if (short) "Save plan" else "Start my day") }
+        }, enabled = any || dayOff) { Text(if (dayOff && !any) "Done" else if (short) "Save plan" else "Start my day") }
     }
 }
 
@@ -194,7 +199,7 @@ internal fun EveningCard(app: App, date: LocalDate, onDone: () -> Unit) {
  * Shortening asks for a reason and tells your partner, like any other change to work hours.
  */
 @Composable
-internal fun HoursCheckCard(app: App, date: LocalDate, startEditing: Boolean = false, onClose: (() -> Unit)? = null) {
+internal fun HoursCheckCard(app: App, date: LocalDate, startEditing: Boolean = false, onClose: (() -> Unit)? = null, onSaved: (List<dev.ontask.classify.TimeRange>) -> Unit = {}) {
     val fmt = java.time.format.DateTimeFormatter.ofLocalizedTime(java.time.format.FormatStyle.SHORT)
     fun clock(m: Int) = java.time.LocalTime.of((m / 60) % 24, m % 60).format(fmt)
     var ranges by remember { mutableStateOf(app.settings.schedule.rangesFor(date)) }
@@ -208,6 +213,7 @@ internal fun HoursCheckCard(app: App, date: LocalDate, startEditing: Boolean = f
         try {
             app.workHours.saveException(date, newRanges, reason.ifBlank { null }, App.nowSec())
             ranges = newRanges; mode = "done"; error = null
+            onSaved(newRanges)
             onClose?.invoke()
         } catch (e: dev.ontask.block.ReasonRequired) { error = "Say why: your partner is told when work hours get shorter." }
     }
