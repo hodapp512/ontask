@@ -59,6 +59,18 @@ fun main() {
     val showWindow = !login.managed || app.prefs.bool("startup.show_window", false)
     app.prefs.set("startup.show_window", null)
     app.start()
+    // Crash loop guard: a stop counts unless the interface stayed up 10 minutes since.
+    val guard = CrashGuard(app.dir.resolve("crashes.txt"))
+    val errorsLog = app.dir.resolve("errors.log")
+    /** The interface stopped: the exit code that relaunches OnTask, or 0 (and an alert) when it keeps stopping. */
+    fun stoppedExitCode(): Int {
+        if (!login.managed) return 1
+        if (!guard.record(System.currentTimeMillis() / 1000)) return dev.ontask.block.LoginItem.QUIT_REOPEN
+        System.err.println("${java.time.LocalDateTime.now()} stopped 3 times in 10 minutes; not restarting")
+        CrashGuard.tellUser(errorsLog)
+        return 0
+    }
+    Thread { Thread.sleep(600_000); guard.clear() }.apply { isDaemon = true; name = "crash-guard" }.start()
     // However OnTask is quit (menu bar, Cmd-Q, Dock), a non-zero exit code makes launchd bring it back when "reopen" is on.
     fun exitCode() = if (login.managed && app.prefs.bool("startup.reopen", false)) dev.ontask.block.LoginItem.QUIT_REOPEN else 0
     runCatching {
@@ -77,7 +89,7 @@ fun main() {
             Thread.sleep(30_000)
             if (!mainThread.isAlive) {
                 System.err.println("${java.time.LocalDateTime.now()} the interface ended but OnTask was still running; restarting")
-                Runtime.getRuntime().halt(if (login.managed) dev.ontask.block.LoginItem.QUIT_REOPEN else 1)
+                Runtime.getRuntime().halt(stoppedExitCode())
             }
         }
     }.apply { isDaemon = true; name = "ui-watchdog" }.start()
@@ -118,7 +130,7 @@ fun main() {
     } } catch (t: Throwable) {
         System.err.println("${java.time.LocalDateTime.now()} the interface stopped:"); t.printStackTrace()
         runCatching { app.shutdown() }
-        kotlin.system.exitProcess(if (login.managed) dev.ontask.block.LoginItem.QUIT_REOPEN else 1)
+        kotlin.system.exitProcess(stoppedExitCode())
     }
     app.shutdown()
     kotlin.system.exitProcess(exitCode())

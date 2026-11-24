@@ -833,3 +833,11 @@ when it comes to the front.*
   show ("LocalHostDefaultProvider not present"), so the interface stopped, the app relaunched and asked again.
 - **The question is now a small window like every other pop-up** (BatteryAskWindow, FitHeight). Pop-ups that live
   outside the main window must always be their own Window.
+
+## 2026-11-24 · A crash loop stops after 3 tries
+
+- **Why:** when the interface stops, OnTask exits with 75 so launchd restarts it. A crash on every start (the battery
+  question, 2026-11-22) became 2,400 relaunches over two days: the main window flashed and quit, and nothing said why.
+- **The 3rd stop within 10 minutes exits with 0 instead** (launchd doesn't restart that), after a macOS alert:
+  "OnTask keeps stopping… Open OnTask to try again", with "Show error log". Stops are kept in crashes.txt across
+  relaunches (CrashGuard); 10 minutes up clears them. Opening OnTask by hand starts it again.
