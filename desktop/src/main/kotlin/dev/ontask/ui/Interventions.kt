@@ -67,14 +67,28 @@ fun AppOverlays(app: App) {
     prompt?.let { PromptWindow(app, it, mode) }
     val helperPrompt by app.helperPrompt.collectAsState()
     if (helperPrompt) BlockingHelperPromptWindow(app, mode)
-    if (battery) OnTaskTheme(mode) {
-        AlertDialog(
-            onDismissRequest = { app.answerBattery(false) },
-            title = { Text("Battery is at 20%") },
-            text = { Text("Reading on-screen text with an AI model uses extra power. Switch to metadata-only (app names and sites) until you plug in?") },
-            confirmButton = { Button({ app.answerBattery(true) }) { Text("Switch to metadata-only") } },
-            dismissButton = { TextButton({ app.answerBattery(false) }) { Text("Keep going") } },
-        )
+    if (battery) BatteryAskWindow(app, mode)
+}
+
+/**
+ * "Battery is at 20%": its own window like every other pop-up. (As a bare AlertDialog outside any window it crashed
+ * the interface, and every relaunch asked again and crashed again until the Mac was plugged in.)
+ */
+@Composable
+internal fun BatteryAskWindow(app: App, mode: ThemeMode) {
+    val size = DpSize(480.dp, 220.dp)
+    val state = rememberWindowState(size = size, position = centeredOnActiveScreen(size))
+    Window(onCloseRequest = { app.answerBattery(false) }, title = "OnTask", alwaysOnTop = true, resizable = true, state = state) {
+        OnTaskTheme(mode) { Surface(Modifier.fillMaxSize()) { FitHeight(state, 480.dp) {
+            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Battery is at 20%", style = MaterialTheme.typography.titleLarge)
+                Text("Reading on-screen text with an AI model uses extra power. Switch to metadata-only (app names and sites) until you plug in?", style = MaterialTheme.typography.bodyMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button({ app.answerBattery(true) }) { Text("Switch to metadata-only") }
+                    TextButton({ app.answerBattery(false) }) { Text("Keep going") }
+                }
+            }
+        } } }
     }
 }
 

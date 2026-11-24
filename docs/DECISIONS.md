@@ -825,3 +825,11 @@ when it comes to the front.*
 - **Default lowered to 50%** on the Mac and for the phone (the server's `judgeSeen`).
 - **Settings → AI labeling → "How sure it must be": 40, 50, 60, 70 or 80%.** Mac only; the phone's server cutoff
   stays at 50%.
+
+## 2026-11-24 · "Battery is at 20%" is its own window
+
+- **Why:** from 2026-11-22 OnTask crashed on every launch while the battery was under 20% (2,400+ relaunches, the
+  main window flashing each time). The question was a bare AlertDialog outside any window, which Compose can't
+  show ("LocalHostDefaultProvider not present"), so the interface stopped, the app relaunched and asked again.
+- **The question is now a small window like every other pop-up** (BatteryAskWindow, FitHeight). Pop-ups that live
+  outside the main window must always be their own Window.

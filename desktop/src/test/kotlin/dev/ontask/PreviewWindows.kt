@@ -32,6 +32,7 @@ fun main(args: Array<String>) {
             "unblock" -> dev.ontask.ui.UnblockPickerWindow(app, listOf("usatoday.com"), startSite = "usatoday.com") {}
             "unblockwork" -> dev.ontask.ui.UnblockPickerWindow(app, listOf("usatoday.com"), startSite = "usatoday.com", startForWork = true) {}
             "unblockno" -> dev.ontask.ui.UnblockPickerWindow(app, listOf("usatoday.com"), startSite = "usatoday.com", startForWork = false) {}
+            "battery" -> dev.ontask.ui.BatteryAskWindow(app, dev.ontask.ui.ThemeMode.SYSTEM)
             else -> InterventionWindow(app, iv, ThemeMode.LIGHT)
         }
     }
